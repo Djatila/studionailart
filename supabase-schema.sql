@@ -87,7 +87,8 @@ ALTER TABLE public.availability ENABLE ROW LEVEL SECURITY;
 
 -- Create policies (basic policies - you may want to customize these)
 -- Allow designers to read/write their own data
-CREATE POLICY "Designers can view own profile" ON public.nail_designers FOR SELECT USING (auth.uid()::text = id::text);
+CREATE POLICY "Anyone can create designer account" ON public.nail_designers FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can view designer profiles" ON public.nail_designers FOR SELECT USING (true);
 CREATE POLICY "Designers can update own profile" ON public.nail_designers FOR UPDATE USING (auth.uid()::text = id::text);
 
 CREATE POLICY "Designers can manage own services" ON public.services FOR ALL USING (auth.uid()::text = designer_id::text);

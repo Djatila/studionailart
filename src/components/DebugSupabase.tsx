@@ -81,28 +81,33 @@ const DebugSupabase: React.FC = () => {
       position: 'fixed', 
       top: '10px', 
       right: '10px', 
-      zIndex: 9999,
-      backgroundColor: 'white',
-      border: '2px solid #ccc',
-      borderRadius: '8px',
-      padding: '10px',
-      maxWidth: '400px',
-      maxHeight: '500px',
+      zIndex: 99999,
+      backgroundColor: '#ff6b6b',
+      color: 'white',
+      border: '3px solid #ff4757',
+      borderRadius: '12px',
+      padding: '15px',
+      maxWidth: '450px',
+      maxHeight: '600px',
       overflow: 'auto',
-      fontSize: '12px',
-      fontFamily: 'monospace'
+      fontSize: '14px',
+      fontFamily: 'Arial, sans-serif',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
     }}>
       <button 
         onClick={runDebugTest}
         disabled={isLoading}
         style={{
-          backgroundColor: '#007bff',
-          color: 'white',
-          border: 'none',
-          padding: '8px 16px',
-          borderRadius: '4px',
+          backgroundColor: '#ffffff',
+          color: '#ff4757',
+          border: '2px solid #ffffff',
+          padding: '12px 20px',
+          borderRadius: '8px',
           cursor: isLoading ? 'not-allowed' : 'pointer',
-          marginBottom: '10px'
+          marginBottom: '15px',
+          fontWeight: 'bold',
+          fontSize: '16px',
+          width: '100%'
         }}
       >
         {isLoading ? '🔄 Testando...' : '🔍 Debug Supabase'}

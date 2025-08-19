@@ -44,6 +44,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [designers, setDesigners] = useState<NailDesigner[]>([]);
+  const [loadingDesigners, setLoadingDesigners] = useState(true);
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -54,9 +56,51 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   }, [loggedClient]);
 
-  const getDesigners = (): NailDesigner[] => {
-    const saved = localStorage.getItem('nail_designers');
-    return saved ? JSON.parse(saved) : [];
+  useEffect(() => {
+    // Carregar designers quando o componente for montado
+    const loadDesigners = async () => {
+      setLoadingDesigners(true);
+      try {
+        const designersList = await getDesigners();
+        setDesigners(designersList);
+      } catch (error) {
+        console.error('Erro ao carregar designers:', error);
+      } finally {
+        setLoadingDesigners(false);
+      }
+    };
+    
+    loadDesigners();
+  }, []);
+
+  const getDesigners = async (): Promise<NailDesigner[]> => {
+    try {
+      // Buscar do Supabase
+      const { getNailDesigners } = await import('../utils/supabaseUtils');
+      const supabaseDesigners = await getNailDesigners();
+      
+      // Buscar do localStorage
+      const saved = localStorage.getItem('nail_designers');
+      const localDesigners = saved ? JSON.parse(saved) : [];
+      
+      // Combinar e remover duplicatas, priorizando Supabase
+      const allDesigners = [...supabaseDesigners];
+      
+      localDesigners.forEach((localDesigner: NailDesigner) => {
+        if (!allDesigners.find(d => d.id === localDesigner.id)) {
+          allDesigners.push(localDesigner);
+        }
+      });
+      
+      // Filtrar apenas designers ativos
+      return allDesigners.filter(d => d.isActive);
+    } catch (error) {
+      console.error('Erro ao buscar designers:', error);
+      // Fallback para localStorage
+      const saved = localStorage.getItem('nail_designers');
+      const localDesigners = saved ? JSON.parse(saved) : [];
+      return localDesigners.filter((d: NailDesigner) => d.isActive);
+    }
   };
 
   const getServices = (): Service[] => {
@@ -472,7 +516,18 @@ Aguardo confirmação!`;
                     <h3 className="text-lg font-semibold text-white">1. Escolha sua Nail Designer</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {getDesigners().map((designer) => (
+                    {loadingDesigners ? (
+                      <div className="col-span-full text-center text-white py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                        Carregando designers...
+                      </div>
+                    ) : designers.length === 0 ? (
+                      <div className="col-span-full text-center text-white py-8">
+                        <p>Nenhuma nail designer encontrada.</p>
+                        <p className="text-sm text-white/70 mt-2">Verifique se há designers cadastradas no sistema.</p>
+                      </div>
+                    ) : (
+                      designers.map((designer) => (
                       <button
                         key={designer.id}
                         onClick={() => {
@@ -496,7 +551,8 @@ Aguardo confirmação!`;
                           Clique para ver os serviços disponíveis
                         </p>
                       </button>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}

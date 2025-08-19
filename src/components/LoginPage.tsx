@@ -215,17 +215,34 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
   const getClients = async () => {
     try {
+      // Buscar clientes do Supabase
       const designers = await getNailDesigners();
-      // Filtrar apenas clientes (designers com isClient = true)
-      return designers.filter(d => d.email?.includes('client-') || d.id?.includes('client-'));
+      const supabaseClients = designers.filter(d => d.email?.includes('client-') || d.id?.includes('client-'));
+      
+      // Buscar clientes do localStorage
+      const localClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
+      
+      // Combinar e remover duplicatas (priorizar Supabase)
+      const allClients = [...supabaseClients];
+      
+      localClients.forEach((localClient: any) => {
+        const existsInSupabase = supabaseClients.some(sc => sc.phone === localClient.phone);
+        if (!existsInSupabase) {
+          allClients.push(localClient);
+        }
+      });
+      
+      return allClients;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      return [];
+      // Se falhar o Supabase, retornar apenas do localStorage
+      return JSON.parse(localStorage.getItem('registered_clients') || '[]');
     }
   };
 
   const saveClient = async (client: any) => {
     try {
+      // Salvar no Supabase
       const existingClient = await getNailDesignerByPhone(client.phone);
       
       if (existingClient) {
@@ -235,6 +252,28 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         // Criar novo cliente
         await createNailDesigner(client);
       }
+      
+      // Também salvar no localStorage para compatibilidade
+      const registeredClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
+      const existingIndex = registeredClients.findIndex((c: any) => c.phone === client.phone);
+      
+      const clientData = {
+        id: client.id,
+        name: client.name,
+        phone: client.phone,
+        email: client.email,
+        password: client.password,
+        createdAt: client.createdAt
+      };
+      
+      if (existingIndex >= 0) {
+        registeredClients[existingIndex] = clientData;
+      } else {
+        registeredClients.push(clientData);
+      }
+      
+      localStorage.setItem('registered_clients', JSON.stringify(registeredClients));
+      
       return true;
     } catch (error) {
       console.error('Erro ao salvar cliente:', error);

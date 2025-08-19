@@ -384,25 +384,89 @@ export const availabilityService = {
 }
 
 // Legacy function exports for backward compatibility
-export const getNailDesigners = () => designerService.getAll();
-export const createNailDesigner = (designer: Database['public']['Tables']['nail_designers']['Insert']) => designerService.create(designer);
-export const updateNailDesigner = (id: string, updates: Database['public']['Tables']['nail_designers']['Update']) => designerService.update(id, updates);
+export const getNailDesigners = async () => {
+  const designers = await designerService.getAll();
+  // Converter de snake_case (Supabase) para camelCase (App)
+  return designers.map(designer => ({
+    id: designer.id,
+    name: designer.name,
+    email: designer.email,
+    password: designer.password,
+    phone: designer.phone,
+    pixKey: designer.pix_key,
+    isActive: designer.is_active,
+    createdAt: designer.created_at
+  }));
+};
+export const createNailDesigner = async (designer: any) => {
+  // Converter de camelCase (App) para snake_case (Supabase)
+  const supabaseDesigner: Database['public']['Tables']['nail_designers']['Insert'] = {
+    id: designer.id,
+    name: designer.name,
+    email: designer.email,
+    password: designer.password,
+    phone: designer.phone,
+    pix_key: designer.pixKey || null,
+    is_active: designer.isActive ?? true
+  };
+  
+  return designerService.create(supabaseDesigner);
+};
+export const updateNailDesigner = async (id: string, updates: any) => {
+  // Converter de camelCase (App) para snake_case (Supabase)
+  const supabaseUpdates: Database['public']['Tables']['nail_designers']['Update'] = {};
+  
+  if (updates.name !== undefined) supabaseUpdates.name = updates.name;
+  if (updates.email !== undefined) supabaseUpdates.email = updates.email;
+  if (updates.password !== undefined) supabaseUpdates.password = updates.password;
+  if (updates.phone !== undefined) supabaseUpdates.phone = updates.phone;
+  if (updates.pixKey !== undefined) supabaseUpdates.pix_key = updates.pixKey;
+  if (updates.isActive !== undefined) supabaseUpdates.is_active = updates.isActive;
+  
+  return designerService.update(id, supabaseUpdates);
+};
 export const deleteNailDesigner = (id: string) => designerService.delete(id);
 export const getNailDesignerByPhone = async (phone: string) => {
   const { data, error } = await supabase
     .from('nail_designers')
     .select('*')
     .eq('phone', phone)
-    .single()
-  
+    .single();
+
   if (error) {
-    console.error('Error fetching designer by phone:', error)
-    return null
+    console.error('Error fetching designer by phone:', error);
+    return null;
   }
-  
-  return data
+
+  // Converter de snake_case (Supabase) para camelCase (App)
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    phone: data.phone,
+    pixKey: data.pix_key,
+    isActive: data.is_active,
+    createdAt: data.created_at
+  };
 };
-export const getNailDesignerById = (id: string) => designerService.getById(id);
+
+export const getNailDesignerById = async (id: string) => {
+  const designer = await designerService.getById(id);
+  if (!designer) return null;
+  
+  // Converter de snake_case (Supabase) para camelCase (App)
+  return {
+    id: designer.id,
+    name: designer.name,
+    email: designer.email,
+    password: designer.password,
+    phone: designer.phone,
+    pixKey: designer.pix_key,
+    isActive: designer.is_active,
+    createdAt: designer.created_at
+  };
+};
 
 export const getAppointments = () => appointmentService.getAll();
 export const createAppointment = (appointment: Database['public']['Tables']['appointments']['Insert']) => appointmentService.create(appointment);

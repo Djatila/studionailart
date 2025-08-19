@@ -20,8 +20,12 @@ export interface NailDesigner {
   email: string;
   password: string;
   isActive: boolean;
+  is_active?: boolean; // Campo do Supabase (snake_case)
   createdAt: string;
+  created_at?: string; // Campo do Supabase (snake_case)
+  updated_at?: string; // Campo do Supabase (snake_case)
   pixKey?: string;
+  pix_key?: string; // Campo do Supabase (snake_case)
 }
 
 export interface Service {

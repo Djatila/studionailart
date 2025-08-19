@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Designers</title>
+</head>
+<body>
+    <h1>Debug Designers</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        // Verificar localStorage
+        const localDesigners = localStorage.getItem('nail_designers');
+        console.log('localStorage nail_designers:', localDesigners);
+        
+        // Verificar se há dados no Supabase
+        try {
+            const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js');
+            
+            // Usar as mesmas variáveis de ambiente do projeto
+            const supabaseUrl = 'https://rnqvqjqzjxqjqzjxqjqz.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJucXZxanF6anhxanF6anhxanF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1NzQ0MDAsImV4cCI6MjA1MTE1MDQwMH0.example';
+            
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            
+            const { data, error } = await supabase
+                .from('nail_designers')
+                .select('*');
+                
+            console.log('Supabase designers:', data);
+            console.log('Supabase error:', error);
+            
+            document.getElementById('results').innerHTML = `
+                <h2>localStorage:</h2>
+                <pre>${JSON.stringify(JSON.parse(localDesigners || '[]'), null, 2)}</pre>
+                <h2>Supabase:</h2>
+                <pre>${JSON.stringify(data || [], null, 2)}</pre>
+                <h2>Error:</h2>
+                <pre>${JSON.stringify(error, null, 2)}</pre>
+            `;
+        } catch (err) {
+            console.error('Erro ao conectar com Supabase:', err);
+            document.getElementById('results').innerHTML = `
+                <h2>localStorage:</h2>
+                <pre>${JSON.stringify(JSON.parse(localDesigners || '[]'), null, 2)}</pre>
+                <h2>Erro Supabase:</h2>
+                <pre>${err.message}</pre>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -92,14 +92,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         }
       });
       
-      // Filtrar apenas designers ativos
-      return allDesigners.filter(d => d.isActive);
+      // Filtrar apenas designers ativos (verificar ambos os formatos de campo)
+      const activeDesigners = allDesigners.filter(d => d.isActive || d.is_active);
+      return activeDesigners;
     } catch (error) {
       console.error('Erro ao buscar designers:', error);
       // Fallback para localStorage
       const saved = localStorage.getItem('nail_designers');
       const localDesigners = saved ? JSON.parse(saved) : [];
-      return localDesigners.filter((d: NailDesigner) => d.isActive);
+      return localDesigners.filter((d: NailDesigner) => d.isActive || d.is_active);
     }
   };
 

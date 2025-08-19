@@ -90,6 +90,7 @@ ALTER TABLE public.availability ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can create designer account" ON public.nail_designers FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anyone can view designer profiles" ON public.nail_designers FOR SELECT USING (true);
 CREATE POLICY "Designers can update own profile" ON public.nail_designers FOR UPDATE USING (auth.uid()::text = id::text);
+CREATE POLICY "Allow delete designer accounts" ON public.nail_designers FOR DELETE USING (true);
 
 CREATE POLICY "Designers can manage own services" ON public.services FOR ALL USING (auth.uid()::text = designer_id::text);
 CREATE POLICY "Anyone can view services" ON public.services FOR SELECT USING (true);

@@ -1,0 +1,609 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, User, Phone, MapPin, ArrowLeft, History, CalendarDays, Plus, X, Settings, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { NailDesigner } from '../App';
+
+interface Appointment {
+  id: string;
+  designerId: string;
+  clientName: string;
+  clientPhone: string;
+  service: string;
+  date: string;
+  time: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  price: number;
+  createdAt: string;
+}
+
+interface ClientDashboardProps {
+  client: NailDesigner;
+  onBack: () => void;
+  onBookService?: () => void;
+}
+
+export default function ClientDashboard({ client, onBack, onBookService }: ClientDashboardProps) {
+  const [currentView, setCurrentView] = useState<'current' | 'history' | 'profile'>('current');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [showBookingWarning, setShowBookingWarning] = useState(false);
+  const [designers, setDesigners] = useState<NailDesigner[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: client.name,
+    email: client.email || '',
+    phone: client.phone,
+    password: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, [client.phone]);
+
+  const loadData = () => {
+    // Carregar agendamentos do cliente
+    const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+    const clientAppointments = allAppointments.filter((apt: Appointment) => 
+      apt.clientPhone === client.phone
+    );
+    setAppointments(clientAppointments);
+
+    // Carregar designers
+    const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+    setDesigners(savedDesigners);
+  };
+
+  const getDesignerName = (designerId: string) => {
+    const designer = designers.find(d => d.id === designerId);
+    return designer ? designer.name : 'Designer não encontrada';
+  };
+
+  const getCurrentMonthAppointments = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    
+    return appointments.filter(apt => {
+      const aptDate = new Date(apt.date);
+      return aptDate >= now && (apt.status === 'confirmed' || apt.status === 'pending');
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const getHistoryAppointments = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    return appointments.filter(apt => {
+      const aptDate = new Date(apt.date);
+      return (aptDate.getMonth() !== currentMonth || aptDate.getFullYear() !== currentYear) ||
+             apt.status === 'completed' || apt.status === 'cancelled';
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pendente';
+      case 'confirmed': return 'Confirmado';
+      case 'completed': return 'Concluído';
+      case 'cancelled': return 'Cancelado';
+      default: return status;
+    }
+  };
+
+  const handleSaveProfile = () => {
+    try {
+      // Atualizar dados no localStorage
+      const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+      const updatedDesigners = savedDesigners.map((designer: NailDesigner) => {
+        if (designer.id === client.id) {
+          return {
+            ...designer,
+            name: profileData.name,
+            email: profileData.email,
+            phone: profileData.phone,
+            ...(profileData.password && { password: profileData.password })
+          };
+        }
+        return designer;
+      });
+      
+      localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
+      
+      // Atualizar agendamentos com novo telefone se mudou
+      if (profileData.phone !== client.phone) {
+        const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+        const updatedAppointments = allAppointments.map((apt: Appointment) => {
+          if (apt.clientPhone === client.phone) {
+            return { ...apt, clientPhone: profileData.phone, clientName: profileData.name };
+          }
+          return apt;
+        });
+        localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+      }
+      
+      setIsEditing(false);
+      setSaveMessage('Dados salvos com sucesso!');
+      setTimeout(() => setSaveMessage(''), 3000);
+      
+      // Recarregar dados
+      loadData();
+    } catch (error) {
+      setSaveMessage('Erro ao salvar dados. Tente novamente.');
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
+
+  const handleCancelEdit = () => {
+     setProfileData({
+       name: client.name,
+       email: client.email || '',
+       phone: client.phone,
+       password: ''
+     });
+     setIsEditing(false);
+   };
+
+  const handleCancelAppointment = (appointmentId: string) => {
+    setAppointmentToCancel(appointmentId);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancelAppointment = () => {
+    if (!appointmentToCancel) return;
+    
+    try {
+      const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+      const updatedAppointments = allAppointments.map((apt: Appointment) => {
+        if (apt.id === appointmentToCancel) {
+          return { ...apt, status: 'cancelled' as const };
+        }
+        return apt;
+      });
+      
+      localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+      loadData();
+      setShowCancelModal(false);
+      setAppointmentToCancel(null);
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+    }
+  };
+
+  const closeCancelModal = () => {
+    setShowCancelModal(false);
+    setAppointmentToCancel(null);
+  };
+
+  const currentMonthAppointments = getCurrentMonthAppointments();
+  const historyAppointments = getHistoryAppointments();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-white hover:text-pink-200 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Voltar
+            </button>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-white">Olá, {client.name}!</h1>
+              <p className="text-purple-200 text-sm">Bem-vinda ao seu painel</p>
+            </div>
+            <div className="w-16"></div>
+          </div>
+          
+          <div className="flex items-center gap-3 text-purple-100">
+            <Phone className="w-5 h-5" />
+            <span>{client.phone}</span>
+          </div>
+        </div>
+
+        {/* Quick Action Button */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowBookingWarning(true)}
+            className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl p-4 font-semibold text-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
+          >
+            <Plus className="w-6 h-6" />
+            Agendar Novo Serviço
+          </button>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-2 mb-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentView('current')}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
+                currentView === 'current'
+                  ? 'bg-white/20 text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <CalendarDays className="w-5 h-5" />
+              Próximos ({currentMonthAppointments.length})
+            </button>
+            <button
+              onClick={() => setCurrentView('history')}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
+                currentView === 'history'
+                  ? 'bg-white/20 text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <History className="w-5 h-5" />
+              Histórico ({historyAppointments.length})
+            </button>
+            <button
+              onClick={() => setCurrentView('profile')}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
+                currentView === 'profile'
+                  ? 'bg-white/20 text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              Perfil
+            </button>
+          </div>
+        </div>
+
+        {/* Appointments List */}
+        <div className="space-y-4">
+          {currentView === 'current' && (
+            <>
+              {currentMonthAppointments.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8 text-center">
+                  <CalendarDays className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Nenhum agendamento futuro</h3>
+                  <p className="text-purple-200 mb-4">Você não possui agendamentos futuros confirmados.</p>
+                  <button
+                    onClick={() => setShowBookingWarning(true)}
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center gap-2 mx-auto"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Fazer Primeiro Agendamento
+                  </button>
+                </div>
+              ) : (
+                currentMonthAppointments.map((appointment) => (
+                  <div key={appointment.id} className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-white mb-1">{appointment.service}</h3>
+                        <div className="flex items-center gap-2 text-purple-200 mb-2">
+                          <User className="w-4 h-4" />
+                          <span>{getDesignerName(appointment.designerId)}</span>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-purple-100 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-sm">{formatDate(appointment.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm">{appointment.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-green-300">R$ {appointment.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    {(appointment.status === 'confirmed' || appointment.status === 'pending') && (
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => handleCancelAppointment(appointment.id)}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 border border-red-500/30"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Cancelar Agendamento
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {currentView === 'history' && (
+            <>
+              {historyAppointments.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8 text-center">
+                  <History className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Nenhum histórico</h3>
+                  <p className="text-purple-200">Você ainda não possui histórico de agendamentos.</p>
+                </div>
+              ) : (
+                historyAppointments.map((appointment) => (
+                  <div key={appointment.id} className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-white mb-1">{appointment.service}</h3>
+                        <div className="flex items-center gap-2 text-purple-200 mb-2">
+                          <User className="w-4 h-4" />
+                          <span>{getDesignerName(appointment.designerId)}</span>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-purple-100">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-sm">{formatDate(appointment.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm">{appointment.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-green-300">R$ {appointment.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {currentView === 'profile' && (
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Settings className="w-6 h-6" />
+                  Meus Dados
+                </h3>
+                {!isEditing && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Editar
+                  </button>
+                )}
+              </div>
+
+              {saveMessage && (
+                <div className={`mb-4 p-3 rounded-xl text-center font-semibold ${
+                  saveMessage.includes('sucesso') 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {saveMessage}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="block text-purple-200 text-sm font-semibold mb-2">
+                    Nome Completo
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="Digite seu nome completo"
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
+                      {client.name}
+                    </div>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-purple-200 text-sm font-semibold mb-2">
+                    Email
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="Digite seu email"
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
+                      {client.email || 'Não informado'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Telefone */}
+                <div>
+                  <label className="block text-purple-200 text-sm font-semibold mb-2">
+                    Telefone
+                  </label>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="Digite seu telefone"
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
+                      {client.phone}
+                    </div>
+                  )}
+                </div>
+
+                {/* Senha */}
+                {isEditing && (
+                  <div>
+                    <label className="block text-purple-200 text-sm font-semibold mb-2">
+                      Nova Senha (deixe em branco para manter a atual)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={profileData.password}
+                        onChange={(e) => setProfileData({...profileData, password: e.target.value})}
+                        className="w-full p-3 pr-12 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Digite uma nova senha"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Botões de Ação */}
+                {isEditing && (
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={handleSaveProfile}
+                      className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all"
+                    >
+                      Salvar Alterações
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Booking Warning Modal */}
+      {showBookingWarning && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/95 backdrop-blur-md rounded-3xl p-8 w-full max-w-md mx-auto shadow-2xl border border-white/30 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowBookingWarning(false)}
+              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Warning Content */}
+            <div className="text-center">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  ATENÇÃO LEIA ANTES DE AGENDAR!!! ✨🙏🏼
+                </h2>
+              </div>
+
+              <div className="text-left space-y-3 mb-8 text-gray-700 leading-relaxed">
+                <p className="font-medium">
+                  Olá! No nosso Studio agora você pode escolher com qual profissional você deseja fazer!
+                </p>
+                <p>
+                  Fica a vontade pra fazer seu agendamento com a Nail de sua preferência!
+                </p>
+                <p className="font-semibold text-pink-600">
+                  AGENDAMENTOS COM UMA SEMANA DE ANTECEDÊNCIA!
+                </p>
+                <p className="font-semibold text-pink-600">
+                  ATRASO DE TOLERÂNCIA 10 MINUTOS
+                </p>
+              </div>
+
+              {/* Concordo Button */}
+              <button
+                onClick={() => {
+                  setShowBookingWarning(false);
+                  onBookService();
+                }}
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 hover:scale-105 shadow-lg"
+              >
+                Concordo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Cancelamento */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-purple-900/95 to-pink-900/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8 max-w-md w-full mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-400" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-white mb-2">Cancelar Agendamento</h3>
+              <p className="text-purple-200 mb-6">
+                Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={closeCancelModal}
+                  className="flex-1 bg-gray-500/20 hover:bg-gray-500/30 text-gray-300 hover:text-white px-6 py-3 rounded-xl font-semibold transition-all border border-gray-500/30"
+                >
+                  Manter Agendamento
+                </button>
+                <button
+                  onClick={confirmCancelAppointment}
+                  className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 px-6 py-3 rounded-xl font-semibold transition-all border border-red-500/30"
+                >
+                  Sim, Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+   );
+ };

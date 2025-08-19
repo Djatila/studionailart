@@ -107,6 +107,21 @@ export const designerService = {
 
 // Services CRUD Operations
 export const serviceService = {
+  // Get all services
+  async getAll(): Promise<Service[]> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching all services:', error)
+      return []
+    }
+    
+    return data || []
+  },
+
   // Get services by designer ID
   async getByDesignerId(designerId: string): Promise<Service[]> {
     const { data, error } = await supabase
@@ -174,6 +189,22 @@ export const serviceService = {
 
 // Appointments CRUD Operations
 export const appointmentService = {
+  // Get all appointments
+  async getAll(): Promise<Appointment[]> {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .order('date', { ascending: true })
+      .order('time', { ascending: true })
+    
+    if (error) {
+      console.error('Error fetching all appointments:', error)
+      return []
+    }
+    
+    return data || []
+  },
+
   // Get appointments by designer ID
   async getByDesignerId(designerId: string): Promise<Appointment[]> {
     const { data, error } = await supabase

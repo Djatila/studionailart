@@ -66,23 +66,28 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
 
   const saveService = async (service: Service) => {
     try {
-      // Converte para o formato do Supabase
-      const supabaseService = {
-        id: service.id,
-        designer_id: service.designerId,
-        name: service.name,
-        price: service.price,
-        duration: service.duration,
-        description: service.description,
-        category: service.category
-      };
-
       if (editingService) {
         // Atualiza no Supabase
-        await serviceService.update(editingService.id, supabaseService);
+        const updateData = {
+          designer_id: service.designerId,
+          name: service.name,
+          price: service.price,
+          duration: service.duration,
+          description: service.description,
+          category: service.category
+        };
+        await serviceService.update(editingService.id, updateData);
       } else {
-        // Cria no Supabase
-        await serviceService.create(supabaseService);
+        // Cria no Supabase (sem ID, deixa o Supabase gerar)
+        const createData = {
+          designer_id: service.designerId,
+          name: service.name,
+          price: service.price,
+          duration: service.duration,
+          description: service.description,
+          category: service.category
+        };
+        await serviceService.create(createData);
       }
 
       // Também salva no localStorage para compatibilidade

@@ -46,6 +46,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [isResetting, setIsResetting] = useState(false);
   const [designers, setDesigners] = useState<NailDesigner[]>([]);
   const [loadingDesigners, setLoadingDesigners] = useState(true);
+  const [services, setServices] = useState<Service[]>([]);
+  const [availability, setAvailability] = useState<any[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -72,6 +76,42 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     
     loadDesigners();
   }, []);
+
+  // Carregar serviços e disponibilidade quando designer for selecionado
+  useEffect(() => {
+    if (selectedDesigner) {
+      const loadDesignerData = async () => {
+        // Carregar serviços
+        setLoadingServices(true);
+        try {
+          const designerServices = await getServices();
+          setServices(designerServices);
+        } catch (error) {
+          console.error('Erro ao carregar serviços:', error);
+          setServices([]);
+        } finally {
+          setLoadingServices(false);
+        }
+
+        // Carregar disponibilidade
+        setLoadingAvailability(true);
+        try {
+          const designerAvailability = await getDesignerAvailability();
+          setAvailability(designerAvailability);
+        } catch (error) {
+          console.error('Erro ao carregar disponibilidade:', error);
+          setAvailability([]);
+        } finally {
+          setLoadingAvailability(false);
+        }
+      };
+
+      loadDesignerData();
+    } else {
+      setServices([]);
+      setAvailability([]);
+    }
+  }, [selectedDesigner]);
 
   const getDesigners = async (): Promise<NailDesigner[]> => {
     try {
@@ -104,11 +144,37 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
-  const getServices = (): Service[] => {
+  const getServices = async (): Promise<Service[]> => {
     if (!selectedDesigner) return [];
-    const saved = localStorage.getItem('nail_services');
-    const allServices = saved ? JSON.parse(saved) : [];
-    return allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+    try {
+      // Buscar do Supabase
+      const { serviceService } = await import('../utils/supabaseUtils');
+      const supabaseServices = await serviceService.getByDesignerId(selectedDesigner.id);
+      
+      // Mapear campos do Supabase para o formato esperado
+      const mappedServices = supabaseServices.map(service => ({
+        id: service.id,
+        name: service.name,
+        duration: service.duration,
+        price: service.price,
+        designerId: service.designer_id
+      }));
+      
+      if (mappedServices.length > 0) {
+        return mappedServices;
+      }
+      
+      // Fallback para localStorage se não houver dados no Supabase
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      return allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+    } catch (error) {
+      console.error('Erro ao buscar serviços:', error);
+      // Fallback para localStorage em caso de erro
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      return allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+    }
   };
 
   const getAppointments = (): Appointment[] => {
@@ -119,18 +185,50 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   };
 
   // Get designer's availability settings
-  const getDesignerAvailability = () => {
+  const getDesignerAvailability = async () => {
     if (!selectedDesigner) return [];
-    const saved = localStorage.getItem('nail_availability');
-    const allAvailability = saved ? JSON.parse(saved) : [];
-    return allAvailability.filter((avail: any) => 
-      avail.designerId === selectedDesigner.id && avail.isActive
-    );
+    try {
+      // Buscar do Supabase
+      const { availabilityService } = await import('../utils/supabaseUtils');
+      const supabaseAvailability = await availabilityService.getByDesignerId(selectedDesigner.id);
+      
+      // Mapear campos do Supabase para o formato esperado
+      const mappedAvailability = supabaseAvailability
+        .filter(avail => avail.is_active)
+        .map(avail => ({
+          id: avail.id,
+          designerId: avail.designer_id,
+          dayOfWeek: avail.day_of_week,
+          startTime: avail.start_time,
+          endTime: avail.end_time,
+          isActive: avail.is_active,
+          specificDate: avail.specific_date
+        }));
+      
+      if (mappedAvailability.length > 0) {
+        return mappedAvailability;
+      }
+      
+      // Fallback para localStorage se não houver dados no Supabase
+      const saved = localStorage.getItem('nail_availability');
+      const allAvailability = saved ? JSON.parse(saved) : [];
+      return allAvailability.filter((avail: any) => 
+        avail.designerId === selectedDesigner.id && avail.isActive
+      );
+    } catch (error) {
+      console.error('Erro ao buscar disponibilidade:', error);
+      // Fallback para localStorage em caso de erro
+      const saved = localStorage.getItem('nail_availability');
+      const allAvailability = saved ? JSON.parse(saved) : [];
+      return allAvailability.filter((avail: any) => 
+        avail.designerId === selectedDesigner.id && avail.isActive
+      );
+    }
   };
 
   // Check if a specific date is available
-  const isDateAvailable = (date: string) => {
-    const availability = getDesignerAvailability();
+  const isDateAvailable = async (date: string) => {
+    const availability = await getDesignerAvailability();
     if (availability.length === 0) return false; // No availability configured
     return availability.some((avail: any) => avail.specificDate === date);
   };
@@ -277,7 +375,7 @@ Aguardo confirmação!`;
     return encodeURIComponent(message);
   };
 
-  const services = getServices();
+
 
   if (showConfirmation) {
     return (
@@ -575,20 +673,33 @@ Aguardo confirmação!`;
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {getServices().map((service) => (
-                      <button
-                        key={service.id}
-                        onClick={() => {
-                          setSelectedService(service);
-                          setStep(3);
-                        }}
-                        className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105"
-                      >
-                        <h4 className="font-semibold text-white mb-2">{service.name}</h4>
-                        <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
-                        <p className="text-pink-400 font-bold text-lg">R$ {service.price.toFixed(2)}</p>
-                      </button>
-                    ))}
+                    {loadingServices ? (
+                      <div className="col-span-full flex items-center justify-center py-8">
+                        <div className="text-white/70 text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/70 mx-auto mb-2"></div>
+                          <p>Carregando serviços...</p>
+                        </div>
+                      </div>
+                    ) : services.length === 0 ? (
+                      <div className="col-span-full text-center py-8">
+                        <p className="text-white/70">Nenhum serviço disponível para esta designer.</p>
+                      </div>
+                    ) : (
+                      services.map((service) => (
+                        <button
+                          key={service.id}
+                          onClick={() => {
+                            setSelectedService(service);
+                            setStep(3);
+                          }}
+                          className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105"
+                        >
+                          <h4 className="font-semibold text-white mb-2">{service.name}</h4>
+                          <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
+                          <p className="text-pink-400 font-bold text-lg">R$ {service.price.toFixed(2)}</p>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -617,7 +728,7 @@ Aguardo confirmação!`;
                       value={selectedDate}
                       onChange={(e) => {
                         const selectedDateValue = e.target.value;
-                        if (selectedDateValue && !isDateAvailable(selectedDateValue)) {
+                        if (selectedDateValue && availability.length > 0 && !availability.some((avail: any) => avail.specificDate === selectedDateValue)) {
                           alert('Esta data não está disponível. A designer só liberou datas específicas para agendamento.');
                           return;
                         }
@@ -627,19 +738,25 @@ Aguardo confirmação!`;
                       min={new Date().toISOString().split('T')[0]}
                       className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                     />
-                    {getDesignerAvailability().length > 0 && (
+                    {loadingAvailability ? (
+                      <div className="mt-3 p-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
+                        <div className="flex items-center justify-center py-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white/70 mr-2"></div>
+                          <p className="text-white/70 text-sm">Carregando disponibilidade...</p>
+                        </div>
+                      </div>
+                    ) : availability.length > 0 ? (
                       <div className="mt-3 p-3 bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 rounded-xl">
                         <p className="text-blue-100 text-sm font-medium mb-2">📅 Datas Disponíveis:</p>
                         <div className="flex flex-wrap gap-2">
-                          {getDesignerAvailability().map((avail: any) => (
+                          {availability.map((avail: any) => (
                             <span key={avail.id} className="bg-blue-400/30 text-blue-100 px-2 py-1 rounded-lg text-xs">
                               {new Date(avail.specificDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </span>
                           ))}
                         </div>
                       </div>
-                    )}
-                    {getDesignerAvailability().length === 0 && (
+                    ) : (
                       <div className="mt-3 p-3 bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/30 rounded-xl">
                         <p className="text-yellow-100 text-sm">⚠️ Esta designer ainda não configurou datas disponíveis para agendamento.</p>
                       </div>

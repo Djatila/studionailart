@@ -6,7 +6,11 @@ import {
   createNailDesigner, 
   updateNailDesigner,
   getNailDesignerByPhone,
-  getNailDesignerById 
+  getNailDesignerById,
+  getClients,
+  getClientByPhone,
+  createClientRecord,
+  updateClient
 } from '../utils/supabaseUtils';
 
 interface LoginPageProps {
@@ -213,38 +217,11 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     }
   };
 
-  const getClients = async () => {
-    try {
-      // Buscar clientes do Supabase
-      const designers = await getNailDesigners();
-      const supabaseClients = designers.filter(d => d.email?.includes('client-') || d.id?.includes('client-'));
-      
-      // Buscar clientes do localStorage
-      const localClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
-      
-      // Combinar e remover duplicatas (priorizar Supabase)
-      const allClients = [...supabaseClients];
-      
-      localClients.forEach((localClient: any) => {
-        const existsInSupabase = supabaseClients.some(sc => sc.phone === localClient.phone);
-        if (!existsInSupabase) {
-          allClients.push(localClient);
-        }
-      });
-      
-      return allClients;
-    } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
-      // Se falhar o Supabase, retornar apenas do localStorage
-      return JSON.parse(localStorage.getItem('registered_clients') || '[]');
-    }
-  };
+  // Usar a função getClients do supabaseUtils que já combina Supabase + localStorage
+  // A função já está importada no topo do arquivo
 
   const saveClient = async (client: any) => {
     try {
-      // Import client functions
-      const { getClientByPhone, createClient, updateClient } = await import('../utils/supabaseUtils');
-      
       // Check if client already exists in Supabase
       const existingClient = await getClientByPhone(client.phone);
       
@@ -259,7 +236,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         });
       } else {
         // Create new client
-        savedClient = await createClient(client);
+        savedClient = await createClientRecord(client);
       }
       
       if (savedClient) {
@@ -341,7 +318,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
     try {
       // Verificar se o telefone já está cadastrado
-      const existingClient = await getNailDesignerByPhone(clientRegisterData.phone);
+      const existingClient = await getClientByPhone(clientRegisterData.phone);
       
       if (existingClient) {
         setClientRegisterError('Este telefone já está cadastrado!');
@@ -410,7 +387,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
     try {
       // Verificar se o telefone existe no sistema
-      const existingClient = await getNailDesignerByPhone(recoveryPhone);
+      const existingClient = await getClientByPhone(recoveryPhone);
       
       if (!existingClient) {
         setRecoveryError('Este telefone não está cadastrado no sistema!');

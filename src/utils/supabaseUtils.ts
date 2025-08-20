@@ -641,9 +641,8 @@ export const updateClient = async (id: string, updates: any) => {
 };
 
 // New client management functions
-export const createClient = async (client: any) => {
+export const createClientRecord = async (client: any) => {
   const clientData = {
-    id: client.id || 'client-' + client.phone,
     name: client.name,
     email: client.email,
     password: client.password,

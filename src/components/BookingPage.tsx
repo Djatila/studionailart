@@ -330,7 +330,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
 
     const newAppointment: Appointment = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       designerId: selectedDesigner.id,
       clientName,
       clientPhone,

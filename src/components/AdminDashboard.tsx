@@ -201,7 +201,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       }
 
       // Save client
-      const clientId = existingClient?.id || Date.now().toString();
+      const clientId = existingClient?.id || crypto.randomUUID();
       const client: Client = {
         id: clientId,
         name: newClientData.name,

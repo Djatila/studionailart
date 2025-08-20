@@ -150,7 +150,7 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
     e.preventDefault();
     
     const service: Service = {
-      id: editingService?.id || Date.now().toString(),
+      id: editingService?.id || crypto.randomUUID(),
       designerId: designer.id,
       name: formData.name,
       price: parseFloat(formData.price),

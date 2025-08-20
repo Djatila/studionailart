@@ -10,7 +10,7 @@ const CreateTestDesigner: React.FC = () => {
     setResult('🔄 Criando designer de teste...');
     
     const testDesigner = {
-      id: 'test-designer-' + Date.now(),
+      id: crypto.randomUUID(),
       name: 'Maria Silva (Teste)',
       phone: '11999999999',
       email: 'maria.teste@nail.com',

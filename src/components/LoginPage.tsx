@@ -131,7 +131,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setLoading(true);
     
     const newDesigner: NailDesigner = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       name: formData.name,
       phone: formData.phone,
       email: formData.email,

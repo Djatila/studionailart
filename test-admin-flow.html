@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Fluxo AdminDashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { padding: 12px 24px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        button.success { background: #28a745; }
+        button.danger { background: #dc3545; }
+        .info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #007bff; }
+        .success { background: #d4edda; color: #155724; border-left-color: #28a745; }
+        .error { background: #f8d7da; color: #721c24; border-left-color: #dc3545; }
+        .warning { background: #fff3cd; color: #856404; border-left-color: #ffc107; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 12px; border: 1px solid #dee2e6; }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #dee2e6; border-radius: 5px; }
+        .step h3 { margin-top: 0; color: #495057; }
+        #logs { max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Completo do Fluxo AdminDashboard</h1>
+        
+        <div class="info">
+            <h3>📋 Informações do Sistema:</h3>
+            <p><strong>Designer Kika ID:</strong> c9dc57fc-f196-4cce-aca5-2a2ab189333c</p>
+            <p><strong>Designer Klicia ID:</strong> 1bc656c1-9f19-4f50-b40c-58a5be3fd599</p>
+            <p><strong>Agendamentos no DB:</strong> 5 (todos para Kika)</p>
+        </div>
+
+        <div class="step">
+            <h3>🔑 Passo 1: Configurar Designer</h3>
+            <button onclick="loginAsKika()">Login como Kika</button>
+            <button onclick="loginAsKlicia()">Login como Klicia</button>
+            <button onclick="checkCurrentDesigner()">Verificar Designer Atual</button>
+            <div id="designerStatus" class="info"></div>
+        </div>
+
+        <div class="step">
+            <h3>📊 Passo 2: Testar Função getSupabaseAppointments</h3>
+            <button onclick="testGetSupabaseAppointments()">Testar getSupabaseAppointments</button>
+            <div id="supabaseResult" class="info"></div>
+        </div>
+
+        <div class="step">
+            <h3>🎯 Passo 3: Simular loadAppointments do AdminDashboard</h3>
+            <button onclick="simulateLoadAppointments()">Simular loadAppointments</button>
+            <div id="loadResult" class="info"></div>
+        </div>
+
+        <div class="step">
+            <h3>🔍 Passo 4: Verificar Filtragem</h3>
+            <button onclick="testFiltering()">Testar Filtragem</button>
+            <div id="filterResult" class="info"></div>
+        </div>
+
+        <div class="step">
+            <h3>📋 Logs do Console</h3>
+            <button onclick="clearLogs()">Limpar Logs</button>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let currentDesigner = null;
+        
+        // Função para adicionar logs
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        // Função para mostrar resultado
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `info ${type}`;
+        }
+        
+        // Simular appointmentService.getAll()
+        async function getSupabaseAppointments() {
+            addLog('🔍 Chamando appointmentService.getAll()...');
+            
+            const { data, error } = await supabase
+                .from('appointments')
+                .select('*')
+                .order('date', { ascending: true })
+                .order('time', { ascending: true });
+            
+            if (error) {
+                addLog(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                return [];
+            }
+            
+            addLog(`📊 appointmentService.getAll() retornou: ${data?.length || 0} agendamentos`);
+            addLog(`📋 Dados: ${JSON.stringify(data, null, 2)}`);
+            return data || [];
+        }
+        
+        // Login functions
+        window.loginAsKika = function() {
+            currentDesigner = {
+                id: 'c9dc57fc-f196-4cce-aca5-2a2ab189333c',
+                name: 'Kika',
+                email: 'kika@studionailart.com',
+                phone: '(11) 99999-9999',
+                active: true
+            };
+            
+            localStorage.setItem('designer', JSON.stringify(currentDesigner));
+            showResult('designerStatus', `✅ Login realizado como ${currentDesigner.name} (ID: ${currentDesigner.id})`, 'success');
+            addLog(`🔑 Login realizado como ${currentDesigner.name}`);
+        };
+        
+        window.loginAsKlicia = function() {
+            currentDesigner = {
+                id: '1bc656c1-9f19-4f50-b40c-58a5be3fd599',
+                name: 'Klicia',
+                email: 'klicia@studionailart.com',
+                phone: '(11) 88888-8888',
+                active: true
+            };
+            
+            localStorage.setItem('designer', JSON.stringify(currentDesigner));
+            showResult('designerStatus', `✅ Login realizado como ${currentDesigner.name} (ID: ${currentDesigner.id})`, 'success');
+            addLog(`🔑 Login realizado como ${currentDesigner.name}`);
+        };
+        
+        window.checkCurrentDesigner = function() {
+            const designer = JSON.parse(localStorage.getItem('designer') || '{}');
+            currentDesigner = designer.id ? designer : null;
+            
+            if (currentDesigner) {
+                showResult('designerStatus', `👤 Designer atual: ${currentDesigner.name} (ID: ${currentDesigner.id})`, 'info');
+                addLog(`👤 Designer atual: ${currentDesigner.name}`);
+            } else {
+                showResult('designerStatus', '❌ Nenhum designer logado', 'error');
+                addLog('❌ Nenhum designer logado', 'error');
+            }
+        };
+        
+        window.testGetSupabaseAppointments = async function() {
+            try {
+                addLog('🧪 Testando getSupabaseAppointments...');
+                const data = await getSupabaseAppointments();
+                showResult('supabaseResult', `📊 Total de agendamentos: ${data.length}<br>📋 Dados: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+            } catch (error) {
+                addLog(`❌ Erro no teste: ${error.message}`, 'error');
+                showResult('supabaseResult', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.simulateLoadAppointments = async function() {
+            if (!currentDesigner) {
+                showResult('loadResult', '❌ Faça login primeiro!', 'error');
+                return;
+            }
+            
+            try {
+                addLog(`🔍 Simulando loadAppointments para designer: ${currentDesigner.id} (${currentDesigner.name})`);
+                const data = await getSupabaseAppointments();
+                addLog(`📊 Total de agendamentos do Supabase: ${data.length}`);
+                
+                // Filter by designer_id (Supabase field) or designerId (localStorage field)
+                const designerAppointments = data.filter((apt) => {
+                    const matches = apt.designer_id === currentDesigner.id || apt.designerId === currentDesigner.id;
+                    if (matches) {
+                        addLog(`✅ Agendamento encontrado para designer: ${JSON.stringify(apt)}`);
+                    }
+                    return matches;
+                });
+                
+                addLog(`🎯 Agendamentos filtrados para designer: ${designerAppointments.length}`);
+                showResult('loadResult', `🎯 Agendamentos encontrados: ${designerAppointments.length}<br>📋 Dados: <pre>${JSON.stringify(designerAppointments, null, 2)}</pre>`, designerAppointments.length > 0 ? 'success' : 'warning');
+            } catch (error) {
+                addLog(`❌ Erro na simulação: ${error.message}`, 'error');
+                showResult('loadResult', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.testFiltering = async function() {
+            if (!currentDesigner) {
+                showResult('filterResult', '❌ Faça login primeiro!', 'error');
+                return;
+            }
+            
+            try {
+                addLog('🧪 Testando lógica de filtragem...');
+                const data = await getSupabaseAppointments();
+                
+                addLog(`🔍 Testando filtros para designer ID: ${currentDesigner.id}`);
+                
+                data.forEach((apt, index) => {
+                    const matchDesignerId = apt.designer_id === currentDesigner.id;
+                    const matchDesignerIdLocal = apt.designerId === currentDesigner.id;
+                    
+                    addLog(`📋 Agendamento ${index + 1}:`);
+                    addLog(`   - apt.designer_id: ${apt.designer_id}`);
+                    addLog(`   - apt.designerId: ${apt.designerId}`);
+                    addLog(`   - Match designer_id: ${matchDesignerId}`);
+                    addLog(`   - Match designerId: ${matchDesignerIdLocal}`);
+                    addLog(`   - Match final: ${matchDesignerId || matchDesignerIdLocal}`);
+                });
+                
+                const matches = data.filter(apt => apt.designer_id === currentDesigner.id || apt.designerId === currentDesigner.id);
+                showResult('filterResult', `🎯 Agendamentos que passaram no filtro: ${matches.length}`, matches.length > 0 ? 'success' : 'warning');
+            } catch (error) {
+                addLog(`❌ Erro no teste de filtragem: ${error.message}`, 'error');
+                showResult('filterResult', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+        };
+        
+        // Verificar designer atual ao carregar a página
+        window.onload = function() {
+            checkCurrentDesigner();
+        };
+    </script>
+</body>
+</html>

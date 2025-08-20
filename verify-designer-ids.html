@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar IDs da Designer Kika</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Verificação de IDs da Designer Kika</h1>
+        <p>Este script verifica se o ID da designer Kika no localStorage corresponde ao ID no banco de dados Supabase.</p>
+        
+        <button onclick="checkDesignerIds()">Verificar IDs da Designer</button>
+        <button onclick="clearResults()">Limpar Resultados</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://pjwvdpqzgkqjqjqzgkqj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqd3ZkcHF6Z2txanFqcXpna3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NzI4NzQsImV4cCI6MjA1MTI0ODg3NH0.Ej4rswIoUNfAOdmLOjqAhAnhXMZmkJhFCOQiQzQgBhY';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        window.checkDesignerIds = async function() {
+            clearResults();
+            addResult('🔍 Iniciando verificação de IDs da designer Kika...', 'info');
+            
+            try {
+                // 1. Verificar localStorage
+                addResult('📱 Verificando localStorage...', 'info');
+                const designerFromStorage = localStorage.getItem('designer');
+                
+                if (!designerFromStorage) {
+                    addResult('❌ Nenhuma designer encontrada no localStorage', 'error');
+                    return;
+                }
+                
+                const designer = JSON.parse(designerFromStorage);
+                addResult(`✅ Designer no localStorage: ${designer.name} (ID: ${designer.id})`, 'success');
+                
+                // 2. Buscar designers no Supabase
+                addResult('🗄️ Buscando designers no Supabase...', 'info');
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (designersError) {
+                    addResult(`❌ Erro ao buscar designers: ${designersError.message}`, 'error');
+                    return;
+                }
+                
+                addResult(`📊 Total de designers no Supabase: ${designers.length}`, 'info');
+                
+                // 3. Listar todas as designers
+                designers.forEach((d, index) => {
+                    addResult(`Designer ${index + 1}: ${d.name} (ID: ${d.id})`, 'info');
+                });
+                
+                // 4. Verificar se existe correspondência
+                const matchingDesigner = designers.find(d => d.id === designer.id);
+                
+                if (matchingDesigner) {
+                    addResult(`✅ CORRESPONDÊNCIA ENCONTRADA!`, 'success');
+                    addResult(`   - localStorage: ${designer.name} (${designer.id})`, 'success');
+                    addResult(`   - Supabase: ${matchingDesigner.name} (${matchingDesigner.id})`, 'success');
+                } else {
+                    addResult(`❌ NENHUMA CORRESPONDÊNCIA ENCONTRADA!`, 'error');
+                    addResult(`   - ID no localStorage: ${designer.id}`, 'error');
+                    addResult(`   - IDs no Supabase: ${designers.map(d => d.id).join(', ')}`, 'error');
+                }
+                
+                // 5. Verificar agendamentos para o ID do localStorage
+                addResult('📅 Verificando agendamentos para o ID do localStorage...', 'info');
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .eq('designer_id', designer.id);
+                
+                if (appointmentsError) {
+                    addResult(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`, 'error');
+                } else {
+                    addResult(`📊 Agendamentos encontrados para ${designer.name}: ${appointments.length}`, appointments.length > 0 ? 'success' : 'error');
+                    
+                    if (appointments.length > 0) {
+                        appointments.forEach((apt, index) => {
+                            addResult(`   Agendamento ${index + 1}: ${apt.client_name} - ${apt.date} ${apt.time}`, 'info');
+                        });
+                    }
+                }
+                
+                // 6. Se não há correspondência, simular login com ID correto
+                if (!matchingDesigner && designers.length > 0) {
+                    const kikaDesigner = designers.find(d => d.name.toLowerCase().includes('kika'));
+                    if (kikaDesigner) {
+                        addResult('🔧 Tentando corrigir localStorage com ID correto da Kika...', 'info');
+                        localStorage.setItem('designer', JSON.stringify(kikaDesigner));
+                        addResult(`✅ localStorage atualizado com: ${kikaDesigner.name} (${kikaDesigner.id})`, 'success');
+                        
+                        // Verificar agendamentos com ID correto
+                        const { data: correctAppointments, error: correctError } = await supabase
+                            .from('appointments')
+                            .select('*')
+                            .eq('designer_id', kikaDesigner.id);
+                        
+                        if (!correctError) {
+                            addResult(`📊 Agendamentos com ID correto: ${correctAppointments.length}`, correctAppointments.length > 0 ? 'success' : 'error');
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro geral: ${error.message}`, 'error');
+                console.error('Erro:', error);
+            }
+        }
+    </script>
+</body>
+</html>

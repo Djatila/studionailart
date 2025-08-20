@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Final - Solução do Problema</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste Final - Solução do Problema dos Agendamentos</h1>
+        <p>Este script executa um teste completo para verificar se o problema dos agendamentos não aparecerem foi resolvido.</p>
+        
+        <div class="step">
+            <h3>Passo 1: Verificar e Corrigir IDs</h3>
+            <button onclick="step1_VerifyAndFixIds()">Executar Passo 1</button>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 2: Simular Carregamento de Agendamentos</h3>
+            <button onclick="step2_LoadAppointments()">Executar Passo 2</button>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 3: Ir para o Painel Administrativo</h3>
+            <button onclick="step3_GoToAdminPanel()">Ir para o Painel</button>
+        </div>
+        
+        <button onclick="runAllSteps()">🚀 Executar Todos os Passos</button>
+        <button onclick="clearResults()">🧹 Limpar Resultados</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://pjwvdpqzgkqjqjqzgkqj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqd3ZkcHF6Z2txanFqcXpna3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NzI4NzQsImV4cCI6MjA1MTI0ODg3NH0.Ej4rswIoUNfAOdmLOjqAhAnhXMZmkJhFCOQiQzQgBhY';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        window.step1_VerifyAndFixIds = async function() {
+            addResult('🔍 <strong>PASSO 1: Verificando e Corrigindo IDs</strong>', 'info');
+            
+            try {
+                // Buscar designers no Supabase
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (designersError) {
+                    addResult(`❌ Erro ao buscar designers: ${designersError.message}`, 'error');
+                    return false;
+                }
+                
+                addResult(`📊 Designers encontrados: ${designers.length}`, 'success');
+                
+                // Encontrar Kika
+                const kikaDesigner = designers.find(d => d.name.toLowerCase().includes('kika'));
+                
+                if (!kikaDesigner) {
+                    addResult('❌ Designer Kika não encontrada no banco!', 'error');
+                    return false;
+                }
+                
+                addResult(`✅ Designer Kika encontrada: ${kikaDesigner.name} (ID: ${kikaDesigner.id})`, 'success');
+                
+                // Verificar localStorage atual
+                const currentDesigner = localStorage.getItem('designer');
+                if (currentDesigner) {
+                    const parsed = JSON.parse(currentDesigner);
+                    addResult(`📱 Designer atual no localStorage: ${parsed.name} (ID: ${parsed.id})`, 'info');
+                    
+                    if (parsed.id === kikaDesigner.id) {
+                        addResult('✅ IDs já estão corretos!', 'success');
+                    } else {
+                        addResult('⚠️ IDs diferentes - corrigindo...', 'warning');
+                        localStorage.setItem('designer', JSON.stringify(kikaDesigner));
+                        addResult('✅ localStorage corrigido!', 'success');
+                    }
+                } else {
+                    addResult('📱 Nenhuma designer no localStorage - adicionando Kika...', 'warning');
+                    localStorage.setItem('designer', JSON.stringify(kikaDesigner));
+                    addResult('✅ Kika adicionada ao localStorage!', 'success');
+                }
+                
+                return true;
+                
+            } catch (error) {
+                addResult(`❌ Erro no Passo 1: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        window.step2_LoadAppointments = async function() {
+            addResult('📅 <strong>PASSO 2: Carregando Agendamentos</strong>', 'info');
+            
+            try {
+                const designer = JSON.parse(localStorage.getItem('designer'));
+                if (!designer) {
+                    addResult('❌ Nenhuma designer no localStorage!', 'error');
+                    return false;
+                }
+                
+                addResult(`👤 Carregando agendamentos para: ${designer.name} (${designer.id})`, 'info');
+                
+                // Buscar agendamentos
+                const { data: appointments, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .eq('designer_id', designer.id)
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+                
+                if (error) {
+                    addResult(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                    return false;
+                }
+                
+                addResult(`📊 Total de agendamentos encontrados: ${appointments.length}`, appointments.length > 0 ? 'success' : 'warning');
+                
+                if (appointments.length > 0) {
+                    addResult('📋 <strong>Lista de Agendamentos:</strong>', 'info');
+                    appointments.forEach((apt, index) => {
+                        const date = new Date(apt.date).toLocaleDateString('pt-BR');
+                        addResult(`   ${index + 1}. ${apt.client_name} - ${date} às ${apt.time} (${apt.service})`, 'success');
+                    });
+                } else {
+                    addResult('⚠️ Nenhum agendamento encontrado para esta designer', 'warning');
+                }
+                
+                return appointments.length > 0;
+                
+            } catch (error) {
+                addResult(`❌ Erro no Passo 2: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        window.step3_GoToAdminPanel = function() {
+            addResult('🚀 <strong>PASSO 3: Redirecionando para o Painel Administrativo</strong>', 'info');
+            addResult('⏳ Redirecionando em 3 segundos...', 'warning');
+            
+            setTimeout(() => {
+                window.location.href = '/admin';
+            }, 3000);
+        }
+        
+        window.runAllSteps = async function() {
+            clearResults();
+            addResult('🚀 <strong>EXECUTANDO TESTE COMPLETO</strong>', 'info');
+            addResult('=' .repeat(50), 'info');
+            
+            const step1Success = await step1_VerifyAndFixIds();
+            if (!step1Success) {
+                addResult('❌ Falha no Passo 1 - interrompendo teste', 'error');
+                return;
+            }
+            
+            addResult('\n' + '=' .repeat(50), 'info');
+            
+            const step2Success = await step2_LoadAppointments();
+            
+            addResult('\n' + '=' .repeat(50), 'info');
+            
+            if (step2Success) {
+                addResult('🎉 <strong>TESTE CONCLUÍDO COM SUCESSO!</strong>', 'success');
+                addResult('✅ IDs corrigidos e agendamentos encontrados', 'success');
+                addResult('🔄 Redirecionando para o painel em 5 segundos...', 'info');
+                
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 5000);
+            } else {
+                addResult('⚠️ <strong>TESTE CONCLUÍDO COM AVISOS</strong>', 'warning');
+                addResult('✅ IDs corrigidos, mas nenhum agendamento encontrado', 'warning');
+                addResult('💡 Verifique se há agendamentos no banco para esta designer', 'info');
+            }
+        }
+    </script>
+</body>
+</html>

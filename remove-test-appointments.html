@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remover Agendamentos de Teste</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #c0392b;
+        }
+        .button.secondary {
+            background: #3498db;
+        }
+        .button.secondary:hover {
+            background: #2980b9;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .appointment-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .appointment-item.to-remove {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Remover Agendamentos "Manicure Teste"</h1>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAppointments">-</div>
+                <div class="stat-label">Total de Agendamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="testAppointments">-</div>
+                <div class="stat-label">Agendamentos "Manicure Teste"</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="kikaAppointments">-</div>
+                <div class="stat-label">Agendamentos da Kika</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button secondary" onclick="loadAppointments()">📋 Listar Agendamentos</button>
+            <button class="button secondary" onclick="findTestAppointments()">🔍 Encontrar "Manicure Teste"</button>
+            <button class="button" onclick="removeTestAppointments()">🗑️ Remover Agendamentos de Teste</button>
+        </div>
+
+        <div class="log" id="log">Clique em "Listar Agendamentos" para começar...</div>
+        
+        <div id="appointmentsList"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://pktmkpkdccfrpjhilqrn.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdG1rcGtkY2NmcnBqaGlscXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NzI4NzQsImV4cCI6MjA1MTI0ODg3NH0.9OJYJGGbhKJJqGlHJWULNJJqGlHJWULNJJqGlHJWULN';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let allAppointments = [];
+        let testAppointments = [];
+        let kikaDesigner = null;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateStats() {
+            document.getElementById('totalAppointments').textContent = allAppointments.length;
+            document.getElementById('testAppointments').textContent = testAppointments.length;
+            document.getElementById('kikaAppointments').textContent = 
+                allAppointments.filter(apt => apt.designer_id === kikaDesigner?.id).length;
+        }
+        
+        async function loadAppointments() {
+            try {
+                log('🔄 Carregando agendamentos...');
+                
+                // Buscar designers primeiro
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (designersError) {
+                    log(`❌ Erro ao buscar designers: ${designersError.message}`);
+                    return;
+                }
+                
+                // Encontrar a designer Kika
+                kikaDesigner = designers.find(d => d.name.toLowerCase().includes('kika'));
+                if (kikaDesigner) {
+                    log(`👩‍🎨 Designer Kika encontrada: ${kikaDesigner.name} (ID: ${kikaDesigner.id})`);
+                } else {
+                    log('⚠️ Designer Kika não encontrada!');
+                }
+                
+                // Buscar todos os agendamentos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        nail_designers(name),
+                        clients(name, phone)
+                    `);
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`);
+                    return;
+                }
+                
+                allAppointments = appointments || [];
+                log(`✅ ${allAppointments.length} agendamentos carregados`);
+                
+                // Listar alguns agendamentos para debug
+                allAppointments.slice(0, 5).forEach(apt => {
+                    log(`📅 ${apt.service_name} - ${apt.nail_designers?.name || 'Designer não encontrada'} - ${apt.appointment_date}`);
+                });
+                
+                updateStats();
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        async function findTestAppointments() {
+            if (allAppointments.length === 0) {
+                log('⚠️ Carregue os agendamentos primeiro!');
+                return;
+            }
+            
+            log('🔍 Procurando agendamentos "manicure teste"...');
+            
+            // Buscar agendamentos que contenham "manicure teste" (case insensitive)
+            testAppointments = allAppointments.filter(apt => 
+                apt.service_name && apt.service_name.toLowerCase().includes('manicure teste')
+            );
+            
+            log(`🎯 Encontrados ${testAppointments.length} agendamentos "manicure teste"`);
+            
+            const appointmentsList = document.getElementById('appointmentsList');
+            appointmentsList.innerHTML = '';
+            
+            if (testAppointments.length > 0) {
+                const title = document.createElement('h3');
+                title.textContent = 'Agendamentos "Manicure Teste" encontrados:';
+                appointmentsList.appendChild(title);
+                
+                testAppointments.forEach(apt => {
+                    const div = document.createElement('div');
+                    div.className = 'appointment-item to-remove';
+                    div.innerHTML = `
+                        <strong>🗑️ ${apt.service_name}</strong><br>
+                        Designer: ${apt.nail_designers?.name || 'N/A'}<br>
+                        Cliente: ${apt.clients?.name || 'N/A'} (${apt.clients?.phone || 'N/A'})<br>
+                        Data: ${apt.appointment_date}<br>
+                        Horário: ${apt.appointment_time}<br>
+                        ID: ${apt.id}
+                    `;
+                    appointmentsList.appendChild(div);
+                    
+                    log(`🗑️ Para remover: ${apt.service_name} - ${apt.appointment_date} ${apt.appointment_time}`);
+                });
+            } else {
+                log('✅ Nenhum agendamento "manicure teste" encontrado!');
+            }
+            
+            updateStats();
+        }
+        
+        async function removeTestAppointments() {
+            if (testAppointments.length === 0) {
+                log('⚠️ Nenhum agendamento de teste encontrado para remover!');
+                return;
+            }
+            
+            const confirmed = confirm(`Tem certeza que deseja remover ${testAppointments.length} agendamento(s) "manicure teste"?\n\nEsta ação não pode ser desfeita!`);
+            
+            if (!confirmed) {
+                log('❌ Operação cancelada pelo usuário');
+                return;
+            }
+            
+            log(`🗑️ Removendo ${testAppointments.length} agendamentos de teste...`);
+            
+            let removedCount = 0;
+            let errorCount = 0;
+            
+            for (const apt of testAppointments) {
+                try {
+                    const { error } = await supabase
+                        .from('appointments')
+                        .delete()
+                        .eq('id', apt.id);
+                    
+                    if (error) {
+                        log(`❌ Erro ao remover agendamento ${apt.id}: ${error.message}`);
+                        errorCount++;
+                    } else {
+                        log(`✅ Agendamento removido: ${apt.service_name} (ID: ${apt.id})`);
+                        removedCount++;
+                    }
+                } catch (error) {
+                    log(`❌ Erro inesperado ao remover ${apt.id}: ${error.message}`);
+                    errorCount++;
+                }
+            }
+            
+            log(`\n📊 RESULTADO:`);
+            log(`✅ Removidos: ${removedCount}`);
+            log(`❌ Erros: ${errorCount}`);
+            
+            if (removedCount > 0) {
+                log('\n🔄 Recarregando agendamentos...');
+                await loadAppointments();
+                testAppointments = [];
+                document.getElementById('appointmentsList').innerHTML = '';
+                log('✅ Agendamentos de teste removidos com sucesso!');
+            }
+        }
+        
+        // Disponibilizar funções globalmente
+        window.loadAppointments = loadAppointments;
+        window.findTestAppointments = findTestAppointments;
+        window.removeTestAppointments = removeTestAppointments;
+        
+        // Carregar automaticamente ao abrir a página
+        loadAppointments();
+    </script>
+</body>
+</html>

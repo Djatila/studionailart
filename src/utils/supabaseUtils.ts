@@ -201,6 +201,7 @@ export const serviceService = {
 export const appointmentService = {
   // Get all appointments
   async getAll(): Promise<Appointment[]> {
+    console.log('🔍 supabaseUtils: appointmentService.getAll() chamada');
     const { data, error } = await supabase
       .from('appointments')
       .select('*')
@@ -208,10 +209,12 @@ export const appointmentService = {
       .order('time', { ascending: true })
     
     if (error) {
-      console.error('Error fetching all appointments:', error)
+      console.error('❌ supabaseUtils: Error fetching all appointments:', error)
       return []
     }
     
+    console.log('📊 supabaseUtils: appointmentService.getAll() retornou:', data?.length || 0, 'agendamentos');
+    console.log('📋 supabaseUtils: Dados:', data);
     return data || []
   },
 

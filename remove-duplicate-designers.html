@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remover Designers Duplicadas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .danger {
+            background-color: #dc3545;
+        }
+        .danger:hover {
+            background-color: #c82333;
+        }
+        .designer-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .duplicate {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .keep {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Remover Designers Duplicadas</h1>
+        <p>Este script identifica e remove designers duplicadas no banco de dados Supabase.</p>
+        
+        <button onclick="listAllDesigners()">📋 Listar Todas as Designers</button>
+        <button onclick="findDuplicates()">🔍 Encontrar Duplicatas</button>
+        <button onclick="removeDuplicates()" class="danger">🗑️ Remover Duplicatas</button>
+        <button onclick="clearResults()">🧹 Limpar Resultados</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://pjwvdpqzgkqjqjqzgkqj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqd3ZkcHF6Z2txanFqcXpna3FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NzI4NzQsImV4cCI6MjA1MTI0ODg3NH0.Ej4rswIoUNfAOdmLOjqAhAnhXMZmkJhFCOQiQzQgBhY';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let allDesigners = [];
+        let duplicateGroups = [];
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        window.listAllDesigners = async function() {
+            clearResults();
+            addResult('📋 <strong>Listando todas as designers...</strong>', 'info');
+            
+            try {
+                const { data: designers, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    addResult(`❌ Erro ao buscar designers: ${error.message}`, 'error');
+                    return;
+                }
+                
+                allDesigners = designers || [];
+                addResult(`📊 Total de designers encontradas: ${allDesigners.length}`, 'success');
+                
+                if (allDesigners.length === 0) {
+                    addResult('⚠️ Nenhuma designer encontrada no banco de dados', 'warning');
+                    return;
+                }
+                
+                addResult('<strong>Lista de Designers:</strong>', 'info');
+                allDesigners.forEach((designer, index) => {
+                    const isActive = designer.is_active ? '🟢 Ativa' : '🔴 Inativa';
+                    const createdAt = new Date(designer.created_at).toLocaleString('pt-BR');
+                    addResult(`
+                        <div class="designer-card">
+                            <strong>${index + 1}. ${designer.name}</strong><br>
+                            ID: ${designer.id}<br>
+                            Email: ${designer.email || 'N/A'}<br>
+                            Telefone: ${designer.phone || 'N/A'}<br>
+                            Status: ${isActive}<br>
+                            Criada em: ${createdAt}
+                        </div>
+                    `, 'info');
+                });
+                
+            } catch (error) {
+                addResult(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        }
+        
+        window.findDuplicates = async function() {
+            if (allDesigners.length === 0) {
+                addResult('⚠️ Execute "Listar Todas as Designers" primeiro', 'warning');
+                return;
+            }
+            
+            addResult('🔍 <strong>Procurando por duplicatas...</strong>', 'info');
+            
+            // Agrupar designers por nome (case-insensitive)
+            const designersByName = {};
+            
+            allDesigners.forEach(designer => {
+                const normalizedName = designer.name.toLowerCase().trim();
+                if (!designersByName[normalizedName]) {
+                    designersByName[normalizedName] = [];
+                }
+                designersByName[normalizedName].push(designer);
+            });
+            
+            // Encontrar grupos com mais de uma designer
+            duplicateGroups = [];
+            Object.entries(designersByName).forEach(([name, designers]) => {
+                if (designers.length > 1) {
+                    duplicateGroups.push({
+                        name: name,
+                        designers: designers
+                    });
+                }
+            });
+            
+            if (duplicateGroups.length === 0) {
+                addResult('✅ Nenhuma duplicata encontrada!', 'success');
+                return;
+            }
+            
+            addResult(`⚠️ Encontradas ${duplicateGroups.length} duplicatas:`, 'warning');
+            
+            duplicateGroups.forEach((group, groupIndex) => {
+                addResult(`<strong>Duplicata ${groupIndex + 1}: ${group.name}</strong>`, 'warning');
+                
+                // Ordenar por data de criação (mais antiga primeiro)
+                const sortedDesigners = group.designers.sort((a, b) => 
+                    new Date(a.created_at) - new Date(b.created_at)
+                );
+                
+                sortedDesigners.forEach((designer, index) => {
+                    const isOldest = index === 0;
+                    const cardClass = isOldest ? 'keep' : 'duplicate';
+                    const action = isOldest ? '✅ MANTER (mais antiga)' : '🗑️ REMOVER';
+                    const createdAt = new Date(designer.created_at).toLocaleString('pt-BR');
+                    const isActive = designer.is_active ? '🟢 Ativa' : '🔴 Inativa';
+                    
+                    addResult(`
+                        <div class="designer-card ${cardClass}">
+                            <strong>${action}</strong><br>
+                            Nome: ${designer.name}<br>
+                            ID: ${designer.id}<br>
+                            Email: ${designer.email || 'N/A'}<br>
+                            Telefone: ${designer.phone || 'N/A'}<br>
+                            Status: ${isActive}<br>
+                            Criada em: ${createdAt}
+                        </div>
+                    `, isOldest ? 'success' : 'warning');
+                });
+            });
+            
+            addResult('💡 <strong>Estratégia:</strong> Manter a designer mais antiga de cada grupo e remover as duplicatas mais recentes.', 'info');
+        }
+        
+        window.removeDuplicates = async function() {
+            if (duplicateGroups.length === 0) {
+                addResult('⚠️ Execute "Encontrar Duplicatas" primeiro', 'warning');
+                return;
+            }
+            
+            const confirmation = confirm(
+                `⚠️ ATENÇÃO: Esta ação irá remover ${duplicateGroups.reduce((total, group) => total + group.designers.length - 1, 0)} designers duplicadas do banco de dados.\n\nEsta ação NÃO PODE SER DESFEITA!\n\nDeseja continuar?`
+            );
+            
+            if (!confirmation) {
+                addResult('❌ Operação cancelada pelo usuário', 'warning');
+                return;
+            }
+            
+            addResult('🗑️ <strong>Removendo duplicatas...</strong>', 'info');
+            
+            let removedCount = 0;
+            let errorCount = 0;
+            
+            for (const group of duplicateGroups) {
+                // Ordenar por data de criação (mais antiga primeiro)
+                const sortedDesigners = group.designers.sort((a, b) => 
+                    new Date(a.created_at) - new Date(b.created_at)
+                );
+                
+                // Manter a primeira (mais antiga) e remover as outras
+                const toKeep = sortedDesigners[0];
+                const toRemove = sortedDesigners.slice(1);
+                
+                addResult(`📝 Grupo "${group.name}": Mantendo ${toKeep.id}, removendo ${toRemove.length} duplicatas`, 'info');
+                
+                for (const designer of toRemove) {
+                    try {
+                        // Primeiro, verificar se há agendamentos para esta designer
+                        const { data: appointments, error: appointmentsError } = await supabase
+                            .from('appointments')
+                            .select('id')
+                            .eq('designer_id', designer.id);
+                        
+                        if (appointmentsError) {
+                            addResult(`⚠️ Erro ao verificar agendamentos para ${designer.name} (${designer.id}): ${appointmentsError.message}`, 'warning');
+                        }
+                        
+                        if (appointments && appointments.length > 0) {
+                            addResult(`⚠️ ${designer.name} (${designer.id}) tem ${appointments.length} agendamentos. Transferindo para ${toKeep.id}...`, 'warning');
+                            
+                            // Transferir agendamentos para a designer que será mantida
+                            const { error: updateError } = await supabase
+                                .from('appointments')
+                                .update({ designer_id: toKeep.id })
+                                .eq('designer_id', designer.id);
+                            
+                            if (updateError) {
+                                addResult(`❌ Erro ao transferir agendamentos: ${updateError.message}`, 'error');
+                                errorCount++;
+                                continue;
+                            } else {
+                                addResult(`✅ ${appointments.length} agendamentos transferidos com sucesso`, 'success');
+                            }
+                        }
+                        
+                        // Agora remover a designer duplicada
+                        const { error: deleteError } = await supabase
+                            .from('nail_designers')
+                            .delete()
+                            .eq('id', designer.id);
+                        
+                        if (deleteError) {
+                            addResult(`❌ Erro ao remover ${designer.name} (${designer.id}): ${deleteError.message}`, 'error');
+                            errorCount++;
+                        } else {
+                            addResult(`✅ ${designer.name} (${designer.id}) removida com sucesso`, 'success');
+                            removedCount++;
+                        }
+                        
+                    } catch (error) {
+                        addResult(`❌ Erro inesperado ao processar ${designer.name}: ${error.message}`, 'error');
+                        errorCount++;
+                    }
+                }
+            }
+            
+            addResult(`\n🎉 <strong>Operação concluída!</strong>`, 'success');
+            addResult(`✅ Designers removidas: ${removedCount}`, 'success');
+            if (errorCount > 0) {
+                addResult(`❌ Erros encontrados: ${errorCount}`, 'error');
+            }
+            
+            // Limpar cache
+            allDesigners = [];
+            duplicateGroups = [];
+            
+            addResult('🔄 Execute "Listar Todas as Designers" para ver o resultado final', 'info');
+        }
+    </script>
+</body>
+</html>

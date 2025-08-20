@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste: Sincronização de Serviços</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .panel {
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .localStorage-panel {
+            border-color: #f39c12;
+            background: #fef9e7;
+        }
+        .supabase-panel {
+            border-color: #27ae60;
+            background: #eafaf1;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button.success {
+            background: #27ae60;
+        }
+        .button.success:hover {
+            background: #229954;
+        }
+        .button.warning {
+            background: #f39c12;
+        }
+        .button.warning:hover {
+            background: #e67e22;
+        }
+        .button.danger {
+            background: #e74c3c;
+        }
+        .button.danger:hover {
+            background: #c0392b;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .service-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .service-item.localStorage {
+            border-left: 4px solid #f39c12;
+        }
+        .service-item.supabase {
+            border-left: 4px solid #27ae60;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-number {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+            font-size: 0.9em;
+        }
+        .sync-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .sync-status.synced {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .sync-status.not-synced {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .test-form {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Teste: Sincronização de Serviços</h1>
+        <p><strong>Objetivo:</strong> Verificar se os serviços estão sendo salvos no Supabase e sincronizando entre dispositivos</p>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button" onclick="runFullTest()">🧪 Teste Completo</button>
+            <button class="button success" onclick="testCreateService()">➕ Criar Serviço Teste</button>
+            <button class="button warning" onclick="compareData()">🔄 Comparar Dados</button>
+            <button class="button danger" onclick="cleanupTestData()">🗑️ Limpar Testes</button>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="localStorageCount">-</div>
+                <div class="stat-label">localStorage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="supabaseCount">-</div>
+                <div class="stat-label">Supabase</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="syncDifference">-</div>
+                <div class="stat-label">Diferença</div>
+            </div>
+        </div>
+
+        <div id="syncStatus" class="sync-status" style="display: none;">
+            <span id="syncStatusText"></span>
+        </div>
+
+        <div class="test-form" id="testForm" style="display: none;">
+            <h3>➕ Criar Serviço de Teste</h3>
+            <div class="form-group">
+                <label>Nome do Serviço:</label>
+                <input type="text" id="serviceName" value="Teste de Sincronização" placeholder="Nome do serviço">
+            </div>
+            <div class="form-group">
+                <label>Preço (R$):</label>
+                <input type="number" id="servicePrice" value="75" step="0.01" placeholder="Preço">
+            </div>
+            <div class="form-group">
+                <label>Duração (minutos):</label>
+                <input type="number" id="serviceDuration" value="90" placeholder="Duração em minutos">
+            </div>
+            <div class="form-group">
+                <label>Descrição:</label>
+                <input type="text" id="serviceDescription" value="Serviço criado para testar sincronização" placeholder="Descrição">
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="button success" onclick="createTestService()">✅ Criar Serviço</button>
+                <button class="button" onclick="toggleTestForm()">❌ Cancelar</button>
+            </div>
+        </div>
+
+        <div class="log" id="log">Clique em "Teste Completo" para começar...</div>
+        
+        <div class="comparison" id="comparison" style="display: none;">
+            <div class="panel localStorage-panel">
+                <h3>📱 localStorage</h3>
+                <div id="localStorageData"></div>
+            </div>
+            <div class="panel supabase-panel">
+                <h3>☁️ Supabase</h3>
+                <div id="supabaseData"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let localStorageServices = [];
+        let supabaseServices = [];
+        let testServiceId = null;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateStats() {
+            document.getElementById('localStorageCount').textContent = localStorageServices.length;
+            document.getElementById('supabaseCount').textContent = supabaseServices.length;
+            const difference = Math.abs(localStorageServices.length - supabaseServices.length);
+            document.getElementById('syncDifference').textContent = difference;
+            
+            // Atualizar status de sincronização
+            const syncStatusDiv = document.getElementById('syncStatus');
+            const syncStatusText = document.getElementById('syncStatusText');
+            
+            if (difference === 0) {
+                syncStatusDiv.className = 'sync-status synced';
+                syncStatusText.textContent = '✅ Dados sincronizados - mesmo número de serviços';
+            } else {
+                syncStatusDiv.className = 'sync-status not-synced';
+                syncStatusText.textContent = `⚠️ Dados não sincronizados - diferença de ${difference} serviço(s)`;
+            }
+            
+            syncStatusDiv.style.display = 'block';
+        }
+        
+        async function loadLocalStorageData() {
+            try {
+                const services = localStorage.getItem('nail_services');
+                localStorageServices = services ? JSON.parse(services) : [];
+                log(`📱 localStorage: ${localStorageServices.length} serviços encontrados`);
+                return localStorageServices;
+            } catch (error) {
+                log(`❌ Erro ao ler localStorage: ${error.message}`);
+                return [];
+            }
+        }
+        
+        async function loadSupabaseData() {
+            try {
+                log('☁️ Buscando serviços no Supabase...');
+                const { data: services, error } = await supabase
+                    .from('services')
+                    .select(`
+                        *,
+                        nail_designers(name)
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`❌ Erro ao buscar do Supabase: ${error.message}`);
+                    supabaseServices = [];
+                } else {
+                    supabaseServices = services || [];
+                    log(`☁️ Supabase: ${supabaseServices.length} serviços encontrados`);
+                }
+                
+                return supabaseServices;
+            } catch (error) {
+                log(`❌ Erro ao conectar com Supabase: ${error.message}`);
+                return [];
+            }
+        }
+        
+        function displayLocalStorageData() {
+            const localDiv = document.getElementById('localStorageData');
+            
+            if (localStorageServices.length === 0) {
+                localDiv.innerHTML = '<p style="color: #e74c3c;">❌ Nenhum serviço encontrado no localStorage</p>';
+                return;
+            }
+            
+            localDiv.innerHTML = '<h5>Serviços encontrados:</h5>';
+            localStorageServices.slice(0, 5).forEach(service => {
+                localDiv.innerHTML += `
+                    <div class="service-item localStorage">
+                        <strong>${service.name || 'Serviço sem nome'}</strong><br>
+                        Preço: R$ ${service.price || 0}<br>
+                        Duração: ${service.duration || 0} min<br>
+                        Designer ID: ${service.designerId || 'N/A'}<br>
+                        Descrição: ${service.description || 'N/A'}
+                    </div>
+                `;
+            });
+            
+            if (localStorageServices.length > 5) {
+                localDiv.innerHTML += `<p><em>... e mais ${localStorageServices.length - 5} serviço(s)</em></p>`;
+            }
+        }
+        
+        function displaySupabaseData() {
+            const supabaseDiv = document.getElementById('supabaseData');
+            
+            if (supabaseServices.length === 0) {
+                supabaseDiv.innerHTML = '<p style="color: #e74c3c;">❌ Nenhum serviço encontrado no Supabase</p>';
+                return;
+            }
+            
+            supabaseDiv.innerHTML = '<h5>Serviços encontrados:</h5>';
+            supabaseServices.slice(0, 5).forEach(service => {
+                const designerName = service.nail_designers?.name || 'N/A';
+                supabaseDiv.innerHTML += `
+                    <div class="service-item supabase">
+                        <strong>${service.name || 'Serviço sem nome'}</strong><br>
+                        Preço: R$ ${service.price || 0}<br>
+                        Duração: ${service.duration || 0} min<br>
+                        Designer: ${designerName}<br>
+                        Descrição: ${service.description || 'N/A'}
+                    </div>
+                `;
+            });
+            
+            if (supabaseServices.length > 5) {
+                supabaseDiv.innerHTML += `<p><em>... e mais ${supabaseServices.length - 5} serviço(s)</em></p>`;
+            }
+        }
+        
+        window.runFullTest = async function() {
+            log('🔄 Iniciando teste completo de sincronização...');
+            document.getElementById('log').textContent = '';
+            log('🔄 Iniciando teste completo de sincronização...');
+            
+            // Carregar dados
+            await loadLocalStorageData();
+            await loadSupabaseData();
+            
+            // Atualizar estatísticas
+            updateStats();
+            
+            // Mostrar comparação
+            document.getElementById('comparison').style.display = 'grid';
+            displayLocalStorageData();
+            displaySupabaseData();
+            
+            // Análise
+            log('\n📊 ANÁLISE DE SINCRONIZAÇÃO:');
+            log(`📱 localStorage: ${localStorageServices.length} serviços`);
+            log(`☁️ Supabase: ${supabaseServices.length} serviços`);
+            
+            if (localStorageServices.length !== supabaseServices.length) {
+                log('⚠️ PROBLEMA: Dados não estão sincronizados!');
+                if (localStorageServices.length > supabaseServices.length) {
+                    log('   Mais serviços no localStorage - alguns podem não ter sido salvos no Supabase.');
+                } else {
+                    log('   Mais serviços no Supabase - localStorage pode estar desatualizado.');
+                }
+            } else {
+                log('✅ Mesmo número de serviços - dados parecem sincronizados.');
+            }
+            
+            log('\n✅ Teste completo finalizado!');
+        }
+        
+        window.compareData = async function() {
+            log('🔄 Comparando dados entre localStorage e Supabase...');
+            
+            await loadLocalStorageData();
+            await loadSupabaseData();
+            updateStats();
+            
+            // Comparar IDs
+            const localIds = localStorageServices.map(s => s.id);
+            const supabaseIds = supabaseServices.map(s => s.id);
+            
+            const onlyInLocal = localIds.filter(id => !supabaseIds.includes(id));
+            const onlyInSupabase = supabaseIds.filter(id => !localIds.includes(id));
+            
+            log('\n🔍 COMPARAÇÃO DETALHADA:');
+            
+            if (onlyInLocal.length > 0) {
+                log(`⚠️ ${onlyInLocal.length} serviços existem apenas no localStorage:`);
+                onlyInLocal.forEach(id => {
+                    const service = localStorageServices.find(s => s.id === id);
+                    log(`   - ${service?.name || 'Sem nome'} (ID: ${id})`);
+                });
+            }
+            
+            if (onlyInSupabase.length > 0) {
+                log(`⚠️ ${onlyInSupabase.length} serviços existem apenas no Supabase:`);
+                onlyInSupabase.forEach(id => {
+                    const service = supabaseServices.find(s => s.id === id);
+                    log(`   - ${service?.name || 'Sem nome'} (ID: ${id})`);
+                });
+            }
+            
+            if (onlyInLocal.length === 0 && onlyInSupabase.length === 0) {
+                log('✅ Todos os serviços estão presentes em ambos os locais!');
+            }
+        }
+        
+        window.testCreateService = function() {
+            document.getElementById('testForm').style.display = 'block';
+            log('📝 Formulário de teste aberto. Preencha os dados e clique em "Criar Serviço".');
+        }
+        
+        window.toggleTestForm = function() {
+            const form = document.getElementById('testForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        window.createTestService = async function() {
+            const name = document.getElementById('serviceName').value;
+            const price = parseFloat(document.getElementById('servicePrice').value);
+            const duration = parseInt(document.getElementById('serviceDuration').value);
+            const description = document.getElementById('serviceDescription').value;
+            
+            if (!name || !price || !duration) {
+                log('❌ Preencha todos os campos obrigatórios!');
+                return;
+            }
+            
+            const testService = {
+                id: `test_sync_${Date.now()}`,
+                designer_id: 'test_designer_sync',
+                name: name,
+                price: price,
+                duration: duration,
+                description: description,
+                category: 'services'
+            };
+            
+            try {
+                log('🔄 Criando serviço de teste no Supabase...');
+                
+                const { data, error } = await supabase
+                    .from('services')
+                    .insert(testService)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log(`❌ Erro ao criar serviço no Supabase: ${error.message}`);
+                    return;
+                }
+                
+                testServiceId = data.id;
+                log(`✅ Serviço criado no Supabase! ID: ${data.id}`);
+                
+                // Também salvar no localStorage (simulando o comportamento do ServicesManager)
+                const localServices = JSON.parse(localStorage.getItem('nail_services') || '[]');
+                const localService = {
+                    id: testService.id,
+                    designerId: testService.designer_id,
+                    name: testService.name,
+                    price: testService.price,
+                    duration: testService.duration,
+                    description: testService.description,
+                    category: testService.category
+                };
+                
+                localServices.push(localService);
+                localStorage.setItem('nail_services', JSON.stringify(localServices));
+                log('✅ Serviço também salvo no localStorage!');
+                
+                // Fechar formulário e atualizar dados
+                document.getElementById('testForm').style.display = 'none';
+                await runFullTest();
+                
+            } catch (error) {
+                log(`❌ Erro ao criar serviço: ${error.message}`);
+            }
+        }
+        
+        window.cleanupTestData = async function() {
+            if (!confirm('⚠️ Tem certeza que deseja remover todos os serviços de teste?')) {
+                return;
+            }
+            
+            try {
+                log('🗑️ Removendo serviços de teste...');
+                
+                // Remover do Supabase
+                const { error } = await supabase
+                    .from('services')
+                    .delete()
+                    .like('id', 'test_sync_%');
+                
+                if (error) {
+                    log(`❌ Erro ao remover do Supabase: ${error.message}`);
+                } else {
+                    log('✅ Serviços de teste removidos do Supabase!');
+                }
+                
+                // Remover do localStorage
+                const localServices = JSON.parse(localStorage.getItem('nail_services') || '[]');
+                const filteredServices = localServices.filter(service => 
+                    !service.id.startsWith('test_sync_')
+                );
+                localStorage.setItem('nail_services', JSON.stringify(filteredServices));
+                log('✅ Serviços de teste removidos do localStorage!');
+                
+                // Atualizar dados
+                await runFullTest();
+                
+            } catch (error) {
+                log(`❌ Erro ao limpar dados de teste: ${error.message}`);
+            }
+        }
+        
+    </script>
+</body>
+</html>

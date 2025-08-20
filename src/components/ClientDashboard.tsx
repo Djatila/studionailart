@@ -44,11 +44,44 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
 
   const loadData = async () => {
     try {
-      // Carregar agendamentos do cliente
-      const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-      const clientAppointments = allAppointments.filter((apt: Appointment) => 
-        apt.clientPhone === client.phone
-      );
+      // Carregar agendamentos do Supabase primeiro (como o AdminDashboard)
+      let clientAppointments: Appointment[] = [];
+      
+      try {
+        console.log('🔍 ClientDashboard: Buscando agendamentos do Supabase...');
+        const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
+        const supabaseAppointments = await getSupabaseAppointments();
+        
+        // Filtrar agendamentos do cliente pelo telefone
+        clientAppointments = supabaseAppointments.filter((apt: any) => {
+          // Verificar tanto client_phone (Supabase) quanto clientPhone (localStorage)
+          const phone = apt.client_phone || apt.clientPhone;
+          return phone === client.phone;
+        }).map((apt: any) => ({
+          id: apt.id,
+          designerId: apt.designer_id || apt.designerId,
+          clientName: apt.client_name || apt.clientName,
+          clientPhone: apt.client_phone || apt.clientPhone,
+          service: apt.service_name || apt.service,
+          date: apt.appointment_date || apt.date,
+          time: apt.appointment_time || apt.time,
+          status: apt.status || 'pending',
+          price: apt.service_price || apt.price || 0,
+          createdAt: apt.created_at || apt.createdAt
+        }));
+        
+        console.log(`✅ ClientDashboard: ${clientAppointments.length} agendamentos encontrados no Supabase`);
+      } catch (supabaseError) {
+        console.error('❌ ClientDashboard: Erro ao buscar do Supabase, usando localStorage:', supabaseError);
+        
+        // Fallback para localStorage se Supabase falhar
+        const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+        clientAppointments = allAppointments.filter((apt: Appointment) => 
+          apt.clientPhone === client.phone
+        );
+        console.log(`📱 ClientDashboard: ${clientAppointments.length} agendamentos encontrados no localStorage (fallback)`);
+      }
+      
       setAppointments(clientAppointments);
 
       // Carregar designers do localStorage
@@ -202,24 +235,44 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     setShowCancelModal(true);
   };
 
-  const confirmCancelAppointment = () => {
+  const confirmCancelAppointment = async () => {
     if (!appointmentToCancel) return;
     
     try {
-      const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-      const updatedAppointments = allAppointments.map((apt: Appointment) => {
-        if (apt.id === appointmentToCancel) {
-          return { ...apt, status: 'cancelled' as const };
+      // Tentar cancelar no Supabase primeiro
+      try {
+        console.log('🔄 ClientDashboard: Cancelando agendamento no Supabase...', appointmentToCancel);
+        const { updateAppointment } = await import('../utils/supabaseUtils');
+        
+        const updatedAppointment = await updateAppointment(appointmentToCancel, {
+          status: 'cancelled'
+        });
+        
+        if (updatedAppointment) {
+          console.log('✅ ClientDashboard: Agendamento cancelado no Supabase');
         }
-        return apt;
-      });
+      } catch (supabaseError) {
+        console.error('❌ ClientDashboard: Erro ao cancelar no Supabase:', supabaseError);
+        
+        // Fallback para localStorage se Supabase falhar
+        const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+        const updatedAppointments = allAppointments.map((apt: Appointment) => {
+          if (apt.id === appointmentToCancel) {
+            return { ...apt, status: 'cancelled' as const };
+          }
+          return apt;
+        });
+        
+        localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+        console.log('📱 ClientDashboard: Agendamento cancelado no localStorage (fallback)');
+      }
       
-      localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
-      loadData();
+      // Recarregar dados e fechar modal
+      await loadData();
       setShowCancelModal(false);
       setAppointmentToCancel(null);
     } catch (error) {
-      console.error('Erro ao cancelar agendamento:', error);
+      console.error('❌ ClientDashboard: Erro ao cancelar agendamento:', error);
     }
   };
 

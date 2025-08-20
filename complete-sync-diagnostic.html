@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Completo de Sincronização</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+        .button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .button.success {
+            background: linear-gradient(45deg, #56ab2f, #a8e6cf);
+        }
+        .button.warning {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+        }
+        .button.danger {
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+        }
+        .button.info {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .metric-card.localStorage {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            color: #333;
+        }
+        .metric-card.supabase {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+        .metric-card.sync {
+            background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+            color: #333;
+        }
+        .metric-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .metric-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .status-indicator {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.2em;
+        }
+        .status-indicator.excellent {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+        }
+        .status-indicator.good {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .status-indicator.warning {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #333;
+        }
+        .status-indicator.critical {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            color: white;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .data-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .data-panel {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .data-panel.localStorage {
+            border-color: #ffc107;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        }
+        .data-panel.supabase {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda 0%, #a8e6cf 100%);
+        }
+        .data-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .data-item.appointment {
+            border-left-color: #007bff;
+        }
+        .data-item.service {
+            border-left-color: #28a745;
+        }
+        .data-item.client {
+            border-left-color: #ffc107;
+        }
+        .data-item.availability {
+            border-left-color: #dc3545;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+        .test-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .test-result {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .test-result.pass {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+        .test-result.fail {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+        .test-result.warning {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            color: #856404;
+        }
+        .device-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .recommendations {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .recommendations h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .recommendation-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Completo de Sincronização</h1>
+        <p class="subtitle">Ferramenta avançada para identificar problemas de sincronização entre dispositivos</p>
+        
+        <div class="device-info" id="deviceInfo">
+            <h3>📱 Informações do Dispositivo</h3>
+            <div id="deviceDetails">Carregando...</div>
+        </div>
+        
+        <div class="control-panel">
+            <button class="button" onclick="runCompleteDiagnostic()">🧪 Diagnóstico Completo</button>
+            <button class="button success" onclick="testSupabaseConnection()">☁️ Testar Conexão</button>
+            <button class="button info" onclick="compareAllData()">🔄 Comparar Dados</button>
+            <button class="button warning" onclick="createTestData()">➕ Criar Dados Teste</button>
+            <button class="button danger" onclick="cleanupTestData()">🗑️ Limpar Testes</button>
+            <button class="button" onclick="exportDiagnostic()">📊 Exportar Relatório</button>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <div class="metric-card localStorage">
+                <div class="metric-number" id="localStorageTotal">-</div>
+                <div class="metric-label">Total localStorage</div>
+            </div>
+            <div class="metric-card supabase">
+                <div class="metric-number" id="supabaseTotal">-</div>
+                <div class="metric-label">Total Supabase</div>
+            </div>
+            <div class="metric-card sync">
+                <div class="metric-number" id="syncPercentage">-</div>
+                <div class="metric-label">% Sincronizado</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-number" id="issuesFound">-</div>
+                <div class="metric-label">Problemas Encontrados</div>
+            </div>
+        </div>
+
+        <div id="overallStatus" class="status-indicator" style="display: none;">
+            <span id="statusText"></span>
+        </div>
+
+        <div class="progress-bar" id="progressContainer" style="display: none;">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+
+        <div class="test-results" id="testResults" style="display: none;"></div>
+
+        <div class="log" id="log">Clique em "Diagnóstico Completo" para começar a análise...</div>
+        
+        <div class="data-comparison" id="dataComparison" style="display: none;">
+            <div class="data-panel localStorage">
+                <h3>📱 Dados Locais (localStorage)</h3>
+                <div id="localStorageDetails"></div>
+            </div>
+            <div class="data-panel supabase">
+                <h3>☁️ Dados Remotos (Supabase)</h3>
+                <div id="supabaseDetails"></div>
+            </div>
+        </div>
+
+        <div class="recommendations" id="recommendations" style="display: none;">
+            <h3>💡 Recomendações</h3>
+            <div id="recommendationsList"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let diagnosticData = {
+            localStorage: {
+                appointments: [],
+                services: [],
+                clients: [],
+                availability: []
+            },
+            supabase: {
+                appointments: [],
+                services: [],
+                clients: [],
+                availability: []
+            },
+            issues: [],
+            recommendations: []
+        };
+        
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${icon} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateProgress(percentage) {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            
+            progressContainer.style.display = 'block';
+            progressFill.style.width = `${percentage}%`;
+            
+            if (percentage >= 100) {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        function updateDashboard() {
+            const localTotal = Object.values(diagnosticData.localStorage).reduce((sum, arr) => sum + arr.length, 0);
+            const supabaseTotal = Object.values(diagnosticData.supabase).reduce((sum, arr) => sum + arr.length, 0);
+            const syncPercentage = supabaseTotal > 0 ? Math.round((Math.min(localTotal, supabaseTotal) / Math.max(localTotal, supabaseTotal)) * 100) : 0;
+            
+            document.getElementById('localStorageTotal').textContent = localTotal;
+            document.getElementById('supabaseTotal').textContent = supabaseTotal;
+            document.getElementById('syncPercentage').textContent = syncPercentage + '%';
+            document.getElementById('issuesFound').textContent = diagnosticData.issues.length;
+        }
+        
+        function updateOverallStatus() {
+            const statusDiv = document.getElementById('overallStatus');
+            const statusText = document.getElementById('statusText');
+            const issueCount = diagnosticData.issues.length;
+            
+            let status, message;
+            
+            if (issueCount === 0) {
+                status = 'excellent';
+                message = '🎉 Excelente! Todos os dados estão sincronizados perfeitamente.';
+            } else if (issueCount <= 2) {
+                status = 'good';
+                message = `✅ Bom! Apenas ${issueCount} problema(s) menor(es) encontrado(s).`;
+            } else if (issueCount <= 5) {
+                status = 'warning';
+                message = `⚠️ Atenção! ${issueCount} problemas de sincronização encontrados.`;
+            } else {
+                status = 'critical';
+                message = `🚨 Crítico! ${issueCount} problemas sérios de sincronização detectados.`;
+            }
+            
+            statusDiv.className = `status-indicator ${status}`;
+            statusText.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+        
+        function displayDeviceInfo() {
+            const deviceDetails = document.getElementById('deviceDetails');
+            const userAgent = navigator.userAgent;
+            const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
+            const isMobile = /mobile|android|iphone/i.test(userAgent);
+            const isDesktop = !isTablet && !isMobile;
+            
+            let deviceType = 'Desconhecido';
+            if (isDesktop) deviceType = '💻 Desktop/Computador';
+            else if (isTablet) deviceType = '📱 Tablet';
+            else if (isMobile) deviceType = '📱 Celular';
+            
+            deviceDetails.innerHTML = `
+                <strong>Tipo:</strong> ${deviceType}<br>
+                <strong>Navegador:</strong> ${navigator.userAgent.split(' ').pop()}<br>
+                <strong>Resolução:</strong> ${screen.width}x${screen.height}<br>
+                <strong>Conexão:</strong> ${navigator.onLine ? '🟢 Online' : '🔴 Offline'}<br>
+                <strong>Timestamp:</strong> ${new Date().toLocaleString()}
+            `;
+        }
+        
+        async function loadLocalStorageData() {
+            try {
+                log('📱 Carregando dados do localStorage...');
+                
+                diagnosticData.localStorage.appointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+                diagnosticData.localStorage.services = JSON.parse(localStorage.getItem('nail_services') || '[]');
+                diagnosticData.localStorage.clients = JSON.parse(localStorage.getItem('nail_clients') || '[]');
+                diagnosticData.localStorage.availability = JSON.parse(localStorage.getItem('nail_availability') || '[]');
+                
+                const total = Object.values(diagnosticData.localStorage).reduce((sum, arr) => sum + arr.length, 0);
+                log(`📱 localStorage: ${total} registros carregados`);
+                
+                return true;
+            } catch (error) {
+                log(`❌ Erro ao carregar localStorage: ${error.message}`, 'error');
+                diagnosticData.issues.push(`Erro no localStorage: ${error.message}`);
+                return false;
+            }
+        }
+        
+        async function loadSupabaseData() {
+            try {
+                log('☁️ Carregando dados do Supabase...');
+                
+                // Carregar agendamentos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*');
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao carregar agendamentos: ${appointmentsError.message}`, 'error');
+                    diagnosticData.issues.push(`Erro agendamentos Supabase: ${appointmentsError.message}`);
+                } else {
+                    diagnosticData.supabase.appointments = appointments || [];
+                }
+                
+                // Carregar serviços
+                const { data: services, error: servicesError } = await supabase
+                    .from('services')
+                    .select('*');
+                
+                if (servicesError) {
+                    log(`❌ Erro ao carregar serviços: ${servicesError.message}`, 'error');
+                    diagnosticData.issues.push(`Erro serviços Supabase: ${servicesError.message}`);
+                } else {
+                    diagnosticData.supabase.services = services || [];
+                }
+                
+                // Carregar clientes
+                const { data: clients, error: clientsError } = await supabase
+                    .from('clients')
+                    .select('*');
+                
+                if (clientsError) {
+                    log(`❌ Erro ao carregar clientes: ${clientsError.message}`, 'error');
+                    diagnosticData.issues.push(`Erro clientes Supabase: ${clientsError.message}`);
+                } else {
+                    diagnosticData.supabase.clients = clients || [];
+                }
+                
+                // Carregar disponibilidade
+                const { data: availability, error: availabilityError } = await supabase
+                    .from('availability')
+                    .select('*');
+                
+                if (availabilityError) {
+                    log(`❌ Erro ao carregar disponibilidade: ${availabilityError.message}`, 'error');
+                    diagnosticData.issues.push(`Erro disponibilidade Supabase: ${availabilityError.message}`);
+                } else {
+                    diagnosticData.supabase.availability = availability || [];
+                }
+                
+                const total = Object.values(diagnosticData.supabase).reduce((sum, arr) => sum + arr.length, 0);
+                log(`☁️ Supabase: ${total} registros carregados`);
+                
+                return true;
+            } catch (error) {
+                log(`❌ Erro ao conectar com Supabase: ${error.message}`, 'error');
+                diagnosticData.issues.push(`Erro conexão Supabase: ${error.message}`);
+                return false;
+            }
+        }
+        
+        function analyzeDataConsistency() {
+            log('🔍 Analisando consistência dos dados...');
+            
+            const categories = ['appointments', 'services', 'clients', 'availability'];
+            
+            categories.forEach(category => {
+                const localData = diagnosticData.localStorage[category];
+                const supabaseData = diagnosticData.supabase[category];
+                
+                log(`📊 ${category}: localStorage(${localData.length}) vs Supabase(${supabaseData.length})`);
+                
+                if (localData.length !== supabaseData.length) {
+                    const issue = `Inconsistência em ${category}: ${localData.length} local vs ${supabaseData.length} remoto`;
+                    diagnosticData.issues.push(issue);
+                    
+                    if (localData.length > supabaseData.length) {
+                        diagnosticData.recommendations.push(`Sincronizar ${category} do localStorage para o Supabase`);
+                    } else {
+                        diagnosticData.recommendations.push(`Atualizar ${category} do localStorage com dados do Supabase`);
+                    }
+                }
+                
+                // Verificar IDs duplicados ou ausentes
+                if (localData.length > 0 && supabaseData.length > 0) {
+                    const localIds = localData.map(item => item.id).filter(Boolean);
+                    const supabaseIds = supabaseData.map(item => item.id).filter(Boolean);
+                    
+                    const onlyLocal = localIds.filter(id => !supabaseIds.includes(id));
+                    const onlySupabase = supabaseIds.filter(id => !localIds.includes(id));
+                    
+                    if (onlyLocal.length > 0) {
+                        diagnosticData.issues.push(`${category}: ${onlyLocal.length} registros existem apenas localmente`);
+                    }
+                    
+                    if (onlySupabase.length > 0) {
+                        diagnosticData.issues.push(`${category}: ${onlySupabase.length} registros existem apenas no Supabase`);
+                    }
+                }
+            });
+        }
+        
+        function displayTestResults() {
+            const testResultsDiv = document.getElementById('testResults');
+            const categories = ['appointments', 'services', 'clients', 'availability'];
+            
+            testResultsDiv.innerHTML = '';
+            
+            categories.forEach(category => {
+                const localCount = diagnosticData.localStorage[category].length;
+                const supabaseCount = diagnosticData.supabase[category].length;
+                const isSync = localCount === supabaseCount;
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-result ${isSync ? 'pass' : 'fail'}`;
+                resultDiv.innerHTML = `
+                    <strong>${category.toUpperCase()}</strong><br>
+                    ${isSync ? '✅ Sincronizado' : '❌ Dessincronizado'}<br>
+                    <small>Local: ${localCount} | Remoto: ${supabaseCount}</small>
+                `;
+                
+                testResultsDiv.appendChild(resultDiv);
+            });
+            
+            testResultsDiv.style.display = 'grid';
+        }
+        
+        function displayRecommendations() {
+            if (diagnosticData.recommendations.length === 0) {
+                document.getElementById('recommendations').style.display = 'none';
+                return;
+            }
+            
+            const recommendationsList = document.getElementById('recommendationsList');
+            recommendationsList.innerHTML = '';
+            
+            diagnosticData.recommendations.forEach((recommendation, index) => {
+                const item = document.createElement('div');
+                item.className = 'recommendation-item';
+                item.innerHTML = `<strong>${index + 1}.</strong> ${recommendation}`;
+                recommendationsList.appendChild(item);
+            });
+            
+            document.getElementById('recommendations').style.display = 'block';
+        }
+        
+        window.runCompleteDiagnostic = async function() {
+            log('🚀 Iniciando diagnóstico completo de sincronização...');
+            document.getElementById('log').textContent = '';
+            log('🚀 Iniciando diagnóstico completo de sincronização...');
+            
+            // Reset data
+            diagnosticData.issues = [];
+            diagnosticData.recommendations = [];
+            
+            displayDeviceInfo();
+            updateProgress(10);
+            
+            // Carregar dados localStorage
+            await loadLocalStorageData();
+            updateProgress(30);
+            
+            // Carregar dados Supabase
+            await loadSupabaseData();
+            updateProgress(60);
+            
+            // Analisar consistência
+            analyzeDataConsistency();
+            updateProgress(80);
+            
+            // Atualizar interface
+            updateDashboard();
+            updateOverallStatus();
+            displayTestResults();
+            displayRecommendations();
+            updateProgress(100);
+            
+            log('✅ Diagnóstico completo finalizado!', 'success');
+            log(`📊 Resumo: ${diagnosticData.issues.length} problemas encontrados`);
+        }
+        
+        window.testSupabaseConnection = async function() {
+            log('🔌 Testando conexão com Supabase...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('services')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    log(`❌ Falha na conexão: ${error.message}`, 'error');
+                } else {
+                    log('✅ Conexão com Supabase estabelecida com sucesso!', 'success');
+                }
+            } catch (error) {
+                log(`❌ Erro de rede: ${error.message}`, 'error');
+            }
+        }
+        
+        window.compareAllData = async function() {
+            log('🔄 Comparando todos os dados...');
+            
+            await loadLocalStorageData();
+            await loadSupabaseData();
+            
+            const localDiv = document.getElementById('localStorageDetails');
+            const supabaseDiv = document.getElementById('supabaseDetails');
+            
+            // Exibir dados localStorage
+            localDiv.innerHTML = '';
+            Object.entries(diagnosticData.localStorage).forEach(([category, data]) => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.innerHTML = `<h4>${category.toUpperCase()} (${data.length})</h4>`;
+                
+                data.slice(0, 3).forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `data-item ${category.slice(0, -1)}`;
+                    itemDiv.innerHTML = `
+                        <strong>${item.name || item.client_name || item.date || 'Item'}</strong><br>
+                        <small>ID: ${item.id || 'N/A'}</small>
+                    `;
+                    categoryDiv.appendChild(itemDiv);
+                });
+                
+                if (data.length > 3) {
+                    categoryDiv.innerHTML += `<p><em>... e mais ${data.length - 3} item(s)</em></p>`;
+                }
+                
+                localDiv.appendChild(categoryDiv);
+            });
+            
+            // Exibir dados Supabase
+            supabaseDiv.innerHTML = '';
+            Object.entries(diagnosticData.supabase).forEach(([category, data]) => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.innerHTML = `<h4>${category.toUpperCase()} (${data.length})</h4>`;
+                
+                data.slice(0, 3).forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `data-item ${category.slice(0, -1)}`;
+                    itemDiv.innerHTML = `
+                        <strong>${item.name || item.client_name || item.date || 'Item'}</strong><br>
+                        <small>ID: ${item.id || 'N/A'}</small>
+                    `;
+                    categoryDiv.appendChild(itemDiv);
+                });
+                
+                if (data.length > 3) {
+                    categoryDiv.innerHTML += `<p><em>... e mais ${data.length - 3} item(s)</em></p>`;
+                }
+                
+                supabaseDiv.appendChild(categoryDiv);
+            });
+            
+            document.getElementById('dataComparison').style.display = 'grid';
+            log('✅ Comparação de dados concluída!', 'success');
+        }
+        
+        window.createTestData = async function() {
+            if (!confirm('⚠️ Criar dados de teste? Isso adicionará registros temporários.')) {
+                return;
+            }
+            
+            log('➕ Criando dados de teste...');
+            
+            try {
+                const testService = {
+                    id: `test_diagnostic_${Date.now()}`,
+                    designer_id: 'test_designer',
+                    name: 'Serviço Diagnóstico',
+                    price: 50,
+                    duration: 60,
+                    description: 'Serviço criado para teste de sincronização',
+                    category: 'services'
+                };
+                
+                // Criar no Supabase
+                const { error } = await supabase
+                    .from('services')
+                    .insert(testService);
+                
+                if (error) {
+                    log(`❌ Erro ao criar no Supabase: ${error.message}`, 'error');
+                } else {
+                    log('✅ Dados de teste criados no Supabase!', 'success');
+                }
+                
+                // Criar no localStorage
+                const localServices = JSON.parse(localStorage.getItem('nail_services') || '[]');
+                localServices.push(testService);
+                localStorage.setItem('nail_services', JSON.stringify(localServices));
+                log('✅ Dados de teste criados no localStorage!', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro ao criar dados de teste: ${error.message}`, 'error');
+            }
+        }
+        
+        window.cleanupTestData = async function() {
+            if (!confirm('⚠️ Remover todos os dados de teste?')) {
+                return;
+            }
+            
+            log('🗑️ Removendo dados de teste...');
+            
+            try {
+                // Remover do Supabase
+                await supabase
+                    .from('services')
+                    .delete()
+                    .like('id', 'test_diagnostic_%');
+                
+                // Remover do localStorage
+                const localServices = JSON.parse(localStorage.getItem('nail_services') || '[]');
+                const filteredServices = localServices.filter(service => 
+                    !service.id.startsWith('test_diagnostic_')
+                );
+                localStorage.setItem('nail_services', JSON.stringify(filteredServices));
+                
+                log('✅ Dados de teste removidos!', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro ao remover dados de teste: ${error.message}`, 'error');
+            }
+        }
+        
+        window.exportDiagnostic = function() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                device: {
+                    userAgent: navigator.userAgent,
+                    screen: `${screen.width}x${screen.height}`,
+                    online: navigator.onLine
+                },
+                data: diagnosticData,
+                summary: {
+                    localStorageTotal: Object.values(diagnosticData.localStorage).reduce((sum, arr) => sum + arr.length, 0),
+                    supabaseTotal: Object.values(diagnosticData.supabase).reduce((sum, arr) => sum + arr.length, 0),
+                    issuesCount: diagnosticData.issues.length,
+                    recommendationsCount: diagnosticData.recommendations.length
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diagnostic-report-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('📊 Relatório de diagnóstico exportado!', 'success');
+        }
+        
+        // Inicializar
+        displayDeviceInfo();
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de Sincronização</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button.danger {
+            background: #e74c3c;
+        }
+        .button.danger:hover {
+            background: #c0392b;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .data-item {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .data-item.localStorage {
+            border-left: 4px solid #f39c12;
+        }
+        .data-item.supabase {
+            border-left: 4px solid #27ae60;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .comparison-section {
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .localStorage-section {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        .supabase-section {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico de Sincronização</h1>
+        <p><strong>Objetivo:</strong> Verificar se dados estão sendo salvos no Supabase ou apenas no localStorage</p>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="localStorageAppointments">-</div>
+                <div class="stat-label">Agendamentos (localStorage)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="supabaseAppointments">-</div>
+                <div class="stat-label">Agendamentos (Supabase)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="localStorageServices">-</div>
+                <div class="stat-label">Serviços (localStorage)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="supabaseServices">-</div>
+                <div class="stat-label">Serviços (Supabase)</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button" onclick="diagnoseAll()">🔍 Executar Diagnóstico Completo</button>
+            <button class="button" onclick="checkAppointments()">📅 Verificar Agendamentos</button>
+            <button class="button" onclick="checkServices()">⚙️ Verificar Serviços</button>
+            <button class="button danger" onclick="clearLocalStorage()">🗑️ Limpar localStorage</button>
+        </div>
+
+        <div class="log" id="log">Clique em "Executar Diagnóstico Completo" para começar...</div>
+        
+        <div class="comparison" id="comparison" style="display: none;">
+            <div class="comparison-section localStorage-section">
+                <h3>📱 localStorage (Local)</h3>
+                <div id="localStorageData"></div>
+            </div>
+            <div class="comparison-section supabase-section">
+                <h3>☁️ Supabase (Servidor)</h3>
+                <div id="supabaseData"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let localStorageAppointments = [];
+        let supabaseAppointments = [];
+        let localStorageServices = [];
+        let supabaseServices = [];
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateStats() {
+            document.getElementById('localStorageAppointments').textContent = localStorageAppointments.length;
+            document.getElementById('supabaseAppointments').textContent = supabaseAppointments.length;
+            document.getElementById('localStorageServices').textContent = localStorageServices.length;
+            document.getElementById('supabaseServices').textContent = supabaseServices.length;
+        }
+        
+        function getLocalStorageData() {
+            try {
+                // Buscar agendamentos no localStorage
+                const appointments = localStorage.getItem('appointments');
+                localStorageAppointments = appointments ? JSON.parse(appointments) : [];
+                
+                // Buscar serviços no localStorage
+                const services = localStorage.getItem('services');
+                localStorageServices = services ? JSON.parse(services) : [];
+                
+                log(`📱 localStorage - Agendamentos: ${localStorageAppointments.length}, Serviços: ${localStorageServices.length}`);
+                
+                return { appointments: localStorageAppointments, services: localStorageServices };
+            } catch (error) {
+                log(`❌ Erro ao ler localStorage: ${error.message}`);
+                return { appointments: [], services: [] };
+            }
+        }
+        
+        async function getSupabaseData() {
+            try {
+                log('☁️ Buscando dados no Supabase...');
+                
+                // Buscar agendamentos no Supabase
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        nail_designers(name),
+                        clients(name, phone)
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`);
+                    supabaseAppointments = [];
+                } else {
+                    supabaseAppointments = appointments || [];
+                }
+                
+                // Buscar serviços no Supabase
+                const { data: services, error: servicesError } = await supabase
+                    .from('services')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (servicesError) {
+                    log(`❌ Erro ao buscar serviços: ${servicesError.message}`);
+                    supabaseServices = [];
+                } else {
+                    supabaseServices = services || [];
+                }
+                
+                log(`☁️ Supabase - Agendamentos: ${supabaseAppointments.length}, Serviços: ${supabaseServices.length}`);
+                
+                return { appointments: supabaseAppointments, services: supabaseServices };
+            } catch (error) {
+                log(`❌ Erro ao conectar com Supabase: ${error.message}`);
+                return { appointments: [], services: [] };
+            }
+        }
+        
+        function displayComparison() {
+            const comparisonDiv = document.getElementById('comparison');
+            const localDiv = document.getElementById('localStorageData');
+            const supabaseDiv = document.getElementById('supabaseData');
+            
+            comparisonDiv.style.display = 'grid';
+            
+            // Mostrar dados do localStorage
+            localDiv.innerHTML = '<h4>📅 Agendamentos:</h4>';
+            if (localStorageAppointments.length > 0) {
+                localStorageAppointments.slice(0, 5).forEach(apt => {
+                    localDiv.innerHTML += `
+                        <div class="data-item localStorage">
+                            <strong>${apt.service || 'Serviço não informado'}</strong><br>
+                            Cliente: ${apt.clientName || apt.client_name || 'N/A'}<br>
+                            Data: ${apt.date || apt.appointment_date || 'N/A'}<br>
+                            Horário: ${apt.time || apt.appointment_time || 'N/A'}<br>
+                            Preço: R$ ${apt.price || apt.service_price || 0}
+                        </div>
+                    `;
+                });
+            } else {
+                localDiv.innerHTML += '<p>Nenhum agendamento no localStorage</p>';
+            }
+            
+            localDiv.innerHTML += '<h4>⚙️ Serviços:</h4>';
+            if (localStorageServices.length > 0) {
+                localStorageServices.slice(0, 5).forEach(service => {
+                    localDiv.innerHTML += `
+                        <div class="data-item localStorage">
+                            <strong>${service.name || 'Nome não informado'}</strong><br>
+                            Preço: R$ ${service.price || 0}<br>
+                            Duração: ${service.duration || 'N/A'} min
+                        </div>
+                    `;
+                });
+            } else {
+                localDiv.innerHTML += '<p>Nenhum serviço no localStorage</p>';
+            }
+            
+            // Mostrar dados do Supabase
+            supabaseDiv.innerHTML = '<h4>📅 Agendamentos:</h4>';
+            if (supabaseAppointments.length > 0) {
+                supabaseAppointments.slice(0, 5).forEach(apt => {
+                    const clientName = apt.clients?.name || apt.client_name || 'N/A';
+                    const designerName = apt.nail_designers?.name || 'N/A';
+                    supabaseDiv.innerHTML += `
+                        <div class="data-item supabase">
+                            <strong>${apt.service_name || apt.service || 'Serviço não informado'}</strong><br>
+                            Cliente: ${clientName}<br>
+                            Designer: ${designerName}<br>
+                            Data: ${apt.appointment_date || apt.date || 'N/A'}<br>
+                            Horário: ${apt.appointment_time || apt.time || 'N/A'}<br>
+                            Preço: R$ ${apt.service_price || apt.price || 0}<br>
+                            Status: ${apt.status || 'pending'}
+                        </div>
+                    `;
+                });
+            } else {
+                supabaseDiv.innerHTML += '<p>Nenhum agendamento no Supabase</p>';
+            }
+            
+            supabaseDiv.innerHTML += '<h4>⚙️ Serviços:</h4>';
+            if (supabaseServices.length > 0) {
+                supabaseServices.slice(0, 5).forEach(service => {
+                    supabaseDiv.innerHTML += `
+                        <div class="data-item supabase">
+                            <strong>${service.name || 'Nome não informado'}</strong><br>
+                            Preço: R$ ${service.price || 0}<br>
+                            Duração: ${service.duration || 'N/A'} min<br>
+                            Designer ID: ${service.designer_id || 'N/A'}
+                        </div>
+                    `;
+                });
+            } else {
+                supabaseDiv.innerHTML += '<p>Nenhum serviço no Supabase</p>';
+            }
+        }
+        
+        window.diagnoseAll = async function() {
+            log('🔄 Iniciando diagnóstico completo...');
+            
+            // Limpar log
+            document.getElementById('log').textContent = '';
+            log('🔄 Iniciando diagnóstico completo...');
+            
+            // Verificar localStorage
+            log('📱 Verificando dados no localStorage...');
+            getLocalStorageData();
+            
+            // Verificar Supabase
+            log('☁️ Verificando dados no Supabase...');
+            await getSupabaseData();
+            
+            // Atualizar estatísticas
+            updateStats();
+            
+            // Mostrar comparação
+            displayComparison();
+            
+            // Análise
+            log('\n📊 ANÁLISE:');
+            if (localStorageAppointments.length > supabaseAppointments.length) {
+                log('⚠️ PROBLEMA: Mais agendamentos no localStorage que no Supabase!');
+                log('   Isso indica que alguns agendamentos não estão sendo salvos no servidor.');
+            } else if (localStorageAppointments.length < supabaseAppointments.length) {
+                log('✅ Mais agendamentos no Supabase - dados estão sendo salvos corretamente.');
+            } else {
+                log('🔄 Mesmo número de agendamentos - verificar se são os mesmos dados.');
+            }
+            
+            if (localStorageServices.length > supabaseServices.length) {
+                log('⚠️ PROBLEMA: Mais serviços no localStorage que no Supabase!');
+                log('   Isso indica que alguns serviços não estão sendo salvos no servidor.');
+            } else if (localStorageServices.length < supabaseServices.length) {
+                log('✅ Mais serviços no Supabase - dados estão sendo salvos corretamente.');
+            } else {
+                log('🔄 Mesmo número de serviços - verificar se são os mesmos dados.');
+            }
+            
+            log('\n✅ Diagnóstico completo finalizado!');
+        }
+        
+        window.checkAppointments = async function() {
+            log('📅 Verificando apenas agendamentos...');
+            getLocalStorageData();
+            await getSupabaseData();
+            updateStats();
+        }
+        
+        window.checkServices = async function() {
+            log('⚙️ Verificando apenas serviços...');
+            getLocalStorageData();
+            await getSupabaseData();
+            updateStats();
+        }
+        
+        window.clearLocalStorage = function() {
+            if (confirm('⚠️ Tem certeza que deseja limpar o localStorage? Isso pode afetar dados locais não sincronizados!')) {
+                localStorage.removeItem('appointments');
+                localStorage.removeItem('services');
+                localStorage.removeItem('designers');
+                localStorage.removeItem('clients');
+                log('🗑️ localStorage limpo!');
+                
+                // Atualizar dados
+                getLocalStorageData();
+                updateStats();
+            }
+        }
+        
+        // Definir funções globalmente
+        window.log = log;
+        window.updateStats = updateStats;
+        
+    </script>
+</body>
+</html>

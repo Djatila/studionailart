@@ -33,11 +33,12 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
   const loadClients = async () => {
     try {
       setLoading(true);
-      const clientsData = await getClients();
-      setClients(clientsData);
+      // Use the updated getClients function that already combines Supabase and localStorage
+      const allClients = await getClients();
+      setClients(allClients);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      // Fallback para localStorage se Supabase falhar
+      // Fallback para localStorage apenas
       const localClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
       setClients(localClients);
     } finally {

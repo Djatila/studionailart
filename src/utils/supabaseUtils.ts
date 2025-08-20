@@ -6,6 +6,16 @@ type NailDesigner = Database['public']['Tables']['nail_designers']['Row']
 type Service = Database['public']['Tables']['services']['Row']
 type Appointment = Database['public']['Tables']['appointments']['Row']
 type Availability = Database['public']['Tables']['availability']['Row']
+type Client = {
+  id: string
+  name: string
+  email: string
+  password: string
+  phone: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
 // Nail Designers CRUD Operations
 export const designerService = {
@@ -289,6 +299,120 @@ export const appointmentService = {
   }
 }
 
+// Clients CRUD Operations
+export const clientService = {
+  // Get all clients
+  async getAll(): Promise<Client[]> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching clients:', error)
+      return []
+    }
+    
+    return data || []
+  },
+
+  // Get client by ID
+  async getById(id: string): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching client:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  // Get client by phone
+  async getByPhone(phone: string): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('phone', phone)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching client by phone:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  // Get client by email
+  async getByEmail(email: string): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('email', email)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching client by email:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  // Create new client
+  async create(client: Omit<Client, 'created_at' | 'updated_at'>): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert(client)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error creating client:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  // Update client
+  async update(id: string, updates: Partial<Omit<Client, 'id' | 'created_at' | 'updated_at'>>): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error updating client:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  // Delete client
+  async delete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', id)
+    
+    if (error) {
+      console.error('Error deleting client:', error)
+      return false
+    }
+    
+    return true
+  }
+}
+
 // Availability CRUD Operations
 export const availabilityService = {
   // Get availability by designer ID
@@ -477,51 +601,72 @@ export const getServices = () => serviceService.getAll();
 export const deleteService = (id: string) => serviceService.delete(id);
 
 export const getClients = async () => {
-  // Get unique clients from appointments
-  const { data, error } = await supabase
-    .from('appointments')
-    .select('client_name, client_phone, client_email')
-    .order('created_at', { ascending: false })
-  
-  if (error) {
+  try {
+    // Get clients from the new clients table
+    const supabaseClients = await clientService.getAll()
+    
+    // Also get clients from localStorage for backward compatibility
+    const localClients = JSON.parse(localStorage.getItem('registered_clients') || '[]')
+    
+    // Combine and remove duplicates, prioritizing Supabase
+    const allClients = [...supabaseClients]
+    
+    localClients.forEach((localClient: any) => {
+      const existsInSupabase = supabaseClients.some(sc => sc.phone === localClient.phone)
+      if (!existsInSupabase) {
+        // Convert localStorage format to match Supabase format
+        allClients.push({
+          id: localClient.id,
+          name: localClient.name,
+          phone: localClient.phone,
+          email: localClient.email,
+          password: localClient.password,
+          is_active: localClient.isActive ?? true,
+          created_at: localClient.createdAt || new Date().toISOString(),
+          updated_at: localClient.createdAt || new Date().toISOString()
+        })
+      }
+    })
+    
+    return allClients
+  } catch (error) {
     console.error('Error fetching clients:', error)
-    return []
+    // Fallback to localStorage only
+    return JSON.parse(localStorage.getItem('registered_clients') || '[]')
   }
-  
-  // Remove duplicates based on phone number
-  const uniqueClients = data?.reduce((acc: any[], current) => {
-    const existingClient = acc.find(client => client.client_phone === current.client_phone)
-    if (!existingClient) {
-      acc.push({
-        id: current.client_phone, // Use phone as ID
-        name: current.client_name,
-        phone: current.client_phone,
-        email: current.client_email
-      })
-    }
-    return acc
-  }, []) || []
-  
-  return uniqueClients
 };
 
 export const updateClient = async (id: string, updates: any) => {
-  // Update all appointments with this client phone
-  const { error } = await supabase
-    .from('appointments')
-    .update({
-      client_name: updates.name,
-      client_email: updates.email
-    })
-    .eq('client_phone', id)
-  
-  if (error) {
-    console.error('Error updating client:', error)
-    return false
+  return clientService.update(id, updates)
+};
+
+// New client management functions
+export const createClient = async (client: any) => {
+  const clientData = {
+    id: client.id || 'client-' + client.phone,
+    name: client.name,
+    email: client.email,
+    password: client.password,
+    phone: client.phone,
+    is_active: client.isActive ?? true
   }
   
-  return true
+  return clientService.create(clientData)
 };
+
+export const getClientByPhone = async (phone: string) => {
+  return clientService.getByPhone(phone)
+};
+
+export const getClientByEmail = async (email: string) => {
+  return clientService.getByEmail(email)
+};
+
+export const getClientById = async (id: string) => {
+  return clientService.getById(id)
+};
+
+export const deleteClient = (id: string) => clientService.delete(id);
 
 // Migration helper functions
 export const migrationService = {

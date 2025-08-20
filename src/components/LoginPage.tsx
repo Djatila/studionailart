@@ -242,39 +242,53 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
   const saveClient = async (client: any) => {
     try {
-      // Salvar no Supabase
-      const existingClient = await getNailDesignerByPhone(client.phone);
+      // Import client functions
+      const { getClientByPhone, createClient, updateClient } = await import('../utils/supabaseUtils');
       
+      // Check if client already exists in Supabase
+      const existingClient = await getClientByPhone(client.phone);
+      
+      let savedClient;
       if (existingClient) {
-        // Atualizar cliente existente
-        await updateNailDesigner(existingClient.id, client);
+        // Update existing client
+        savedClient = await updateClient(existingClient.id, {
+          name: client.name,
+          email: client.email,
+          password: client.password,
+          is_active: client.isActive ?? true
+        });
       } else {
-        // Criar novo cliente
-        await createNailDesigner(client);
+        // Create new client
+        savedClient = await createClient(client);
       }
       
-      // Também salvar no localStorage para compatibilidade
-      const registeredClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
-      const existingIndex = registeredClients.findIndex((c: any) => c.phone === client.phone);
-      
-      const clientData = {
-        id: client.id,
-        name: client.name,
-        phone: client.phone,
-        email: client.email,
-        password: client.password,
-        createdAt: client.createdAt
-      };
-      
-      if (existingIndex >= 0) {
-        registeredClients[existingIndex] = clientData;
-      } else {
-        registeredClients.push(clientData);
+      if (savedClient) {
+        // Also save to localStorage for backward compatibility
+        const registeredClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
+        const existingIndex = registeredClients.findIndex((c: any) => c.phone === client.phone);
+        
+        const clientData = {
+          id: client.id,
+          name: client.name,
+          phone: client.phone,
+          email: client.email,
+          password: client.password,
+          isActive: client.isActive ?? true,
+          createdAt: client.createdAt
+        };
+        
+        if (existingIndex >= 0) {
+          registeredClients[existingIndex] = clientData;
+        } else {
+          registeredClients.push(clientData);
+        }
+        
+        localStorage.setItem('registered_clients', JSON.stringify(registeredClients));
+        
+        return true;
       }
       
-      localStorage.setItem('registered_clients', JSON.stringify(registeredClients));
-      
-      return true;
+      return false;
     } catch (error) {
       console.error('Erro ao salvar cliente:', error);
       return false;

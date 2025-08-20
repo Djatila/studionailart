@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Client Registration</title>
+</head>
+<body>
+    <h1>Test Client Registration in Supabase</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        // Import Supabase
+        const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js');
+        
+        // Configurações do Supabase (usar as mesmas do projeto)
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const results = document.getElementById('results');
+        
+        async function testClientRegistration() {
+            results.innerHTML = '<h2>Testando cadastro de cliente...</h2>';
+            
+            // Dados de teste do cliente
+            const testClient = {
+                id: 'client-test-' + Date.now(),
+                name: 'Cliente Teste',
+                email: 'client-test@nail.app',
+                password: '123456',
+                phone: '11999999999',
+                pix_key: null,
+                is_active: true
+            };
+            
+            try {
+                // Tentar inserir cliente na tabela nail_designers
+                console.log('Tentando inserir cliente:', testClient);
+                
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .insert(testClient)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    console.error('Erro ao inserir cliente:', error);
+                    results.innerHTML += `<p style="color: red;">❌ ERRO ao inserir cliente: ${error.message}</p>`;
+                    results.innerHTML += `<pre>${JSON.stringify(error, null, 2)}</pre>`;
+                } else {
+                    console.log('Cliente inserido com sucesso:', data);
+                    results.innerHTML += `<p style="color: green;">✅ Cliente inserido com sucesso!</p>`;
+                    results.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+                
+            } catch (err) {
+                console.error('Erro geral:', err);
+                results.innerHTML += `<p style="color: red;">❌ ERRO GERAL: ${err.message}</p>`;
+            }
+            
+            // Verificar se o cliente foi salvo
+            try {
+                results.innerHTML += '<h3>Verificando se cliente foi salvo...</h3>';
+                
+                const { data: savedClient, error: fetchError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .eq('phone', testClient.phone)
+                    .single();
+                
+                if (fetchError) {
+                    console.error('Erro ao buscar cliente:', fetchError);
+                    results.innerHTML += `<p style="color: red;">❌ Cliente NÃO foi encontrado: ${fetchError.message}</p>`;
+                } else {
+                    console.log('Cliente encontrado:', savedClient);
+                    results.innerHTML += `<p style="color: green;">✅ Cliente encontrado no banco!</p>`;
+                    results.innerHTML += `<pre>${JSON.stringify(savedClient, null, 2)}</pre>`;
+                }
+                
+            } catch (err) {
+                console.error('Erro ao verificar cliente:', err);
+                results.innerHTML += `<p style="color: red;">❌ ERRO ao verificar: ${err.message}</p>`;
+            }
+            
+            // Listar todos os registros na tabela
+            try {
+                results.innerHTML += '<h3>Todos os registros na tabela nail_designers:</h3>';
+                
+                const { data: allRecords, error: listError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (listError) {
+                    console.error('Erro ao listar registros:', listError);
+                    results.innerHTML += `<p style="color: red;">❌ Erro ao listar: ${listError.message}</p>`;
+                } else {
+                    console.log('Todos os registros:', allRecords);
+                    results.innerHTML += `<p>📋 Total de registros: ${allRecords.length}</p>`;
+                    results.innerHTML += `<pre>${JSON.stringify(allRecords, null, 2)}</pre>`;
+                }
+                
+            } catch (err) {
+                console.error('Erro ao listar:', err);
+                results.innerHTML += `<p style="color: red;">❌ ERRO ao listar: ${err.message}</p>`;
+            }
+        }
+        
+        // Executar teste
+        testClientRegistration();
+    </script>
+</body>
+</html>

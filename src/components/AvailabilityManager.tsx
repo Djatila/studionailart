@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Clock, Calendar } from 'lucide-react';
 import { NailDesigner, Availability } from '../App';
 
@@ -10,13 +10,57 @@ interface AvailabilityManagerProps {
 
 export default function AvailabilityManager({ designer, onBack }: AvailabilityManagerProps) {
   const [showForm, setShowForm] = useState(false);
+  const [availability, setAvailability] = useState<Availability[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     specificDate: '',
     startTime: '09:00',
     endTime: '18:00'
   });
 
-  const getAvailability = (): Availability[] => {
+  // Load availability data on component mount
+  useEffect(() => {
+    loadAvailability();
+  }, [designer.id]);
+
+  const loadAvailability = async () => {
+    setLoading(true);
+    try {
+      const data = await getAvailability();
+      setAvailability(data);
+    } catch (error) {
+      console.error('Erro ao carregar disponibilidade:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAvailability = async (): Promise<Availability[]> => {
+    try {
+      // Buscar do Supabase primeiro
+      const { availabilityService } = await import('../utils/supabaseUtils');
+      const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
+      
+      // Mapear campos do Supabase para o formato esperado
+      const mappedAvailability = supabaseAvailability
+        .filter(avail => avail.specific_date) // Apenas datas específicas
+        .map(avail => ({
+          id: avail.id,
+          designerId: avail.designer_id,
+          specificDate: avail.specific_date!,
+          startTime: avail.start_time,
+          endTime: avail.end_time,
+          isActive: avail.is_available
+        }));
+      
+      if (mappedAvailability.length > 0) {
+        return mappedAvailability;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar disponibilidade do Supabase:', error);
+    }
+    
+    // Fallback para localStorage
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
     return allAvailability
@@ -76,8 +120,8 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     const allAvailability = saved ? JSON.parse(saved) : [];
     const filtered = allAvailability.filter((avail: Availability) => avail.id !== availabilityId);
     localStorage.setItem('nail_availability', JSON.stringify(filtered));
-    // Force component re-render instead of full page reload
-    window.dispatchEvent(new Event('storage'));
+    // Reload availability data
+    await loadAvailability();
   };
 
   const toggleAvailability = async (availabilityId: string) => {
@@ -109,15 +153,15 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       avail.id === availabilityId ? { ...avail, isActive: !avail.isActive } : avail
     );
     localStorage.setItem('nail_availability', JSON.stringify(updated));
-    // Force component re-render instead of full page reload
-    window.dispatchEvent(new Event('storage'));
+    // Reload availability data
+    await loadAvailability();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Check if this specific date already has availability
-    const existing = getAvailability().find(avail => 
+    const existing = availability.find(avail => 
       avail.specificDate === formData.specificDate && avail.isActive
     );
     
@@ -132,27 +176,24 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     }
     
     const availability: Availability = {
-      id: Date.now().toString(),
       designerId: designer.id,
       specificDate: formData.specificDate,
       startTime: formData.startTime,
       endTime: formData.endTime,
       isActive: true
-    };
+    } as Availability;
     
     await saveAvailability(availability);
     setShowForm(false);
     setFormData({ specificDate: '', startTime: '09:00', endTime: '18:00' });
-    // Force component re-render instead of full page reload
-    window.dispatchEvent(new Event('storage'));
+    // Reload availability data
+    await loadAvailability();
   };
 
   const handleCancel = () => {
     setShowForm(false);
     setFormData({ specificDate: '', startTime: '09:00', endTime: '18:00' });
   };
-
-  const availability = getAvailability();
 
   return (
     <div className="space-y-6">
@@ -265,7 +306,12 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       {/* Availability List */}
       {!showForm && (
         <div className="space-y-4">
-          {availability.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">Carregando horários...</p>
+            </div>
+          ) : availability.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">Nenhum horário de atendimento configurado ainda.</p>
               <button

@@ -51,7 +51,7 @@ export interface Appointment {
 }
 
 export interface Availability {
-  id: string;
+  id?: string; // Optional - Supabase will generate UUID automatically
   designerId: string;
   specificDate: string; // YYYY-MM-DD format
   startTime: string;

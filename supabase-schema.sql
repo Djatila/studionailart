@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS public.services (
     name VARCHAR(255) NOT NULL,
     duration INTEGER NOT NULL, -- duration in minutes
     price DECIMAL(10,2) NOT NULL,
+    category VARCHAR(50) DEFAULT 'services' CHECK (category IN ('services', 'extras')),
+    description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

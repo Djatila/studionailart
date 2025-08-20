@@ -55,6 +55,8 @@ export interface Database {
           name: string
           duration: number
           price: number
+          category: string
+          description: string | null
           created_at: string
           updated_at: string
         }
@@ -64,6 +66,8 @@ export interface Database {
           name: string
           duration: number
           price: number
+          category?: string
+          description?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -73,6 +77,8 @@ export interface Database {
           name?: string
           duration?: number
           price?: number
+          category?: string
+          description?: string | null
           created_at?: string
           updated_at?: string
         }

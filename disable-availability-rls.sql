@@ -22,10 +22,8 @@ GRANT ALL ON public.availability TO service_role;
 SELECT 
     schemaname,
     tablename,
-    rowsecurity,
-    hasrls
+    rowsecurity
 FROM pg_tables 
-LEFT JOIN pg_class ON pg_class.relname = pg_tables.tablename
 WHERE tablename = 'availability';
 
 -- 5. Verificar políticas restantes (deve retornar vazio)

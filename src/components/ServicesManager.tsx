@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Edit, Trash2, DollarSign, Clock, Tag } from 'lucide-react';
 import { NailDesigner, Service } from '../App';
+import { serviceService } from '../utils/supabaseUtils';
 
 interface ServicesManagerProps {
   designer: NailDesigner;
@@ -19,38 +20,133 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
     category: 'services' as 'services' | 'extras'
   });
 
-  const getServices = (): Service[] => {
-    const saved = localStorage.getItem('nail_services');
-    const allServices = saved ? JSON.parse(saved) : [];
-    return allServices.filter((service: Service) => service.designerId === designer.id);
-  };
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const saveService = (service: Service) => {
-    const saved = localStorage.getItem('nail_services');
-    const allServices = saved ? JSON.parse(saved) : [];
-    
-    if (editingService) {
-      const index = allServices.findIndex((s: Service) => s.id === editingService.id);
-      if (index >= 0) {
-        allServices[index] = service;
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      // Primeiro tenta buscar do Supabase
+      const supabaseServices = await serviceService.getByDesignerId(designer.id);
+      
+      if (supabaseServices && supabaseServices.length > 0) {
+        // Converte os dados do Supabase para o formato local
+        const convertedServices = supabaseServices.map(service => ({
+          id: service.id,
+          designerId: service.designer_id,
+          name: service.name,
+          price: service.price,
+          duration: service.duration,
+          description: service.description || '',
+          category: service.category || 'services'
+        }));
+        setServices(convertedServices);
+      } else {
+        // Fallback para localStorage se não houver dados no Supabase
+        const saved = localStorage.getItem('nail_services');
+        const allServices = saved ? JSON.parse(saved) : [];
+        const localServices = allServices.filter((service: Service) => service.designerId === designer.id);
+        setServices(localServices);
       }
-    } else {
-      allServices.push(service);
+    } catch (error) {
+      console.error('Erro ao carregar serviços:', error);
+      // Em caso de erro, usa localStorage como fallback
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      const localServices = allServices.filter((service: Service) => service.designerId === designer.id);
+      setServices(localServices);
+    } finally {
+      setLoading(false);
     }
-    
-    localStorage.setItem('nail_services', JSON.stringify(allServices));
   };
 
-  const deleteService = (serviceId: string) => {
-    const saved = localStorage.getItem('nail_services');
-    const allServices = saved ? JSON.parse(saved) : [];
-    const filtered = allServices.filter((service: Service) => service.id !== serviceId);
-    localStorage.setItem('nail_services', JSON.stringify(filtered));
-    // Force component re-render instead of full page reload
-    window.dispatchEvent(new Event('storage'));
+  useEffect(() => {
+    loadServices();
+  }, [designer.id]);
+
+  const saveService = async (service: Service) => {
+    try {
+      // Converte para o formato do Supabase
+      const supabaseService = {
+        id: service.id,
+        designer_id: service.designerId,
+        name: service.name,
+        price: service.price,
+        duration: service.duration,
+        description: service.description,
+        category: service.category
+      };
+
+      if (editingService) {
+        // Atualiza no Supabase
+        await serviceService.update(editingService.id, supabaseService);
+      } else {
+        // Cria no Supabase
+        await serviceService.create(supabaseService);
+      }
+
+      // Também salva no localStorage para compatibilidade
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      
+      if (editingService) {
+        const index = allServices.findIndex((s: Service) => s.id === editingService.id);
+        if (index >= 0) {
+          allServices[index] = service;
+        }
+      } else {
+        allServices.push(service);
+      }
+      
+      localStorage.setItem('nail_services', JSON.stringify(allServices));
+      
+      // Recarrega os serviços
+      await loadServices();
+    } catch (error) {
+      console.error('Erro ao salvar serviço:', error);
+      // Em caso de erro, salva apenas no localStorage
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      
+      if (editingService) {
+        const index = allServices.findIndex((s: Service) => s.id === editingService.id);
+        if (index >= 0) {
+          allServices[index] = service;
+        }
+      } else {
+        allServices.push(service);
+      }
+      
+      localStorage.setItem('nail_services', JSON.stringify(allServices));
+      await loadServices();
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const deleteService = async (serviceId: string) => {
+    try {
+      // Deleta do Supabase
+      await serviceService.delete(serviceId);
+      
+      // Também deleta do localStorage para compatibilidade
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      const filtered = allServices.filter((service: Service) => service.id !== serviceId);
+      localStorage.setItem('nail_services', JSON.stringify(filtered));
+      
+      // Recarrega os serviços
+      await loadServices();
+    } catch (error) {
+      console.error('Erro ao deletar serviço:', error);
+      // Em caso de erro, deleta apenas do localStorage
+      const saved = localStorage.getItem('nail_services');
+      const allServices = saved ? JSON.parse(saved) : [];
+      const filtered = allServices.filter((service: Service) => service.id !== serviceId);
+      localStorage.setItem('nail_services', JSON.stringify(filtered));
+      await loadServices();
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const service: Service = {
@@ -63,12 +159,10 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
       category: formData.category
     };
     
-    saveService(service);
+    await saveService(service);
     setShowForm(false);
     setEditingService(null);
     setFormData({ name: '', price: '', duration: '', description: '', category: 'services' });
-    // Force component re-render instead of full page reload
-    window.dispatchEvent(new Event('storage'));
   };
 
   const handleEdit = (service: Service) => {
@@ -94,7 +188,6 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
     setShowForm(true);
   };
 
-  const services = getServices();
   const regularServices = services.filter(s => s.category === 'services');
   const extraServices = services.filter(s => s.category === 'extras');
 
@@ -217,8 +310,18 @@ export default function ServicesManager({ designer, onBack }: ServicesManagerPro
         </div>
       )}
 
+      {/* Loading */}
+      {loading && (
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-8">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+            <span className="ml-3 text-gray-600">Carregando serviços...</span>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      {!showForm && (
+      {!showForm && !loading && (
         <div className="bg-white rounded-xl shadow-sm border border-pink-100">
           <div className="flex border-b border-pink-100">
             <button

@@ -10,7 +10,7 @@ import DesignerSettings from './components/DesignerSettings';
 // Remove unused import
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import ClientDashboard from './components/ClientDashboard';
-import DebugSupabase from './components/DebugSupabase';
+
 import { cleanOldAppointments } from './utils/appointmentUtils';
 
 export interface NailDesigner {
@@ -369,7 +369,7 @@ function App() {
           </div>
         </div>
       )}
-      <DebugSupabase />
+
     </div>
   );
 }

@@ -288,7 +288,7 @@ export default function SuperAdminDashboard({ onBack }: SuperAdminDashboardProps
   
   const totalRevenue = allAppointments.reduce((sum, apt) => sum + apt.price, 0);
   const monthlyRevenue = allAppointments.filter(apt => {
-    const aptDate = new Date(apt.date);
+    const aptDate = new Date(apt.date + 'T00:00:00');
     const now = new Date();
     return aptDate.getMonth() === now.getMonth() && aptDate.getFullYear() === now.getFullYear();
   }).reduce((sum, apt) => sum + apt.price, 0);
@@ -776,7 +776,7 @@ export default function SuperAdminDashboard({ onBack }: SuperAdminDashboardProps
                 const currentMonth = new Date().getMonth();
                 const currentYear = new Date().getFullYear();
                 const currentMonthAppointments = allAppointments.filter(appointment => {
-                  const appointmentDate = new Date(appointment.date);
+                  const appointmentDate = new Date(appointment.date + 'T00:00:00');
                   return appointmentDate.getMonth() === currentMonth && appointmentDate.getFullYear() === currentYear;
                 });
                 

@@ -383,7 +383,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
 Este é um lembrete do seu agendamento:
 
 💅 *Serviço:* ${appointment.service}
-📅 *Data:* ${new Date(appointment.date).toLocaleDateString('pt-BR')}
+📅 *Data:* ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}
 ⏰ *Horário:* ${appointment.time}
 💰 *Valor:* R$ ${appointment.price.toFixed(2)}
 
@@ -420,7 +420,7 @@ Nos vemos em breve! 💖`;
   
   // Get next 7 days appointments
   const nextWeekAppointments = appointments.filter(apt => {
-    const aptDate = new Date(apt.date);
+    const aptDate = new Date(apt.date + 'T00:00:00');
     const today = new Date(selectedDate);
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
@@ -430,7 +430,7 @@ Nos vemos em breve! 💖`;
   // Monthly clients
   const currentMonth = new Date(selectedDate);
   const monthlyClients = appointments.filter(apt => {
-    const aptDate = new Date(apt.date);
+    const aptDate = new Date(apt.date + 'T00:00:00');
     return aptDate.getMonth() === currentMonth.getMonth() && 
            aptDate.getFullYear() === currentMonth.getFullYear();
   });

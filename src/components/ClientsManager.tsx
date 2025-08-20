@@ -199,8 +199,8 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
         designer,
         appointments: allAppointments.filter(appointment => 
           appointment.designerId === designer.id &&
-          new Date(appointment.date).getMonth() === currentMonth &&
-          new Date(appointment.date).getFullYear() === currentYear
+          new Date(appointment.date + 'T00:00:00').getMonth() === currentMonth &&
+        new Date(appointment.date + 'T00:00:00').getFullYear() === currentYear
         )
       };
     });
@@ -503,7 +503,7 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
                         <div>
                           <p className="text-white font-medium">{client?.name || appointment.clientPhone}</p>
                           <p className="text-sm text-purple-200">
-                            {new Date(appointment.date).toLocaleDateString('pt-BR')} às {appointment.time}
+                            {new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')} às {appointment.time}
                           </p>
                           <p className="text-sm text-purple-200">{appointment.service}</p>
                         </div>

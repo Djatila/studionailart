@@ -233,7 +233,35 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     return availability.some((avail: any) => avail.specificDate === date);
   };
 
-  const saveAppointment = (appointment: Appointment) => {
+  const saveAppointment = async (appointment: Appointment) => {
+    try {
+      // Salvar no Supabase
+      const { createAppointment } = await import('../utils/supabaseUtils');
+      
+      // Mapear para o formato do Supabase
+      const supabaseAppointment = {
+        id: appointment.id,
+        designer_id: appointment.designerId,
+        client_name: appointment.clientName,
+        client_phone: appointment.clientPhone,
+        client_email: appointment.clientEmail || null,
+        service: appointment.service,
+        date: appointment.date,
+        time: appointment.time,
+        price: appointment.price,
+        status: appointment.status || 'pending'
+      };
+      
+      const savedAppointment = await createAppointment(supabaseAppointment);
+      
+      if (savedAppointment) {
+        console.log('Agendamento salvo no Supabase:', savedAppointment);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar agendamento no Supabase:', error);
+    }
+    
+    // Também salvar no localStorage para compatibilidade
     const saved = localStorage.getItem('nail_appointments');
     const allAppointments = saved ? JSON.parse(saved) : [];
     allAppointments.push(appointment);
@@ -288,7 +316,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
     if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone || !selectedDesigner) {
       return;
     }
@@ -306,7 +334,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       status: 'pending'
     };
 
-    saveAppointment(newAppointment);
+    await saveAppointment(newAppointment);
     setShowConfirmation(true);
   };
 

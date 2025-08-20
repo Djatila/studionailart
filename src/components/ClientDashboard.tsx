@@ -97,9 +97,9 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     now.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
     
     return appointments.filter(apt => {
-      const aptDate = new Date(apt.date);
+      const aptDate = new Date(apt.date + 'T00:00:00');
       return aptDate >= now && (apt.status === 'confirmed' || apt.status === 'pending');
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }).sort((a, b) => new Date(a.date + 'T00:00:00').getTime() - new Date(b.date + 'T00:00:00').getTime());
   };
 
   const getHistoryAppointments = () => {
@@ -108,14 +108,14 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     const currentYear = now.getFullYear();
     
     return appointments.filter(apt => {
-      const aptDate = new Date(apt.date);
+      const aptDate = new Date(apt.date + 'T00:00:00');
       return (aptDate.getMonth() !== currentMonth || aptDate.getFullYear() !== currentYear) ||
              apt.status === 'completed' || apt.status === 'cancelled';
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => new Date(b.date + 'T00:00:00').getTime() - new Date(a.date + 'T00:00:00').getTime());
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',

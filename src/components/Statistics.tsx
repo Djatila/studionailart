@@ -27,7 +27,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
     const now = new Date();
     
     return appointments.filter(apt => {
-      const aptDate = new Date(apt.date);
+      const aptDate = new Date(apt.date + 'T00:00:00');
       
       switch (selectedPeriod) {
         case 'week':

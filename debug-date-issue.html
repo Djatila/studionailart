@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐛 Debug - Problema de Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .warning { border-left: 4px solid #ff9800; }
+        .info { border-left: 4px solid #2196F3; }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        input, select {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            margin: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        .date-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .date-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Debug - Problema de Data no Agendamento</h1>
+        <p><strong>Problema:</strong> Agendamento feito para dia 31 aparece como dia 30 no painel do cliente</p>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Teste de Formatação de Datas</h2>
+        
+        <div class="test-section">
+            <h3>1. Teste com Data Específica (31/01/2024)</h3>
+            <button onclick="testSpecificDate()">Testar Data 31/01/2024</button>
+            <div id="specificDateResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Teste com Data Personalizada</h3>
+            <input type="date" id="customDate" value="2024-01-31">
+            <button onclick="testCustomDate()">Testar Data Personalizada</button>
+            <div id="customDateResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Comparação de Métodos de Formatação</h3>
+            <button onclick="compareFormattingMethods()">Comparar Métodos</button>
+            <div id="comparisonResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Teste de Timezone</h3>
+            <button onclick="testTimezone()">Testar Problemas de Timezone</button>
+            <div id="timezoneResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Simular Agendamento Real</h3>
+            <input type="date" id="bookingDate" value="2024-01-31">
+            <button onclick="simulateBooking()">Simular Agendamento</button>
+            <button onclick="simulateClientView()">Simular Visualização Cliente</button>
+            <div id="simulationResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>6. Verificar Agendamentos Existentes</h3>
+            <button onclick="checkExistingAppointments()">Verificar Agendamentos</button>
+            <div id="existingResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Função de formatação do ClientDashboard
+        function formatDateClientDashboard(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Função de formatação do AdminDashboard
+        function formatDateAdminDashboard(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function testSpecificDate() {
+            const testDate = '2024-01-31';
+            const result = document.getElementById('specificDateResult');
+            
+            let output = `🧪 TESTE COM DATA: ${testDate}\n\n`;
+            
+            // Teste 1: new Date() direto
+            const date1 = new Date(testDate);
+            output += `1. new Date('${testDate}'):\n`;
+            output += `   - toString(): ${date1.toString()}\n`;
+            output += `   - toLocaleDateString('pt-BR'): ${date1.toLocaleDateString('pt-BR')}\n`;
+            output += `   - getDate(): ${date1.getDate()}\n`;
+            output += `   - getMonth(): ${date1.getMonth()} (0-based)\n`;
+            output += `   - getFullYear(): ${date1.getFullYear()}\n\n`;
+            
+            // Teste 2: Formatação do ClientDashboard
+            output += `2. Formatação ClientDashboard:\n`;
+            output += `   - Resultado: ${formatDateClientDashboard(testDate)}\n\n`;
+            
+            // Teste 3: Formatação do AdminDashboard
+            output += `3. Formatação AdminDashboard:\n`;
+            output += `   - Resultado: ${formatDateAdminDashboard(testDate)}\n\n`;
+            
+            // Teste 4: Timezone info
+            output += `4. Informações de Timezone:\n`;
+            output += `   - Timezone Offset: ${date1.getTimezoneOffset()} minutos\n`;
+            output += `   - UTC String: ${date1.toUTCString()}\n`;
+            output += `   - ISO String: ${date1.toISOString()}\n`;
+            
+            result.textContent = output;
+            result.className = 'result info';
+        }
+
+        function testCustomDate() {
+            const customDate = document.getElementById('customDate').value;
+            const result = document.getElementById('customDateResult');
+            
+            if (!customDate) {
+                result.textContent = '❌ Por favor, selecione uma data';
+                result.className = 'result error';
+                return;
+            }
+            
+            let output = `🧪 TESTE COM DATA PERSONALIZADA: ${customDate}\n\n`;
+            
+            const date = new Date(customDate);
+            output += `Data criada: ${date.toString()}\n`;
+            output += `Formatação ClientDashboard: ${formatDateClientDashboard(customDate)}\n`;
+            output += `Formatação AdminDashboard: ${formatDateAdminDashboard(customDate)}\n`;
+            output += `Dia extraído: ${date.getDate()}\n`;
+            
+            result.textContent = output;
+            result.className = 'result info';
+        }
+
+        function compareFormattingMethods() {
+            const testDate = '2024-01-31';
+            const result = document.getElementById('comparisonResult');
+            
+            let output = `📊 COMPARAÇÃO DE MÉTODOS DE FORMATAÇÃO\n`;
+            output += `Data de teste: ${testDate}\n\n`;
+            
+            // Método 1: new Date() direto
+            const method1 = new Date(testDate);
+            output += `Método 1 - new Date('${testDate}'):\n`;
+            output += `  Dia: ${method1.getDate()}\n`;
+            output += `  Formatado: ${method1.toLocaleDateString('pt-BR')}\n\n`;
+            
+            // Método 2: Split e construção manual (AdminDashboard)
+            const [year, month, day] = testDate.split('-');
+            const method2 = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            output += `Método 2 - Split e construção manual:\n`;
+            output += `  Dia: ${method2.getDate()}\n`;
+            output += `  Formatado: ${method2.toLocaleDateString('pt-BR')}\n\n`;
+            
+            // Método 3: Com timezone específico
+            const method3 = new Date(testDate + 'T00:00:00');
+            output += `Método 3 - Com horário específico:\n`;
+            output += `  Dia: ${method3.getDate()}\n`;
+            output += `  Formatado: ${method3.toLocaleDateString('pt-BR')}\n\n`;
+            
+            // Método 4: UTC
+            const method4 = new Date(testDate + 'T00:00:00.000Z');
+            output += `Método 4 - UTC:\n`;
+            output += `  Dia: ${method4.getDate()}\n`;
+            output += `  Formatado: ${method4.toLocaleDateString('pt-BR')}\n`;
+            
+            result.textContent = output;
+            result.className = 'result info';
+        }
+
+        function testTimezone() {
+            const result = document.getElementById('timezoneResult');
+            const testDate = '2024-01-31';
+            
+            let output = `🌍 TESTE DE TIMEZONE\n\n`;
+            
+            const date = new Date(testDate);
+            output += `Data original: ${testDate}\n`;
+            output += `Timezone local: ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n`;
+            output += `Offset: ${date.getTimezoneOffset()} minutos\n\n`;
+            
+            // Teste em diferentes horários do dia
+            const times = ['00:00:00', '12:00:00', '23:59:59'];
+            times.forEach(time => {
+                const dateTime = new Date(testDate + 'T' + time);
+                output += `${testDate}T${time}:\n`;
+                output += `  Dia: ${dateTime.getDate()}\n`;
+                output += `  Formatado: ${dateTime.toLocaleDateString('pt-BR')}\n\n`;
+            });
+            
+            result.textContent = output;
+            result.className = 'result warning';
+        }
+
+        function simulateBooking() {
+            const bookingDate = document.getElementById('bookingDate').value;
+            const result = document.getElementById('simulationResult');
+            
+            if (!bookingDate) {
+                result.textContent = '❌ Por favor, selecione uma data para o agendamento';
+                result.className = 'result error';
+                return;
+            }
+            
+            // Simular como o agendamento é salvo
+            const appointment = {
+                id: Date.now().toString(),
+                designerId: 'test-designer',
+                clientName: 'Cliente Teste',
+                clientPhone: '(11) 99999-9999',
+                clientEmail: 'teste@email.com',
+                service: 'Manicure',
+                date: bookingDate, // Data salva como string YYYY-MM-DD
+                time: '14:00',
+                price: 50,
+                status: 'pending'
+            };
+            
+            // Salvar no localStorage temporariamente
+            const saved = localStorage.getItem('debug_appointments') || '[]';
+            const appointments = JSON.parse(saved);
+            appointments.push(appointment);
+            localStorage.setItem('debug_appointments', JSON.stringify(appointments));
+            
+            let output = `✅ AGENDAMENTO SIMULADO\n\n`;
+            output += `Data selecionada: ${bookingDate}\n`;
+            output += `Data salva: ${appointment.date}\n`;
+            output += `Agendamento criado com sucesso!\n\n`;
+            output += `Dados salvos:\n${JSON.stringify(appointment, null, 2)}`;
+            
+            result.textContent = output;
+            result.className = 'result success';
+        }
+
+        function simulateClientView() {
+            const result = document.getElementById('simulationResult');
+            
+            // Recuperar agendamentos de teste
+            const saved = localStorage.getItem('debug_appointments') || '[]';
+            const appointments = JSON.parse(saved);
+            
+            if (appointments.length === 0) {
+                result.textContent = '❌ Nenhum agendamento de teste encontrado. Crie um agendamento primeiro.';
+                result.className = 'result error';
+                return;
+            }
+            
+            let output = `👁️ VISUALIZAÇÃO DO CLIENTE\n\n`;
+            
+            appointments.forEach((apt, index) => {
+                output += `Agendamento ${index + 1}:\n`;
+                output += `  Data original: ${apt.date}\n`;
+                output += `  Formatação ClientDashboard: ${formatDateClientDashboard(apt.date)}\n`;
+                output += `  Formatação AdminDashboard: ${formatDateAdminDashboard(apt.date)}\n`;
+                
+                const date = new Date(apt.date);
+                output += `  Dia extraído: ${date.getDate()}\n`;
+                output += `  ⚠️ PROBLEMA: ${date.getDate() !== parseInt(apt.date.split('-')[2]) ? 'SIM' : 'NÃO'}\n\n`;
+            });
+            
+            result.textContent = output;
+            result.className = 'result info';
+        }
+
+        function checkExistingAppointments() {
+            const result = document.getElementById('existingResult');
+            
+            // Verificar agendamentos reais
+            const realAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+            const debugAppointments = JSON.parse(localStorage.getItem('debug_appointments') || '[]');
+            
+            let output = `📋 AGENDAMENTOS EXISTENTES\n\n`;
+            
+            output += `Agendamentos reais: ${realAppointments.length}\n`;
+            output += `Agendamentos de teste: ${debugAppointments.length}\n\n`;
+            
+            if (realAppointments.length > 0) {
+                output += `AGENDAMENTOS REAIS:\n`;
+                realAppointments.slice(-5).forEach((apt, index) => {
+                    output += `${index + 1}. ${apt.clientName} - ${apt.date} - ${formatDateClientDashboard(apt.date)}\n`;
+                });
+                output += `\n`;
+            }
+            
+            if (debugAppointments.length > 0) {
+                output += `AGENDAMENTOS DE TESTE:\n`;
+                debugAppointments.forEach((apt, index) => {
+                    output += `${index + 1}. ${apt.clientName} - ${apt.date} - ${formatDateClientDashboard(apt.date)}\n`;
+                });
+            }
+            
+            result.textContent = output;
+            result.className = 'result info';
+        }
+
+        // Limpar dados de teste
+        function clearTestData() {
+            localStorage.removeItem('debug_appointments');
+            document.getElementById('simulationResult').textContent = 'Dados de teste limpos!';
+            document.getElementById('simulationResult').className = 'result success';
+        }
+
+        // Executar teste inicial
+        window.onload = function() {
+            testSpecificDate();
+        };
+    </script>
+
+    <div class="container">
+        <h2>🧹 Limpeza</h2>
+        <button onclick="clearTestData()">Limpar Dados de Teste</button>
+    </div>
+</body>
+</html>

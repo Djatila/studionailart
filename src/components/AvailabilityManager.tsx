@@ -42,16 +42,17 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
       
       // Mapear campos do Supabase para o formato esperado
-      const mappedAvailability = supabaseAvailability
-        .filter(avail => avail.specific_date) // Apenas datas específicas
-        .map(avail => ({
+      const filteredAvailability = supabaseAvailability.filter(avail => avail.specific_date);
+      const mappedAvailability = filteredAvailability.map(avail => {
+        return {
           id: avail.id,
           designerId: avail.designer_id,
           specificDate: avail.specific_date!,
           startTime: avail.start_time,
           endTime: avail.end_time,
           isActive: avail.is_available
-        }));
+        };
+      });
       
       if (mappedAvailability.length > 0) {
         return mappedAvailability;

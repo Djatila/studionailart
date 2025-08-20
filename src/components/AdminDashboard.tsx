@@ -75,7 +75,10 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   const loadAppointments = async () => {
     try {
       const data = await getSupabaseAppointments();
-      const designerAppointments = data.filter((apt: Appointment) => apt.designerId === designer.id);
+      // Filter by designer_id (Supabase field) or designerId (localStorage field)
+      const designerAppointments = data.filter((apt: any) => 
+        apt.designer_id === designer.id || apt.designerId === designer.id
+      );
       setAppointments(designerAppointments);
     } catch (err) {
       console.error('Erro ao carregar agendamentos:', err);

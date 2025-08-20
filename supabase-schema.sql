@@ -48,9 +48,10 @@ CREATE TABLE IF NOT EXISTS public.appointments (
 CREATE TABLE IF NOT EXISTS public.availability (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     designer_id UUID REFERENCES public.nail_designers(id) ON DELETE CASCADE,
-    day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6), -- 0 = Sunday, 6 = Saturday
+    day_of_week INTEGER CHECK (day_of_week >= 0 AND day_of_week <= 6), -- 0 = Sunday, 6 = Saturday
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
+    specific_date DATE, -- For specific date availability
     is_available BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

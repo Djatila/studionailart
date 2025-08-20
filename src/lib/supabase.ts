@@ -125,9 +125,10 @@ export interface Database {
         Row: {
           id: string
           designer_id: string
-          day_of_week: number
+          day_of_week: number | null
           start_time: string
           end_time: string
+          specific_date: string | null
           is_available: boolean
           created_at: string
           updated_at: string
@@ -135,9 +136,10 @@ export interface Database {
         Insert: {
           id?: string
           designer_id: string
-          day_of_week: number
+          day_of_week?: number | null
           start_time: string
           end_time: string
+          specific_date?: string | null
           is_available?: boolean
           created_at?: string
           updated_at?: string
@@ -145,9 +147,10 @@ export interface Database {
         Update: {
           id?: string
           designer_id?: string
-          day_of_week?: number
+          day_of_week?: number | null
           start_time?: string
           end_time?: string
+          specific_date?: string | null
           is_available?: boolean
           created_at?: string
           updated_at?: string

@@ -27,14 +27,51 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       );
   };
 
-  const saveAvailability = (availability: Availability) => {
+  const saveAvailability = async (availability: Availability) => {
+    try {
+      // Salvar no Supabase
+      const { availabilityService } = await import('../utils/supabaseUtils');
+      
+      // Mapear para o formato do Supabase
+      const supabaseAvailability = {
+        designer_id: availability.designerId,
+        day_of_week: availability.specificDate ? new Date(availability.specificDate).getDay() : 0,
+        start_time: availability.startTime,
+        end_time: availability.endTime,
+        is_available: availability.isActive,
+        specific_date: availability.specificDate
+      };
+      
+      const savedAvailability = await availabilityService.create(supabaseAvailability);
+      
+      if (savedAvailability) {
+        console.log('Disponibilidade salva no Supabase:', savedAvailability);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar disponibilidade no Supabase:', error);
+    }
+    
+    // Também salvar no localStorage para compatibilidade
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
     allAvailability.push(availability);
     localStorage.setItem('nail_availability', JSON.stringify(allAvailability));
   };
 
-  const deleteAvailability = (availabilityId: string) => {
+  const deleteAvailability = async (availabilityId: string) => {
+    try {
+      // Deletar do Supabase
+      const { availabilityService } = await import('../utils/supabaseUtils');
+      const deleted = await availabilityService.delete(availabilityId);
+      
+      if (deleted) {
+        console.log('Disponibilidade deletada do Supabase:', availabilityId);
+      }
+    } catch (error) {
+      console.error('Erro ao deletar disponibilidade do Supabase:', error);
+    }
+    
+    // Também deletar do localStorage
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
     const filtered = allAvailability.filter((avail: Availability) => avail.id !== availabilityId);
@@ -43,7 +80,29 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     window.dispatchEvent(new Event('storage'));
   };
 
-  const toggleAvailability = (availabilityId: string) => {
+  const toggleAvailability = async (availabilityId: string) => {
+    try {
+      // Buscar a disponibilidade atual
+      const saved = localStorage.getItem('nail_availability');
+      const allAvailability = saved ? JSON.parse(saved) : [];
+      const currentAvail = allAvailability.find((avail: Availability) => avail.id === availabilityId);
+      
+      if (currentAvail) {
+        // Atualizar no Supabase
+        const { availabilityService } = await import('../utils/supabaseUtils');
+        const updated = await availabilityService.update(availabilityId, {
+          is_available: !currentAvail.isActive
+        });
+        
+        if (updated) {
+          console.log('Disponibilidade atualizada no Supabase:', updated);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar disponibilidade no Supabase:', error);
+    }
+    
+    // Também atualizar no localStorage
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
     const updated = allAvailability.map((avail: Availability) => 
@@ -54,7 +113,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Check if this specific date already has availability
@@ -81,7 +140,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       isActive: true
     };
     
-    saveAvailability(availability);
+    await saveAvailability(availability);
     setShowForm(false);
     setFormData({ specificDate: '', startTime: '09:00', endTime: '18:00' });
     // Force component re-render instead of full page reload

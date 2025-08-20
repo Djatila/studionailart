@@ -152,12 +152,7 @@ function App() {
     
     if (asClient) {
       // Se for cliente logando pelo sistema de login, vai para o painel do cliente
-      if (designer.id.startsWith('client-')) {
-        setCurrentView('client');
-      } else {
-        // Se for cliente acessando via link da designer, vai para booking
-        setCurrentView('booking');
-      }
+      setCurrentView('client');
     } else {
       setCurrentView('admin');
     }
@@ -227,7 +222,7 @@ function App() {
       <BookingPage 
         designer={currentDesigner!} 
         onBack={handleLogout}
-        loggedClient={currentDesigner?.id.startsWith('client-') ? currentDesigner : undefined}
+        loggedClient={isClient ? currentDesigner : undefined}
       />
     );
   }
@@ -293,14 +288,14 @@ function App() {
             designer={isClient && currentDesigner ? currentDesigner : undefined}
             onBack={() => {
               // Se é uma cliente logada, volta para o painel da cliente
-              if (isClient && currentDesigner && currentDesigner.id?.startsWith('client-')) {
-                setCurrentView('client');
-              } else {
-                // Se não é cliente ou não está logada, faz logout
-                handleLogout();
-              }
+            if (isClient && currentDesigner) {
+              setCurrentView('client');
+            } else {
+              // Se não é cliente ou não está logada, faz logout
+              handleLogout();
+            }
             }}
-            loggedClient={currentDesigner?.id?.startsWith('client-') ? currentDesigner : undefined}
+            loggedClient={isClient ? currentDesigner : undefined}
             onNavigateToClientDashboard={() => setCurrentView('client')}
           />
         )}

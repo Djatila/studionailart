@@ -328,10 +328,9 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
       // Criar novo cliente
       const newClient = {
-        id: 'client-' + clientRegisterData.phone,
         name: clientRegisterData.name,
         phone: clientRegisterData.phone,
-        email: clientRegisterData.email || 'client-' + clientRegisterData.phone + '@nail.app',
+        email: clientRegisterData.email || clientRegisterData.phone + '@nail.app',
         password: clientRegisterData.password,
         isActive: true,
         createdAt: new Date().toISOString()

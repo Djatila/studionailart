@@ -49,7 +49,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
-    if (loggedClient && loggedClient.id.startsWith('client-')) {
+    if (loggedClient) {
       setClientName(loggedClient.name);
       setClientPhone(loggedClient.phone);
       setClientEmail(loggedClient.email || '');
@@ -225,7 +225,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       setSelectedTime('');
       
       // Se há uma cliente logada, preencher automaticamente os campos
-      if (loggedClient && loggedClient.id.startsWith('client-')) {
+      if (loggedClient) {
         setClientName(loggedClient.name);
         setClientPhone(loggedClient.phone);
         setClientEmail(loggedClient.email || '');
@@ -445,7 +445,7 @@ Aguardo confirmação!`;
           </div>
 
           {/* Client Dashboard Button - Only show if client is logged in */}
-          {loggedClient && loggedClient.id.startsWith('client-') && onNavigateToClientDashboard && (
+          {loggedClient && onNavigateToClientDashboard && (
             <button
               onClick={onNavigateToClientDashboard}
               className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 hover:scale-105 mb-4 flex items-center justify-center gap-2"

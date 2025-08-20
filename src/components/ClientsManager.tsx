@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Phone, Mail, Calendar, CheckCircle, XCircle, Clock, Eye, Key, RotateCcw } from 'lucide-react';
 import { NailDesigner, Appointment } from '../App';
+import { getClients } from '../utils/supabaseUtils';
 
 interface RegisteredClient {
   id: string;
@@ -25,6 +26,28 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [clients, setClients] = useState<RegisteredClient[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Carregar clientes do Supabase + localStorage
+  const loadClients = async () => {
+    try {
+      setLoading(true);
+      const clientsData = await getClients();
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      // Fallback para localStorage se Supabase falhar
+      const localClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
+      setClients(localClients);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadClients();
+  }, []);
 
   // Função para obter todos os nail designers
   const getAllDesigners = (): NailDesigner[] => {
@@ -38,15 +61,15 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
     return saved ? JSON.parse(saved) : [];
   };
 
-  // Função para obter clientes cadastrados do localStorage
+  // Função para obter clientes cadastrados (do estado que já inclui Supabase + localStorage)
   const getRegisteredClients = (): RegisteredClient[] => {
-    const saved = localStorage.getItem('registered_clients');
-    return saved ? JSON.parse(saved) : [];
+    return clients;
   };
 
-  // Função para salvar clientes no localStorage
-  const saveRegisteredClients = (clients: RegisteredClient[]) => {
-    localStorage.setItem('registered_clients', JSON.stringify(clients));
+  // Função para salvar clientes no localStorage e atualizar estado
+  const saveRegisteredClients = (updatedClients: RegisteredClient[]) => {
+    localStorage.setItem('registered_clients', JSON.stringify(updatedClients));
+    setClients(updatedClients);
   };
 
   // Função para resetar senha de um cliente

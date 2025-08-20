@@ -768,19 +768,9 @@ export default function SuperAdminDashboard({ onBack }: SuperAdminDashboardProps
               <h2 className="text-xl font-semibold text-white mb-6">Todos os Clientes Cadastrados</h2>
               
               {(() => {
-                // Get all registered clients from localStorage
-                const getRegisteredClients = () => {
-                  const saved = localStorage.getItem('registered_clients');
-                  return saved ? JSON.parse(saved) : [];
-                };
-                
-                const getAllAppointments = () => {
-                  const saved = localStorage.getItem('nail_appointments');
-                  return saved ? JSON.parse(saved) : [];
-                };
-                
-                const registeredClients = getRegisteredClients();
-                const allAppointments = getAllAppointments();
+                // Use clients from state (already loaded from Supabase + localStorage)
+                const registeredClients = clients;
+                const allAppointments = appointments;
                 
                 // Get current month appointments
                 const currentMonth = new Date().getMonth();

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Agendamentos - Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug - Verificar Agendamentos</h1>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAppointments">-</div>
+                <div>Total Agendamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalDesigners">-</div>
+                <div>Total Designers</div>
+            </div>
+        </div>
+        
+        <button class="button" onclick="checkAppointments()">📊 Verificar Agendamentos</button>
+        <button class="button" onclick="checkDesigners()">👩‍💼 Verificar Designers</button>
+        <button class="button" onclick="checkLocalStorage()">💾 Verificar localStorage</button>
+        <button class="button" onclick="clearLog()">🗑️ Limpar Log</button>
+        
+        <div class="log" id="log">Clique em um botão para começar...</div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+        
+        window.checkAppointments = async function() {
+            log('🔍 Verificando agendamentos no Supabase...');
+            
+            try {
+                const { data: appointments, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`❌ Erro ao buscar agendamentos: ${error.message}`);
+                    return;
+                }
+                
+                log(`📊 Total de agendamentos encontrados: ${appointments?.length || 0}`);
+                document.getElementById('totalAppointments').textContent = appointments?.length || 0;
+                
+                if (appointments && appointments.length > 0) {
+                    log('\n📋 Primeiros 5 agendamentos:');
+                    appointments.slice(0, 5).forEach((apt, index) => {
+                        log(`${index + 1}. ID: ${apt.id}`);
+                        log(`   Designer ID: ${apt.designer_id}`);
+                        log(`   Cliente: ${apt.client_name}`);
+                        log(`   Telefone: ${apt.client_phone}`);
+                        log(`   Data: ${apt.date}`);
+                        log(`   Hora: ${apt.time}`);
+                        log(`   Serviço: ${apt.service}`);
+                        log(`   Status: ${apt.status}`);
+                        log(`   Criado em: ${apt.created_at}`);
+                        log('   ---');
+                    });
+                    
+                    // Agrupar por designer_id
+                    const byDesigner = {};
+                    appointments.forEach(apt => {
+                        if (!byDesigner[apt.designer_id]) {
+                            byDesigner[apt.designer_id] = 0;
+                        }
+                        byDesigner[apt.designer_id]++;
+                    });
+                    
+                    log('\n👩‍💼 Agendamentos por Designer:');
+                    Object.entries(byDesigner).forEach(([designerId, count]) => {
+                        log(`   Designer ${designerId}: ${count} agendamentos`);
+                    });
+                } else {
+                    log('⚠️ Nenhum agendamento encontrado no Supabase');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.checkDesigners = async function() {
+            log('🔍 Verificando designers no Supabase...');
+            
+            try {
+                const { data: designers, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`❌ Erro ao buscar designers: ${error.message}`);
+                    return;
+                }
+                
+                log(`👩‍💼 Total de designers encontrados: ${designers?.length || 0}`);
+                document.getElementById('totalDesigners').textContent = designers?.length || 0;
+                
+                if (designers && designers.length > 0) {
+                    log('\n📋 Designers cadastrados:');
+                    designers.forEach((designer, index) => {
+                        log(`${index + 1}. ID: ${designer.id}`);
+                        log(`   Nome: ${designer.name}`);
+                        log(`   Email: ${designer.email}`);
+                        log(`   Telefone: ${designer.phone}`);
+                        log(`   Ativo: ${designer.is_active}`);
+                        log(`   Criado em: ${designer.created_at}`);
+                        log('   ---');
+                    });
+                } else {
+                    log('⚠️ Nenhum designer encontrado no Supabase');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.checkLocalStorage = function() {
+            log('🔍 Verificando localStorage...');
+            
+            // Verificar agendamentos
+            const localAppointments = JSON.parse(localStorage.getItem('appointments') || '[]');
+            log(`📊 Agendamentos no localStorage: ${localAppointments.length}`);
+            
+            if (localAppointments.length > 0) {
+                log('\n📋 Primeiros 3 agendamentos do localStorage:');
+                localAppointments.slice(0, 3).forEach((apt, index) => {
+                    log(`${index + 1}. ID: ${apt.id}`);
+                    log(`   Designer ID: ${apt.designerId}`);
+                    log(`   Cliente: ${apt.clientName}`);
+                    log(`   Telefone: ${apt.clientPhone}`);
+                    log(`   Data: ${apt.date}`);
+                    log(`   Hora: ${apt.time}`);
+                    log(`   Serviço: ${apt.service}`);
+                    log('   ---');
+                });
+            }
+            
+            // Verificar designers
+            const localDesigners = JSON.parse(localStorage.getItem('nailDesigners') || '[]');
+            log(`\n👩‍💼 Designers no localStorage: ${localDesigners.length}`);
+            
+            if (localDesigners.length > 0) {
+                log('\n📋 Designers do localStorage:');
+                localDesigners.forEach((designer, index) => {
+                    log(`${index + 1}. ID: ${designer.id}`);
+                    log(`   Nome: ${designer.name}`);
+                    log(`   Email: ${designer.email}`);
+                    log('   ---');
+                });
+            }
+            
+            // Verificar usuário logado
+            const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+            if (currentUser) {
+                log(`\n👤 Usuário logado: ${currentUser.name} (ID: ${currentUser.id})`);
+            } else {
+                log('\n👤 Nenhum usuário logado');
+            }
+        }
+        
+        // Executar verificação inicial
+        setTimeout(() => {
+            checkAppointments();
+            checkDesigners();
+            checkLocalStorage();
+        }, 1000);
+    </script>
+</body>
+</html>

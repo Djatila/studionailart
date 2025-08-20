@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Fluxo de Agendamento</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button.success {
+            background: #28a745;
+        }
+        .button.success:hover {
+            background: #218838;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .appointment-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste Fluxo de Agendamento</h1>
+        
+        <h2>1. Criar Agendamento de Teste</h2>
+        <div class="form-group">
+            <label>Designer ID:</label>
+            <input type="text" id="designerId" value="" placeholder="ID da designer">
+        </div>
+        <div class="form-group">
+            <label>Nome do Cliente:</label>
+            <input type="text" id="clientName" value="Cliente Teste" placeholder="Nome do cliente">
+        </div>
+        <div class="form-group">
+            <label>Telefone:</label>
+            <input type="text" id="clientPhone" value="(11) 99999-9999" placeholder="Telefone">
+        </div>
+        <div class="form-group">
+            <label>Email:</label>
+            <input type="email" id="clientEmail" value="teste@email.com" placeholder="Email">
+        </div>
+        <div class="form-group">
+            <label>Serviço:</label>
+            <input type="text" id="service" value="Manicure" placeholder="Serviço">
+        </div>
+        <div class="form-group">
+            <label>Data:</label>
+            <input type="date" id="date" value="">
+        </div>
+        <div class="form-group">
+            <label>Hora:</label>
+            <input type="time" id="time" value="14:00">
+        </div>
+        <div class="form-group">
+            <label>Preço:</label>
+            <input type="number" id="price" value="50" step="0.01">
+        </div>
+        
+        <button class="button success" onclick="createTestAppointment()">✅ Criar Agendamento</button>
+        <button class="button" onclick="loadDesigners()">👩‍💼 Carregar Designers</button>
+        <button class="button" onclick="checkAppointments()">📊 Verificar Agendamentos</button>
+        
+        <div class="log" id="log">Clique em "Carregar Designers" para começar...</div>
+    </div>
+    
+    <div class="container">
+        <h2>2. Agendamentos Encontrados</h2>
+        <div id="appointmentsList"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // Definir data padrão para hoje
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        
+        window.loadDesigners = async function() {
+            log('🔍 Carregando designers...');
+            
+            try {
+                const { data: designers, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('name');
+                
+                if (error) {
+                    log(`❌ Erro ao carregar designers: ${error.message}`);
+                    return;
+                }
+                
+                if (designers && designers.length > 0) {
+                    log(`✅ ${designers.length} designers encontrados:`);
+                    designers.forEach((designer, index) => {
+                        log(`${index + 1}. ${designer.name} (ID: ${designer.id})`);
+                    });
+                    
+                    // Definir o primeiro designer como padrão
+                    document.getElementById('designerId').value = designers[0].id;
+                    log(`\n🎯 Designer padrão definido: ${designers[0].name}`);
+                } else {
+                    log('⚠️ Nenhum designer ativo encontrado');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.createTestAppointment = async function() {
+            const designerId = document.getElementById('designerId').value;
+            const clientName = document.getElementById('clientName').value;
+            const clientPhone = document.getElementById('clientPhone').value;
+            const clientEmail = document.getElementById('clientEmail').value;
+            const service = document.getElementById('service').value;
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            const price = parseFloat(document.getElementById('price').value);
+            
+            if (!designerId || !clientName || !clientPhone || !service || !date || !time) {
+                log('❌ Preencha todos os campos obrigatórios');
+                return;
+            }
+            
+            log('🔄 Criando agendamento de teste...');
+            
+            try {
+                const appointmentData = {
+                    designer_id: designerId,
+                    client_name: clientName,
+                    client_phone: clientPhone,
+                    client_email: clientEmail,
+                    service: service,
+                    date: date,
+                    time: time,
+                    price: price,
+                    status: 'pending'
+                };
+                
+                log(`📝 Dados do agendamento: ${JSON.stringify(appointmentData, null, 2)}`);
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert(appointmentData)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log(`❌ Erro ao criar agendamento: ${error.message}`);
+                    return;
+                }
+                
+                log(`✅ Agendamento criado com sucesso!`);
+                log(`📋 ID: ${data.id}`);
+                log(`👤 Cliente: ${data.client_name}`);
+                log(`📅 Data/Hora: ${data.date} às ${data.time}`);
+                
+                // Verificar se foi salvo
+                setTimeout(checkAppointments, 1000);
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.checkAppointments = async function() {
+            log('\n🔍 Verificando agendamentos salvos...');
+            
+            try {
+                const { data: appointments, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (error) {
+                    log(`❌ Erro ao buscar agendamentos: ${error.message}`);
+                    return;
+                }
+                
+                log(`📊 ${appointments?.length || 0} agendamentos encontrados`);
+                
+                const appointmentsList = document.getElementById('appointmentsList');
+                appointmentsList.innerHTML = '';
+                
+                if (appointments && appointments.length > 0) {
+                    appointments.forEach((apt, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'appointment-item';
+                        div.innerHTML = `
+                            <strong>#${index + 1} - ${apt.client_name}</strong><br>
+                            📞 ${apt.client_phone}<br>
+                            📧 ${apt.client_email || 'N/A'}<br>
+                            💅 ${apt.service}<br>
+                            📅 ${apt.date} às ${apt.time}<br>
+                            💰 R$ ${apt.price}<br>
+                            📋 Status: ${apt.status}<br>
+                            👩‍💼 Designer ID: ${apt.designer_id}<br>
+                            🕒 Criado: ${new Date(apt.created_at).toLocaleString()}
+                        `;
+                        appointmentsList.appendChild(div);
+                    });
+                    
+                    log('✅ Lista de agendamentos atualizada');
+                } else {
+                    appointmentsList.innerHTML = '<p>⚠️ Nenhum agendamento encontrado</p>';
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        // Carregar designers automaticamente
+        setTimeout(loadDesigners, 500);
+    </script>
+</body>
+</html>

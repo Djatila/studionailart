@@ -176,15 +176,15 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       return;
     }
     
-    const availability: Availability = {
+    const newAvailability: Availability = {
       designerId: designer.id,
       specificDate: formData.specificDate,
       startTime: formData.startTime,
       endTime: formData.endTime,
       isActive: true
-    } as Availability;
+    };
     
-    await saveAvailability(availability);
+    await saveAvailability(newAvailability);
     setShowForm(false);
     setFormData({ specificDate: '', startTime: '09:00', endTime: '18:00' });
     // Reload availability data

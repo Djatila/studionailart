@@ -197,7 +197,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const supabaseAppointments = await getSupabaseAppointments();
       
       // Garantir que supabaseAppointments é um array válido
-      if (Array.isArray(supabaseAppointments) && supabaseAppointments.length > 0) {
+      if (!Array.isArray(supabaseAppointments)) {
+        console.warn('⚠️ getAppointments: supabaseAppointments is not an array:', supabaseAppointments);
+        throw new Error('Invalid appointments data from Supabase');
+      }
+      
+      if (supabaseAppointments.length > 0) {
         // Filtrar agendamentos do designer e mapear campos
         const designerAppointments = supabaseAppointments
           .filter((apt: any) => {
@@ -254,9 +259,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(selectedDesigner.id);
       
+      // Garantir que supabaseAvailability é um array válido
+      if (!Array.isArray(supabaseAvailability)) {
+        console.warn('⚠️ getDesignerAvailability: supabaseAvailability is not an array:', supabaseAvailability);
+        throw new Error('Invalid availability data from Supabase');
+      }
+      
       // Mapear campos do Supabase para o formato esperado
       const mappedAvailability = supabaseAvailability
-        .filter(avail => avail.is_available)
+        .filter(avail => avail && avail.is_available)
         .map(avail => ({
           id: avail.id,
           designerId: avail.designer_id,
@@ -274,17 +285,36 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       // Fallback para localStorage se não houver dados no Supabase
       const saved = localStorage.getItem('nail_availability');
       const allAvailability = saved ? JSON.parse(saved) : [];
+      
+      // Garantir que allAvailability é um array válido
+      if (!Array.isArray(allAvailability)) {
+        console.warn('⚠️ getDesignerAvailability: localStorage availability is not an array');
+        return [];
+      }
+      
       return allAvailability.filter((avail: any) => 
-        avail.designerId === selectedDesigner.id && avail.isActive
+        avail && avail.designerId === selectedDesigner.id && avail.isActive
       );
     } catch (error) {
-      console.error('Erro ao buscar disponibilidade:', error);
+      console.error('❌ Erro ao buscar disponibilidade:', error);
       // Fallback para localStorage em caso de erro
-      const saved = localStorage.getItem('nail_availability');
-      const allAvailability = saved ? JSON.parse(saved) : [];
-      return allAvailability.filter((avail: any) => 
-        avail.designerId === selectedDesigner.id && avail.isActive
-      );
+      try {
+        const saved = localStorage.getItem('nail_availability');
+        const allAvailability = saved ? JSON.parse(saved) : [];
+        
+        // Garantir que allAvailability é um array válido
+        if (!Array.isArray(allAvailability)) {
+          console.warn('⚠️ getDesignerAvailability fallback: localStorage availability is not an array');
+          return [];
+        }
+        
+        return allAvailability.filter((avail: any) => 
+          avail && avail.designerId === selectedDesigner.id && avail.isActive
+        );
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback de disponibilidade:', fallbackError);
+        return [];
+      }
     }
   };
 

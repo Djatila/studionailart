@@ -220,7 +220,7 @@ function App() {
   if (isClient) {
     return (
       <BookingPage 
-        designer={currentDesigner!} 
+        designer={undefined} // Não passa designer para começar sempre no step 1
         onBack={handleLogout}
         loggedClient={isClient ? currentDesigner : undefined}
       />

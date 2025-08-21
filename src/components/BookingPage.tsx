@@ -32,6 +32,8 @@ interface BookingPageProps {
 
 const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard }) => {
   const [step, setStep] = useState(1);
+  
+
   const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');

@@ -196,36 +196,54 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
       const supabaseAppointments = await getSupabaseAppointments();
       
-      // Filtrar agendamentos do designer e mapear campos
-      const designerAppointments = supabaseAppointments
-        .filter((apt: any) => {
-          const designerId = apt.designer_id || apt.designerId;
-          return designerId === selectedDesigner.id;
-        })
-        .map((apt: any) => ({
-          id: apt.id,
-          designerId: apt.designer_id || apt.designerId,
-          clientName: apt.client_name || apt.clientName,
-          clientPhone: apt.client_phone || apt.clientPhone,
-          clientEmail: apt.client_email || apt.clientEmail,
-          service: apt.service_name || apt.service,
-          date: apt.appointment_date || apt.date,
-          time: apt.appointment_time || apt.time,
-          status: apt.status || 'pending',
-          price: apt.service_price || apt.price || 0
-        }));
-      
-      if (designerAppointments.length > 0) {
-        return designerAppointments;
+      // Garantir que supabaseAppointments é um array válido
+      if (Array.isArray(supabaseAppointments) && supabaseAppointments.length > 0) {
+        // Filtrar agendamentos do designer e mapear campos
+        const designerAppointments = supabaseAppointments
+          .filter((apt: any) => {
+            if (!apt) return false;
+            const designerId = apt.designer_id || apt.designerId;
+            return designerId === selectedDesigner.id;
+          })
+          .map((apt: any) => ({
+            id: apt.id || crypto.randomUUID(),
+            designerId: apt.designer_id || apt.designerId,
+            clientName: apt.client_name || apt.clientName || '',
+            clientPhone: apt.client_phone || apt.clientPhone || '',
+            clientEmail: apt.client_email || apt.clientEmail || '',
+            service: apt.service_name || apt.service || '',
+            date: apt.appointment_date || apt.date || '',
+            time: apt.appointment_time || apt.time || '',
+            status: apt.status || 'pending',
+            price: apt.service_price || apt.price || 0
+          }));
+        
+        if (designerAppointments.length > 0) {
+          return designerAppointments;
+        }
       }
     } catch (error) {
       console.error('Erro ao buscar agendamentos do Supabase:', error);
     }
     
     // Fallback para localStorage se Supabase falhar ou não tiver dados
-    const saved = localStorage.getItem('nail_appointments');
-    const allAppointments = saved ? JSON.parse(saved) : [];
-    return allAppointments.filter((apt: Appointment) => apt.designerId === selectedDesigner.id);
+    try {
+      const saved = localStorage.getItem('nail_appointments');
+      const allAppointments = saved ? JSON.parse(saved) : [];
+      
+      // Garantir que allAppointments é um array válido
+      if (!Array.isArray(allAppointments)) {
+        console.warn('localStorage appointments is not an array');
+        return [];
+      }
+      
+      return allAppointments.filter((apt: Appointment) => 
+        apt && apt.designerId === selectedDesigner.id
+      );
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos do localStorage:', error);
+      return [];
+    }
   }, [selectedDesigner]);
 
   // Get designer's availability settings
@@ -319,15 +337,35 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   // Get available time slots for selected date
   const getAvailableTimeSlots = useCallback(async () => {
-    if (!selectedDate) return timeSlots;
+    const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
     
-    const appointments = await getAppointments();
-    const bookedTimes = appointments
-      .filter(apt => apt.date === selectedDate)
-      .map(apt => apt.time);
+    if (!selectedDate) {
+      return defaultTimeSlots;
+    }
     
-    return timeSlots.filter(time => !bookedTimes.includes(time));
-  }, [selectedDate, timeSlots, getAppointments]);
+    try {
+      const appointments = await getAppointments();
+      
+      // Garantir que appointments é um array válido
+      if (!Array.isArray(appointments)) {
+        console.warn('getAvailableTimeSlots: appointments is not an array, using default slots');
+        return defaultTimeSlots;
+      }
+      
+      const bookedTimes = appointments
+        .filter(apt => apt && apt.date === selectedDate)
+        .map(apt => apt.time)
+        .filter(time => time); // Remove valores undefined/null
+      
+      const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
+      
+      // Garantir que sempre retornamos um array válido
+      return Array.isArray(availableSlots) ? availableSlots : defaultTimeSlots;
+    } catch (error) {
+      console.error('Error in getAvailableTimeSlots:', error);
+      return defaultTimeSlots;
+    }
+  }, [selectedDate, getAppointments]);
 
   // Initialize component
   useEffect(() => {
@@ -343,10 +381,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         setLoadingTimeSlots(true);
         try {
           const slots = await getAvailableTimeSlots();
-          setAvailableTimeSlots(slots || timeSlots); // Garantir que sempre há um array
+          const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+          
+          // Garantir que sempre temos um array válido
+          const finalSlots = Array.isArray(slots) && slots.length >= 0 ? slots : defaultTimeSlots;
+          setAvailableTimeSlots(finalSlots);
         } catch (error) {
           console.error('Erro ao carregar horários disponíveis:', error);
-          setAvailableTimeSlots(timeSlots); // Fallback para todos os horários
+          const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+          setAvailableTimeSlots(defaultTimeSlots);
         } finally {
           setLoadingTimeSlots(false);
         }
@@ -358,17 +401,31 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       setAvailableTimeSlots([]);
       setLoadingTimeSlots(false);
     }
-  }, [isInitialized, selectedDate, step, timeSlots, getAvailableTimeSlots]);
+  }, [isInitialized, selectedDate, step, getAvailableTimeSlots]);
 
   // Get unique client names from appointments for suggestions
   const getClientSuggestions = async (input: string) => {
     if (input.length < 2) return [];
     
-    const appointments = await getAppointments();
-    const uniqueNames = [...new Set(appointments.map(apt => apt.clientName))];
-    return uniqueNames.filter(name => 
-      name.toLowerCase().includes(input.toLowerCase())
-    ).slice(0, 5);
+    try {
+      const appointments = await getAppointments();
+      
+      // Garantir que appointments é um array válido
+      if (!Array.isArray(appointments)) {
+        console.warn('getClientSuggestions: appointments is not an array');
+        return [];
+      }
+      
+      const validAppointments = appointments.filter(apt => apt && apt.clientName);
+      const uniqueNames = [...new Set(validAppointments.map(apt => apt.clientName))];
+      
+      return uniqueNames.filter(name => 
+        name && name.toLowerCase().includes(input.toLowerCase())
+      ).slice(0, 5);
+    } catch (error) {
+      console.error('Error in getClientSuggestions:', error);
+      return [];
+    }
   };
 
   const handleNameChange = async (value: string) => {
@@ -382,12 +439,23 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     setClientName(name);
     setShowSuggestions(false);
     
-    // Auto-fill phone and email if available
-    const appointments = await getAppointments();
-    const existingClient = appointments.find(apt => apt.clientName === name);
-    if (existingClient) {
-      setClientPhone(existingClient.clientPhone);
-      setClientEmail(existingClient.clientEmail);
+    try {
+      // Auto-fill phone and email if available
+      const appointments = await getAppointments();
+      
+      // Garantir que appointments é um array válido
+      if (!Array.isArray(appointments)) {
+        console.warn('selectNameSuggestion: appointments is not an array');
+        return;
+      }
+      
+      const existingClient = appointments.find(apt => apt && apt.clientName === name);
+      if (existingClient) {
+        setClientPhone(existingClient.clientPhone || '');
+        setClientEmail(existingClient.clientEmail || '');
+      }
+    } catch (error) {
+      console.error('Error in selectNameSuggestion:', error);
     }
   };
 
@@ -914,18 +982,24 @@ Aguardo confirmação!`;
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                      {availableTimeSlots.map((time) => (
-                        <button
-                          key={time}
-                          onClick={() => {
-                            setSelectedTime(time);
-                            setStep(5);
-                          }}
-                          className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 px-4 text-white font-medium hover:bg-pink-500 hover:border-pink-400 transition-all duration-300"
-                        >
-                          {time}
-                        </button>
-                      ))}
+                      {Array.isArray(availableTimeSlots) && availableTimeSlots.length > 0 ? (
+                        availableTimeSlots.map((time) => (
+                          <button
+                            key={time}
+                            onClick={() => {
+                              setSelectedTime(time);
+                              setStep(5);
+                            }}
+                            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 px-4 text-white font-medium hover:bg-pink-500 hover:border-pink-400 transition-all duration-300"
+                          >
+                            {time}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center text-white/70 py-4">
+                          Carregando horários disponíveis...
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

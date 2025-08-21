@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔄 Teste de Sincronização de Agendamentos</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #2d3748;
+            border-bottom: 2px solid #4299e1;
+            padding-bottom: 10px;
+        }
+        .button {
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 153, 225, 0.4);
+        }
+        .button.danger {
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+        }
+        .button.success {
+            background: linear-gradient(135deg, #38a169, #2f855a);
+        }
+        .log {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .appointment-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .appointment-item.localStorage {
+            border-left: 4px solid #f6ad55;
+        }
+        .appointment-item.supabase {
+            border-left: 4px solid #48bb78;
+        }
+        .sync-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .sync-status.synced {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        .sync-status.not-synced {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .comparison-side {
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .comparison-side.localStorage {
+            background: #fef5e7;
+            border: 2px solid #f6ad55;
+        }
+        .comparison-side.supabase {
+            background: #f0fff4;
+            border: 2px solid #48bb78;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Teste de Sincronização de Agendamentos</h1>
+        
+        <div class="section">
+            <h3>📊 Estatísticas Gerais</h3>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="localStorageCount">0</div>
+                    <div>localStorage</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="supabaseCount">0</div>
+                    <div>Supabase</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="syncedCount">0</div>
+                    <div>Sincronizados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="notSyncedCount">0</div>
+                    <div>Não Sincronizados</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Ações de Teste</h3>
+            <button class="button" onclick="loadAllData()">🔄 Carregar Todos os Dados</button>
+            <button class="button" onclick="testSupabaseConnection()">☁️ Testar Conexão Supabase</button>
+            <button class="button" onclick="createTestAppointment()">➕ Criar Agendamento de Teste</button>
+            <button class="button" onclick="compareData()">🔍 Comparar Dados</button>
+            <button class="button danger" onclick="clearTestData()">🗑️ Limpar Dados de Teste</button>
+            <button class="button success" onclick="syncLocalToSupabase()">⬆️ Sincronizar Local → Supabase</button>
+        </div>
+
+        <div class="section">
+            <h3>📝 Log de Atividades</h3>
+            <div class="log" id="log"></div>
+            <button class="button" onclick="clearLog()">🧹 Limpar Log</button>
+        </div>
+
+        <div class="section">
+            <h3>📋 Comparação de Dados</h3>
+            <div class="comparison">
+                <div class="comparison-side localStorage">
+                    <h4>📱 localStorage (Computador)</h4>
+                    <div id="localStorageData"></div>
+                </div>
+                <div class="comparison-side supabase">
+                    <h4>☁️ Supabase (Nuvem)</h4>
+                    <div id="supabaseData"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        // Configuração do Supabase
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzU2NzEsImV4cCI6MjA1MDU1MTY3MX0.CstZpGTY_js267gGGJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJhJJ

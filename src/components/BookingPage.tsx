@@ -911,7 +911,8 @@ Aguardo confirmação!`;
                       value={selectedDate}
                       onChange={(e) => {
                         const selectedDateValue = e.target.value;
-                        if (selectedDateValue && availability.length > 0 && !availability.some((avail: any) => avail.specificDate === selectedDateValue)) {
+                        // Garantir que availability é um array válido antes de usar .some()
+                        if (selectedDateValue && Array.isArray(availability) && availability.length > 0 && !availability.some((avail: any) => avail && avail.specificDate === selectedDateValue)) {
                           alert('Esta data não está disponível. A designer só liberou datas específicas para agendamento.');
                           return;
                         }
@@ -928,11 +929,11 @@ Aguardo confirmação!`;
                           <p className="text-white/70 text-sm">Carregando disponibilidade...</p>
                         </div>
                       </div>
-                    ) : availability.length > 0 ? (
+                    ) : Array.isArray(availability) && availability.length > 0 ? (
                       <div className="mt-3 p-3 bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 rounded-xl">
                         <p className="text-blue-100 text-sm font-medium mb-2">📅 Datas Disponíveis:</p>
                         <div className="flex flex-wrap gap-2">
-                          {availability.map((avail: any) => (
+                          {availability.filter(avail => avail && avail.specificDate).map((avail: any) => (
                             <span key={avail.id} className="bg-blue-400/30 text-blue-100 px-2 py-1 rounded-lg text-xs">
                               {new Date(avail.specificDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </span>

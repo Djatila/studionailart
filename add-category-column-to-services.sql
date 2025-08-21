@@ -12,10 +12,19 @@ ADD COLUMN IF NOT EXISTS description TEXT;
 -- Adicionar comentário explicativo
 COMMENT ON COLUMN public.services.category IS 'Categoria do serviço: services (serviços regulares) ou extras (serviços extras)';
 
--- Adicionar constraint para garantir valores válidos
-ALTER TABLE public.services 
-ADD CONSTRAINT check_category_values 
-CHECK (category IN ('services', 'extras'));
+-- Adicionar constraint para garantir valores válidos (apenas se não existir)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'check_category_values' 
+        AND table_name = 'services'
+    ) THEN
+        ALTER TABLE public.services 
+        ADD CONSTRAINT check_category_values 
+        CHECK (category IN ('services', 'extras'));
+    END IF;
+END $$;
 
 -- Verificar se a coluna foi adicionada corretamente
 SELECT 
@@ -25,7 +34,7 @@ SELECT
     column_default
 FROM information_schema.columns 
 WHERE table_name = 'services' 
-AND column_name = 'category';
+AND column_name IN ('category', 'description');
 
 -- Mostrar estrutura completa da tabela services
 SELECT 

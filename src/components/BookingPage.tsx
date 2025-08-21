@@ -50,6 +50,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [availability, setAvailability] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -325,6 +327,26 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     
     return timeSlots.filter(time => !bookedTimes.includes(time));
   };
+
+  // Load available time slots when date is selected
+  useEffect(() => {
+    if (selectedDate && step === 4) {
+      const loadTimeSlots = async () => {
+        setLoadingTimeSlots(true);
+        try {
+          const slots = await getAvailableTimeSlots();
+          setAvailableTimeSlots(slots);
+        } catch (error) {
+          console.error('Erro ao carregar horários disponíveis:', error);
+          setAvailableTimeSlots(timeSlots); // Fallback para todos os horários
+        } finally {
+          setLoadingTimeSlots(false);
+        }
+      };
+      
+      loadTimeSlots();
+    }
+  }, [selectedDate, step]);
 
   // Get unique client names from appointments for suggestions
   const getClientSuggestions = async (input: string) => {
@@ -849,7 +871,14 @@ Aguardo confirmação!`;
                     </button>
                   </div>
                   
-                  {getAvailableTimeSlots().length === 0 ? (
+                  {loadingTimeSlots ? (
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white/70 mr-3"></div>
+                        <p className="text-white/70">Carregando horários disponíveis...</p>
+                      </div>
+                    </div>
+                  ) : availableTimeSlots.length === 0 ? (
                     <div className="bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/30 rounded-xl p-6 text-center">
                       <AlertTriangle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
                       <p className="text-yellow-100 text-lg font-medium mb-2">
@@ -861,7 +890,7 @@ Aguardo confirmação!`;
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                      {getAvailableTimeSlots().map((time) => (
+                      {availableTimeSlots.map((time) => (
                         <button
                           key={time}
                           onClick={() => {

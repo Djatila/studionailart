@@ -285,7 +285,7 @@ function App() {
 
         {currentView === 'booking' && (
           <BookingPage 
-            designer={isClient && currentDesigner ? currentDesigner : undefined}
+            designer={undefined} // Sempre undefined para começar no step 1 (seleção de designer)
             onBack={() => {
               // Se é uma cliente logada, volta para o painel da cliente
             if (isClient && currentDesigner) {

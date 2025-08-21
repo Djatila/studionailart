@@ -185,8 +185,41 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
-  const getAppointments = (): Appointment[] => {
+  const getAppointments = async (): Promise<Appointment[]> => {
     if (!selectedDesigner) return [];
+    
+    try {
+      // Buscar do Supabase primeiro
+      const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
+      const supabaseAppointments = await getSupabaseAppointments();
+      
+      // Filtrar agendamentos do designer e mapear campos
+      const designerAppointments = supabaseAppointments
+        .filter((apt: any) => {
+          const designerId = apt.designer_id || apt.designerId;
+          return designerId === selectedDesigner.id;
+        })
+        .map((apt: any) => ({
+          id: apt.id,
+          designerId: apt.designer_id || apt.designerId,
+          clientName: apt.client_name || apt.clientName,
+          clientPhone: apt.client_phone || apt.clientPhone,
+          clientEmail: apt.client_email || apt.clientEmail,
+          service: apt.service_name || apt.service,
+          date: apt.appointment_date || apt.date,
+          time: apt.appointment_time || apt.time,
+          status: apt.status || 'pending',
+          price: apt.service_price || apt.price || 0
+        }));
+      
+      if (designerAppointments.length > 0) {
+        return designerAppointments;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos do Supabase:', error);
+    }
+    
+    // Fallback para localStorage se Supabase falhar ou não tiver dados
     const saved = localStorage.getItem('nail_appointments');
     const allAppointments = saved ? JSON.parse(saved) : [];
     return allAppointments.filter((apt: Appointment) => apt.designerId === selectedDesigner.id);
@@ -282,10 +315,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   ];
 
   // Get available time slots for selected date
-  const getAvailableTimeSlots = () => {
+  const getAvailableTimeSlots = async () => {
     if (!selectedDate) return timeSlots;
     
-    const appointments = getAppointments();
+    const appointments = await getAppointments();
     const bookedTimes = appointments
       .filter(apt => apt.date === selectedDate)
       .map(apt => apt.time);
@@ -294,29 +327,29 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   };
 
   // Get unique client names from appointments for suggestions
-  const getClientSuggestions = (input: string) => {
+  const getClientSuggestions = async (input: string) => {
     if (input.length < 2) return [];
     
-    const appointments = getAppointments();
+    const appointments = await getAppointments();
     const uniqueNames = [...new Set(appointments.map(apt => apt.clientName))];
     return uniqueNames.filter(name => 
       name.toLowerCase().includes(input.toLowerCase())
     ).slice(0, 5);
   };
 
-  const handleNameChange = (value: string) => {
+  const handleNameChange = async (value: string) => {
     setClientName(value);
-    const suggestions = getClientSuggestions(value);
+    const suggestions = await getClientSuggestions(value);
     setNameSuggestions(suggestions);
     setShowSuggestions(suggestions.length > 0 && value.length >= 2);
   };
 
-  const selectNameSuggestion = (name: string) => {
+  const selectNameSuggestion = async (name: string) => {
     setClientName(name);
     setShowSuggestions(false);
     
     // Auto-fill phone and email if available
-    const appointments = getAppointments();
+    const appointments = await getAppointments();
     const existingClient = appointments.find(apt => apt.clientName === name);
     if (existingClient) {
       setClientPhone(existingClient.clientPhone);

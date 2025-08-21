@@ -63,13 +63,13 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   }, [loggedClient]);
 
-  // Define o designer inicial se fornecido
+  // Define o designer inicial se fornecido (mas não durante reset)
   useEffect(() => {
-    if (initialDesigner) {
+    if (initialDesigner && !isResetting) {
       setSelectedDesigner(initialDesigner);
       setStep(2); // Pula para a seleção de serviços
     }
-  }, [initialDesigner]);
+  }, [initialDesigner, isResetting]);
 
   useEffect(() => {
     // Carregar designers quando o componente for montado

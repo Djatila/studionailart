@@ -337,32 +337,47 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   // Get available time slots for selected date
   const getAvailableTimeSlots = useCallback(async () => {
+    console.log('🕐 getAvailableTimeSlots called with selectedDate:', selectedDate);
     const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
     
     if (!selectedDate) {
+      console.log('❌ No selectedDate, returning default slots');
       return defaultTimeSlots;
     }
     
     try {
+      console.log('📞 Calling getAppointments from getAvailableTimeSlots...');
       const appointments = await getAppointments();
+      console.log('📊 getAppointments returned:', appointments);
       
       // Garantir que appointments é um array válido
       if (!Array.isArray(appointments)) {
-        console.warn('getAvailableTimeSlots: appointments is not an array, using default slots');
+        console.warn('⚠️ getAvailableTimeSlots: appointments is not an array, using default slots');
         return defaultTimeSlots;
       }
       
+      console.log('🔍 Filtering appointments for date:', selectedDate);
       const bookedTimes = appointments
-        .filter(apt => apt && apt.date === selectedDate)
+        .filter(apt => {
+          const matches = apt && apt.date === selectedDate;
+          if (matches) console.log('📅 Found booked appointment:', apt);
+          return matches;
+        })
         .map(apt => apt.time)
         .filter(time => time); // Remove valores undefined/null
       
+      console.log('⏰ Booked times for', selectedDate, ':', bookedTimes);
+      
       const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
+      console.log('✅ Available slots calculated:', availableSlots);
       
       // Garantir que sempre retornamos um array válido
-      return Array.isArray(availableSlots) ? availableSlots : defaultTimeSlots;
+      const finalResult = Array.isArray(availableSlots) ? availableSlots : defaultTimeSlots;
+      console.log('🎯 Final result from getAvailableTimeSlots:', finalResult);
+      return finalResult;
     } catch (error) {
-      console.error('Error in getAvailableTimeSlots:', error);
+      console.error('❌ Error in getAvailableTimeSlots:', error);
+      console.log('🔄 Returning default slots due to error');
       return defaultTimeSlots;
     }
   }, [selectedDate, getAppointments]);
@@ -374,32 +389,51 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   // Load available time slots when date is selected
   useEffect(() => {
-    if (!isInitialized) return;
+    console.log('🔄 loadTimeSlots useEffect triggered:', { isInitialized, selectedDate, step });
+    
+    if (!isInitialized) {
+      console.log('⏳ Component not initialized yet, skipping loadTimeSlots');
+      return;
+    }
     
     if (selectedDate && step === 4) {
+      console.log('✅ Conditions met for loading time slots:', { selectedDate, step });
+      
       const loadTimeSlots = async () => {
+        console.log('🚀 Starting loadTimeSlots function');
         setLoadingTimeSlots(true);
+        
         try {
+          console.log('📞 Calling getAvailableTimeSlots...');
           const slots = await getAvailableTimeSlots();
+          console.log('📊 getAvailableTimeSlots returned:', slots);
+          
           const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
           
           // Garantir que sempre temos um array válido
           const finalSlots = Array.isArray(slots) && slots.length >= 0 ? slots : defaultTimeSlots;
+          console.log('✅ Final slots to set:', finalSlots);
+          
           setAvailableTimeSlots(finalSlots);
+          console.log('✅ availableTimeSlots state updated successfully');
         } catch (error) {
-          console.error('Erro ao carregar horários disponíveis:', error);
+          console.error('❌ Erro ao carregar horários disponíveis:', error);
           const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
           setAvailableTimeSlots(defaultTimeSlots);
+          console.log('🔄 Fallback to default time slots due to error');
         } finally {
           setLoadingTimeSlots(false);
+          console.log('✅ loadTimeSlots completed, loading state set to false');
         }
       };
       
       loadTimeSlots();
     } else {
+      console.log('❌ Conditions not met for loading time slots:', { selectedDate, step });
       // Reset time slots when not on step 4 or no date selected
       setAvailableTimeSlots([]);
       setLoadingTimeSlots(false);
+      console.log('🔄 Time slots reset due to conditions not met');
     }
   }, [isInitialized, selectedDate, step, getAvailableTimeSlots]);
 

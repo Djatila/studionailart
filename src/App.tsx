@@ -83,7 +83,18 @@ function App() {
       setRefreshKey(prev => prev + 1);
     };
     
+    // Listen for designer updates from components
+    const handleDesignerUpdate = (event: CustomEvent) => {
+      const updatedDesigner = event.detail;
+      console.log('🔄 App recebeu evento designerUpdated:', updatedDesigner);
+      if (currentDesigner && updatedDesigner.id === currentDesigner.id) {
+        console.log('✅ Atualizando currentDesigner no App');
+        setCurrentDesigner(updatedDesigner);
+      }
+    };
+    
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('designerUpdated', handleDesignerUpdate as EventListener);
     
     // Check if accessing via designer's personal link
     const path = window.location.pathname;
@@ -119,14 +130,16 @@ function App() {
     
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
     
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       cleanOldAppointments();
       // Set up recurring daily cleanup
       setInterval(cleanOldAppointments, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
     
     return () => {
+      clearTimeout(timeoutId);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('designerUpdated', handleDesignerUpdate as EventListener);
     };
   }, []);
 

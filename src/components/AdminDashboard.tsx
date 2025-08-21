@@ -263,10 +263,27 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   const updatePixKey = async () => {
     try {
       setLoading(true);
-      await updateNailDesigner(designer.id, { pixKey });
-      setShowPixModal(false);
+      console.log('🔄 Iniciando atualização da chave PIX:', { designerId: designer.id, pixKey });
+      
+      const result = await updateNailDesigner(designer.id, { pixKey });
+      console.log('✅ Resultado da atualização:', result);
+      
+      if (result) {
+        console.log('✅ Chave PIX atualizada com sucesso no Supabase');
+        // Atualizar o estado local do designer
+        const updatedDesigner = { ...designer, pixKey };
+        console.log('🔄 Atualizando estado local do designer:', updatedDesigner);
+        
+        // Disparar evento para atualizar dados globais
+        window.dispatchEvent(new CustomEvent('designerUpdated', { detail: updatedDesigner }));
+        
+        setShowPixModal(false);
+      } else {
+        console.error('❌ Falha na atualização - resultado null');
+        setError('Erro ao atualizar chave PIX');
+      }
     } catch (err) {
-      console.error('Erro ao atualizar chave PIX:', err);
+      console.error('❌ Erro ao atualizar chave PIX:', err);
       setError('Erro ao atualizar chave PIX');
     } finally {
       setLoading(false);

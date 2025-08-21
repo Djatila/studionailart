@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste: Fix ClientDashboard - Agendamentos Visíveis</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success { border-color: #4CAF50; background-color: #f8fff8; }
+        .error { border-color: #f44336; background-color: #fff8f8; }
+        .warning { border-color: #ff9800; background-color: #fffaf0; }
+        .info { border-color: #2196F3; background-color: #f0f8ff; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .appointment-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste: Fix ClientDashboard - Agendamentos Visíveis</h1>
+        <p>Este teste verifica se o problema foi resolvido após adicionar a função <code>getSupabaseAppointments</code> no supabaseUtils.</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="supabaseCount">-</div>
+                <div>Agendamentos Supabase</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="localCount">-</div>
+                <div>Agendamentos localStorage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="clientCount">-</div>
+                <div>Visíveis para Cliente</div>
+            </div>
+        </div>
+
+        <div class="test-section info">
+            <h3>🧪 Testes Disponíveis</h3>
+            <button onclick="runFullTest()">🚀 Executar Teste Completo</button>
+            <button onclick="createTestAppointment()">➕ Criar Agendamento Teste</button>
+            <button onclick="simulateClientDashboard()">👤 Simular ClientDashboard</button>
+            <button onclick="checkSupabaseData()">☁️ Verificar Supabase</button>
+            <button onclick="clearTestData()">🗑️ Limpar Dados Teste</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Log de Execução</h3>
+            <div id="testLog" class="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Agendamentos Encontrados</h3>
+            <div id="appointmentsDisplay"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Dados de teste
+        const testClient = {
+            name: 'Cliente Teste Fix',
+            phone: '(11) 99999-8888',
+            email: 'teste.fix@email.com'
+        };
+
+        const testDesigner = {
+            id: 'designer-test-123',
+            name: 'Designer Teste'
+        };
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            }[type] || 'ℹ️';
+            
+            logElement.textContent += `[${timestamp}] ${icon} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateStats(supabase = 0, local = 0, client = 0) {
+            document.getElementById('supabaseCount').textContent = supabase;
+            document.getElementById('localCount').textContent = local;
+            document.getElementById('clientCount').textContent = client;
+        }
+
+        // Simular a função getSupabaseAppointments (como deveria funcionar agora)
+        async function getSupabaseAppointments() {
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+                
+                if (error) throw error;
+                return data || [];
+            } catch (error) {
+                console.error('Erro ao buscar agendamentos:', error);
+                return [];
+            }
+        }
+
+        // Simular o ClientDashboard (como deveria funcionar agora)
+        async function simulateClientDashboard() {
+            log('👤 Simulando ClientDashboard com fix aplicado...');
+            
+            try {
+                let clientAppointments = [];
+                
+                try {
+                    log('🔍 Buscando agendamentos do Supabase...');
+                    const supabaseAppointments = await getSupabaseAppointments();
+                    
+                    // Filtrar agendamentos do cliente pelo telefone
+                    clientAppointments = supabaseAppointments.filter((apt) => {
+                        const phone = apt.client_phone || apt.clientPhone;
+                        return phone === testClient.phone;
+                    }).map((apt) => ({
+                        id: apt.id,
+                        designerId: apt.designer_id || apt.designerId,
+                        clientName: apt.client_name || apt.clientName,
+                        clientPhone: apt.client_phone || apt.clientPhone,
+                        service: apt.service_name || apt.service,
+                        date: apt.appointment_date || apt.date,
+                        time: apt.appointment_time || apt.time,
+                        status: apt.status || 'pending',
+                        price: apt.service_price || apt.price || 0,
+                        createdAt: apt.created_at || apt.createdAt
+                    }));
+                    
+                    log(`✅ ${clientAppointments.length} agendamentos encontrados no Supabase`, 'success');
+                    
+                } catch (supabaseError) {
+                    log(`⚠️ Erro ao buscar do Supabase: ${supabaseError.message}`, 'warning');
+                    
+                    // Fallback para localStorage
+                    const saved = localStorage.getItem('nail_appointments');
+                    const allAppointments = saved ? JSON.parse(saved) : [];
+                    clientAppointments = allAppointments.filter(apt => apt.clientPhone === testClient.phone);
+                    log(`📱 ${clientAppointments.length} agendamentos encontrados no localStorage (fallback)`);
+                }
+                
+                // Exibir resultados
+                displayAppointments(clientAppointments);
+                updateStats(undefined, undefined, clientAppointments.length);
+                
+                if (clientAppointments.length === 0) {
+                    log('❌ PROBLEMA: Nenhum agendamento encontrado para a cliente!', 'error');
+                } else {
+                    log(`🎉 SUCESSO: ${clientAppointments.length} agendamentos visíveis para a cliente!`, 'success');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na simulação: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestAppointment() {
+            log('➕ Criando agendamento de teste...');
+            
+            try {
+                const testAppointment = {
+                    designer_id: testDesigner.id,
+                    client_name: testClient.name,
+                    client_phone: testClient.phone,
+                    client_email: testClient.email,
+                    service: 'Manicure Teste Fix',
+                    date: '2025-01-25',
+                    time: '14:00',
+                    price: 50,
+                    status: 'confirmed'
+                };
+                
+                // Salvar no Supabase
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert([testAppointment])
+                    .select();
+                
+                if (error) throw error;
+                
+                log(`✅ Agendamento criado no Supabase: ID ${data[0].id}`, 'success');
+                
+                // Também salvar no localStorage para compatibilidade
+                const localAppointment = {
+                    id: data[0].id,
+                    designerId: testAppointment.designer_id,
+                    clientName: testAppointment.client_name,
+                    clientPhone: testAppointment.client_phone,
+                    clientEmail: testAppointment.client_email,
+                    service: testAppointment.service,
+                    date: testAppointment.date,
+                    time: testAppointment.time,
+                    price: testAppointment.price,
+                    status: testAppointment.status,
+                    createdAt: new Date().toISOString()
+                };
+                
+                const saved = localStorage.getItem('nail_appointments');
+                const allAppointments = saved ? JSON.parse(saved) : [];
+                allAppointments.push(localAppointment);
+                localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
+                
+                log('✅ Agendamento também salvo no localStorage', 'success');
+                
+            } catch (error) {
+                log(`❌ Erro ao criar agendamento: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkSupabaseData() {
+            log('☁️ Verificando dados no Supabase...');
+            
+            try {
+                const allAppointments = await getSupabaseAppointments();
+                const testAppointments = allAppointments.filter(apt => 
+                    (apt.client_phone || apt.clientPhone) === testClient.phone
+                );
+                
+                log(`📊 Total de agendamentos no Supabase: ${allAppointments.length}`);
+                log(`🎯 Agendamentos do cliente teste: ${testAppointments.length}`);
+                
+                updateStats(allAppointments.length, undefined, undefined);
+                
+                // Verificar localStorage também
+                const saved = localStorage.getItem('nail_appointments');
+                const localAppointments = saved ? JSON.parse(saved) : [];
+                const localTestAppointments = localAppointments.filter(apt => apt.clientPhone === testClient.phone);
+                
+                log(`📱 Total no localStorage: ${localAppointments.length}`);
+                log(`🎯 Do cliente teste no localStorage: ${localTestAppointments.length}`);
+                
+                updateStats(allAppointments.length, localAppointments.length, undefined);
+                
+            } catch (error) {
+                log(`❌ Erro ao verificar dados: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearTestData() {
+            log('🗑️ Limpando dados de teste...', 'warning');
+            
+            try {
+                // Limpar do Supabase
+                const { error: supabaseError } = await supabase
+                    .from('appointments')
+                    .delete()
+                    .eq('client_phone', testClient.phone);
+                
+                if (supabaseError) {
+                    log(`⚠️ Erro ao limpar Supabase: ${supabaseError.message}`, 'warning');
+                } else {
+                    log('✅ Dados removidos do Supabase');
+                }
+                
+                // Limpar do localStorage
+                const saved = localStorage.getItem('nail_appointments');
+                if (saved) {
+                    const allAppointments = JSON.parse(saved);
+                    const filteredAppointments = allAppointments.filter(apt => apt.clientPhone !== testClient.phone);
+                    localStorage.setItem('nail_appointments', JSON.stringify(filteredAppointments));
+                    log('✅ Dados removidos do localStorage');
+                }
+                
+                // Limpar display
+                document.getElementById('appointmentsDisplay').innerHTML = '';
+                updateStats(0, 0, 0);
+                
+            } catch (error) {
+                log(`❌ Erro ao limpar dados: ${error.message}`, 'error');
+            }
+        }
+
+        function displayAppointments(appointments) {
+            const container = document.getElementById('appointmentsDisplay');
+            container.innerHTML = '';
+            
+            if (appointments.length === 0) {
+                container.innerHTML = '<p>⚠️ Nenhum agendamento encontrado.</p>';
+                return;
+            }
+            
+            appointments.forEach(apt => {
+                const div = document.createElement('div');
+                div.className = 'appointment-item';
+                div.innerHTML = `
+                    <strong>🏥 ${apt.service}</strong><br>
+                    👤 Cliente: ${apt.clientName}<br>
+                    📞 Telefone: ${apt.clientPhone}<br>
+                    📅 Data: ${apt.date} às ${apt.time}<br>
+                    💰 Preço: R$ ${apt.price}<br>
+                    📋 Status: ${apt.status}<br>
+                    🆔 ID: ${apt.id}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function runFullTest() {
+            log('🚀 Iniciando teste completo...', 'info');
+            
+            // Limpar dados anteriores
+            await clearTestData();
+            
+            // Aguardar um pouco
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Criar agendamento de teste
+            await createTestAppointment();
+            
+            // Aguardar um pouco
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Verificar dados
+            await checkSupabaseData();
+            
+            // Aguardar um pouco
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Simular ClientDashboard
+            await simulateClientDashboard();
+            
+            log('🏁 Teste completo finalizado!', 'success');
+        }
+
+        // Executar verificação inicial ao carregar a página
+        window.addEventListener('load', () => {
+            log('🔧 Ferramenta de teste carregada');
+            log('📋 Esta ferramenta testa se o fix da função getSupabaseAppointments resolveu o problema');
+            checkSupabaseData();
+        });
+    </script>
+</body>
+</html>

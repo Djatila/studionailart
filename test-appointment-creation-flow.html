@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste: Fluxo de Criação de Agendamentos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        .problem {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .solution {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Teste: Fluxo de Criação de Agendamentos</h1>
+        <p>Esta ferramenta testa o fluxo completo de criação de agendamentos e verificação no painel da cliente.</p>
+        
+        <div class="test-section">
+            <h3>1. Testar Conexão com Supabase</h3>
+            <button onclick="testSupabaseConnection()">Testar Conexão</button>
+            <div id="connection-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Criar Agendamento de Teste</h3>
+            <button onclick="createTestAppointment()">Criar Agendamento</button>
+            <div id="create-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Verificar Agendamento no Supabase</h3>
+            <button onclick="checkSupabaseAppointments()">Verificar no Supabase</button>
+            <div id="supabase-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Simular ClientDashboard</h3>
+            <button onclick="simulateClientDashboard()">Simular Painel da Cliente</button>
+            <div id="client-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Verificar localStorage</h3>
+            <button onclick="checkLocalStorage()">Verificar localStorage</button>
+            <div id="localstorage-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>6. Limpar Dados de Teste</h3>
+            <button onclick="cleanupTestData()">Limpar Dados</button>
+            <div id="cleanup-result" class="result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let testAppointmentId = null;
+        const testClientPhone = '11999887766';
+        const testClientName = 'Cliente Teste';
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.textContent = `[${timestamp}] ${message}`;
+            element.className = `result ${type}`;
+        }
+        
+        window.testSupabaseConnection = async function() {
+            try {
+                log('connection-result', 'Testando conexão com Supabase...', 'info');
+                
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('id, name')
+                    .limit(1);
+                
+                if (error) {
+                    log('connection-result', `❌ Erro na conexão: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log('connection-result', `✅ Conexão OK! Encontradas ${data?.length || 0} designers`, 'success');
+            } catch (error) {
+                log('connection-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.createTestAppointment = async function() {
+            try {
+                log('create-result', 'Criando agendamento de teste...', 'info');
+                
+                // Primeiro, buscar uma designer para usar no teste
+                const { data: designers, error: designerError } = await supabase
+                    .from('nail_designers')
+                    .select('id, name')
+                    .limit(1);
+                
+                if (designerError || !designers || designers.length === 0) {
+                    log('create-result', `❌ Erro ao buscar designer: ${designerError?.message || 'Nenhuma designer encontrada'}`, 'error');
+                    return;
+                }
+                
+                const designer = designers[0];
+                testAppointmentId = `test-${Date.now()}`;
+                
+                // Criar agendamento usando o mesmo formato do BookingPage
+                const appointmentData = {
+                    id: testAppointmentId,
+                    designer_id: designer.id,
+                    client_name: testClientName,
+                    client_phone: testClientPhone,
+                    client_email: 'teste@email.com',
+                    service: 'Manicure Teste',
+                    date: new Date().toISOString().split('T')[0], // Data de hoje
+                    time: '14:00',
+                    price: 50,
+                    status: 'pending'
+                };
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert(appointmentData)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log('create-result', `❌ Erro ao criar agendamento: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log('create-result', `✅ Agendamento criado!\nID: ${data.id}\nCliente: ${data.client_name}\nTelefone: ${data.client_phone}\nDesigner: ${designer.name}`, 'success');
+                
+                // Também salvar no localStorage para compatibilidade
+                const localAppointment = {
+                    id: data.id,
+                    designerId: data.designer_id,
+                    clientName: data.client_name,
+                    clientPhone: data.client_phone,
+                    clientEmail: data.client_email,
+                    service: data.service,
+                    date: data.date,
+                    time: data.time,
+                    price: data.price,
+                    status: data.status
+                };
+                
+                const saved = localStorage.getItem('nail_appointments') || '[]';
+                const appointments = JSON.parse(saved);
+                appointments.push(localAppointment);
+                localStorage.setItem('nail_appointments', JSON.stringify(appointments));
+                
+            } catch (error) {
+                log('create-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.checkSupabaseAppointments = async function() {
+            try {
+                log('supabase-result', 'Verificando agendamentos no Supabase...', 'info');
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        nail_designers(name)
+                    `)
+                    .eq('client_phone', testClientPhone)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log('supabase-result', `❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (!data || data.length === 0) {
+                    log('supabase-result', `⚠️ Nenhum agendamento encontrado para o telefone ${testClientPhone}`, 'warning');
+                    return;
+                }
+                
+                let result = `✅ ${data.length} agendamento(s) encontrado(s):\n\n`;
+                data.forEach((apt, index) => {
+                    result += `${index + 1}. ID: ${apt.id}\n`;
+                    result += `   Cliente: ${apt.client_name}\n`;
+                    result += `   Telefone: ${apt.client_phone}\n`;
+                    result += `   Designer: ${apt.nail_designers?.name || 'N/A'}\n`;
+                    result += `   Serviço: ${apt.service}\n`;
+                    result += `   Data: ${apt.date} às ${apt.time}\n`;
+                    result += `   Status: ${apt.status}\n\n`;
+                });
+                
+                log('supabase-result', result, 'success');
+                
+            } catch (error) {
+                log('supabase-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.simulateClientDashboard = async function() {
+            try {
+                log('client-result', 'Simulando lógica do ClientDashboard...', 'info');
+                
+                // Simular a mesma lógica do ClientDashboard
+                const { data: supabaseAppointments, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        nail_designers(name)
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log('client-result', `❌ Erro ao buscar do Supabase: ${error.message}`, 'error');
+                    return;
+                }
+                
+                // Filtrar agendamentos do cliente pelo telefone
+                const clientAppointments = supabaseAppointments.filter(apt => {
+                    const phone = apt.client_phone || apt.clientPhone;
+                    return phone === testClientPhone;
+                }).map(apt => ({
+                    id: apt.id,
+                    designerId: apt.designer_id || apt.designerId,
+                    clientName: apt.client_name || apt.clientName,
+                    clientPhone: apt.client_phone || apt.clientPhone,
+                    service: apt.service_name || apt.service,
+                    date: apt.appointment_date || apt.date,
+                    time: apt.appointment_time || apt.time,
+                    status: apt.status || 'pending',
+                    price: apt.service_price || apt.price || 0,
+                    createdAt: apt.created_at || apt.createdAt
+                }));
+                
+                if (clientAppointments.length === 0) {
+                    log('client-result', `⚠️ ClientDashboard não encontraria agendamentos para ${testClientPhone}\n\nPossíveis causas:\n- Filtro por telefone não está funcionando\n- Mapeamento de campos incorreto\n- Agendamento não foi salvo corretamente`, 'warning');
+                    return;
+                }
+                
+                let result = `✅ ClientDashboard encontraria ${clientAppointments.length} agendamento(s):\n\n`;
+                clientAppointments.forEach((apt, index) => {
+                    result += `${index + 1}. ${apt.service} - ${apt.date} às ${apt.time}\n`;
+                    result += `   Status: ${apt.status}\n`;
+                    result += `   Preço: R$ ${apt.price}\n\n`;
+                });
+                
+                log('client-result', result, 'success');
+                
+            } catch (error) {
+                log('client-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.checkLocalStorage = function() {
+            try {
+                const appointments = localStorage.getItem('nail_appointments');
+                const parsedAppointments = appointments ? JSON.parse(appointments) : [];
+                
+                const testAppointments = parsedAppointments.filter(apt => 
+                    apt.clientPhone === testClientPhone
+                );
+                
+                let result = `📱 localStorage:\n`;
+                result += `Total de agendamentos: ${parsedAppointments.length}\n`;
+                result += `Agendamentos do cliente teste: ${testAppointments.length}\n\n`;
+                
+                if (testAppointments.length > 0) {
+                    result += `Agendamentos encontrados:\n`;
+                    testAppointments.forEach((apt, index) => {
+                        result += `${index + 1}. ${apt.service} - ${apt.date} às ${apt.time}\n`;
+                    });
+                } else {
+                    result += `⚠️ Nenhum agendamento do cliente teste no localStorage`;
+                }
+                
+                log('localstorage-result', result, 'info');
+                
+            } catch (error) {
+                log('localstorage-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+        
+        window.cleanupTestData = async function() {
+            try {
+                log('cleanup-result', 'Limpando dados de teste...', 'info');
+                
+                // Remover do Supabase
+                if (testAppointmentId) {
+                    const { error } = await supabase
+                        .from('appointments')
+                        .delete()
+                        .eq('id', testAppointmentId);
+                    
+                    if (error) {
+                        log('cleanup-result', `⚠️ Erro ao remover do Supabase: ${error.message}`, 'warning');
+                    }
+                }
+                
+                // Remover do localStorage
+                const appointments = localStorage.getItem('nail_appointments');
+                if (appointments) {
+                    const parsedAppointments = JSON.parse(appointments);
+                    const filteredAppointments = parsedAppointments.filter(apt => 
+                        apt.clientPhone !== testClientPhone
+                    );
+                    localStorage.setItem('nail_appointments', JSON.stringify(filteredAppointments));
+                }
+                
+                testAppointmentId = null;
+                log('cleanup-result', '✅ Dados de teste removidos', 'success');
+                
+            } catch (error) {
+                log('cleanup-result', `❌ Erro: ${error.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

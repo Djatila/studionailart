@@ -322,7 +322,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const isDateAvailable = async (date: string) => {
     const availability = await getDesignerAvailability();
     if (availability.length === 0) return false; // No availability configured
-    return availability.some((avail: any) => avail.specificDate === date);
+    
+    // Normalizar datas para comparação (remover problemas de timezone)
+    const normalizedDate = date.split('T')[0]; // Remove timezone se existir
+    return availability.some((avail: any) => {
+      if (!avail || !avail.specificDate) return false;
+      const normalizedAvailDate = avail.specificDate.split('T')[0]; // Remove timezone se existir
+      return normalizedAvailDate === normalizedDate;
+    });
   };
 
   const saveAppointment = async (appointment: Appointment) => {
@@ -946,9 +953,20 @@ Aguardo confirmação!`;
                       onChange={(e) => {
                         const selectedDateValue = e.target.value;
                         // Garantir que availability é um array válido antes de usar .some()
-                        if (selectedDateValue && Array.isArray(availability) && availability.length > 0 && !availability.some((avail: any) => avail && avail.specificDate === selectedDateValue)) {
-                          alert('Esta data não está disponível. A designer só liberou datas específicas para agendamento.');
-                          return;
+                        if (selectedDateValue && Array.isArray(availability) && availability.length > 0) {
+                          // Normalizar datas para comparação (remover problemas de timezone)
+                          const normalizedSelectedDate = selectedDateValue;
+                          const hasAvailableDate = availability.some((avail: any) => {
+                            if (!avail || !avail.specificDate) return false;
+                            // Normalizar a data de disponibilidade
+                            const normalizedAvailDate = avail.specificDate.split('T')[0]; // Remove timezone se existir
+                            return normalizedAvailDate === normalizedSelectedDate;
+                          });
+                          
+                          if (!hasAvailableDate) {
+                            alert('Esta data não está disponível. A designer só liberou datas específicas para agendamento.');
+                            return;
+                          }
                         }
                         setSelectedDate(selectedDateValue);
                         if (selectedDateValue) setStep(4);

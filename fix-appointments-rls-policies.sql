@@ -6,28 +6,62 @@
 DROP POLICY IF EXISTS "Designers can manage own appointments" ON public.appointments;
 DROP POLICY IF EXISTS "Anyone can create appointments" ON public.appointments;
 DROP POLICY IF EXISTS "Anyone can view appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Anyone can update appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Anyone can delete appointments" ON public.appointments;
 DROP POLICY IF EXISTS "Allow all operations on appointments" ON public.appointments;
 
 -- Create new policies that allow proper access for the application
 -- Allow anyone to create appointments (needed for booking functionality)
-CREATE POLICY "Anyone can create appointments" ON public.appointments 
-    FOR INSERT 
-    WITH CHECK (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'appointments' AND policyname = 'Anyone can create appointments'
+    ) THEN
+        CREATE POLICY "Anyone can create appointments" ON public.appointments 
+            FOR INSERT 
+            WITH CHECK (true);
+    END IF;
+END $$;
 
 -- Allow anyone to view appointments (needed for dashboard and client views)
-CREATE POLICY "Anyone can view appointments" ON public.appointments 
-    FOR SELECT 
-    USING (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'appointments' AND policyname = 'Anyone can view appointments'
+    ) THEN
+        CREATE POLICY "Anyone can view appointments" ON public.appointments 
+            FOR SELECT 
+            USING (true);
+    END IF;
+END $$;
 
 -- Allow anyone to update appointments (needed for status changes and modifications)
-CREATE POLICY "Anyone can update appointments" ON public.appointments 
-    FOR UPDATE 
-    USING (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'appointments' AND policyname = 'Anyone can update appointments'
+    ) THEN
+        CREATE POLICY "Anyone can update appointments" ON public.appointments 
+            FOR UPDATE 
+            USING (true);
+    END IF;
+END $$;
 
 -- Allow anyone to delete appointments (needed for appointment management)
-CREATE POLICY "Anyone can delete appointments" ON public.appointments 
-    FOR DELETE 
-    USING (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'appointments' AND policyname = 'Anyone can delete appointments'
+    ) THEN
+        CREATE POLICY "Anyone can delete appointments" ON public.appointments 
+            FOR DELETE 
+            USING (true);
+    END IF;
+END $$;
 
 -- Verify the policies were created
 SELECT 

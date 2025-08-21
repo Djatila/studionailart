@@ -595,8 +595,8 @@ export const getNailDesignerById = async (id: string) => {
   };
 };
 
-export const getAppointments = () => appointmentService.getAll();
-export const getSupabaseAppointments = () => appointmentService.getAll();
+export const getAppointments = async () => await appointmentService.getAll();
+export const getSupabaseAppointments = async () => await appointmentService.getAll();
 export const createAppointment = (appointment: Database['public']['Tables']['appointments']['Insert']) => appointmentService.create(appointment);
 export const updateAppointment = (id: string, updates: Database['public']['Tables']['appointments']['Update']) => appointmentService.update(id, updates);
 export const deleteAppointment = (id: string) => appointmentService.delete(id);

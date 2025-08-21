@@ -235,14 +235,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       
       // Mapear campos do Supabase para o formato esperado
       const mappedAvailability = supabaseAvailability
-        .filter(avail => avail.is_active)
+        .filter(avail => avail.is_available)
         .map(avail => ({
           id: avail.id,
           designerId: avail.designer_id,
           dayOfWeek: avail.day_of_week,
           startTime: avail.start_time,
           endTime: avail.end_time,
-          isActive: avail.is_active,
+          isActive: avail.is_available,
           specificDate: avail.specific_date
         }));
       

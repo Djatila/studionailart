@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard } from 'lucide-react';
 import { NailDesigner } from '../App';
 
@@ -52,6 +52,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -187,7 +188,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
-  const getAppointments = async (): Promise<Appointment[]> => {
+  const getAppointments = useCallback(async (): Promise<Appointment[]> => {
     if (!selectedDesigner) return [];
     
     try {
@@ -225,7 +226,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     const saved = localStorage.getItem('nail_appointments');
     const allAppointments = saved ? JSON.parse(saved) : [];
     return allAppointments.filter((apt: Appointment) => apt.designerId === selectedDesigner.id);
-  };
+  }, [selectedDesigner]);
 
   // Get designer's availability settings
   const getDesignerAvailability = async () => {
@@ -317,7 +318,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   ];
 
   // Get available time slots for selected date
-  const getAvailableTimeSlots = async () => {
+  const getAvailableTimeSlots = useCallback(async () => {
     if (!selectedDate) return timeSlots;
     
     const appointments = await getAppointments();
@@ -326,16 +327,23 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       .map(apt => apt.time);
     
     return timeSlots.filter(time => !bookedTimes.includes(time));
-  };
+  }, [selectedDate, timeSlots, getAppointments]);
+
+  // Initialize component
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
 
   // Load available time slots when date is selected
   useEffect(() => {
+    if (!isInitialized) return;
+    
     if (selectedDate && step === 4) {
       const loadTimeSlots = async () => {
         setLoadingTimeSlots(true);
         try {
           const slots = await getAvailableTimeSlots();
-          setAvailableTimeSlots(slots);
+          setAvailableTimeSlots(slots || timeSlots); // Garantir que sempre há um array
         } catch (error) {
           console.error('Erro ao carregar horários disponíveis:', error);
           setAvailableTimeSlots(timeSlots); // Fallback para todos os horários
@@ -345,8 +353,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       };
       
       loadTimeSlots();
+    } else {
+      // Reset time slots when not on step 4 or no date selected
+      setAvailableTimeSlots([]);
+      setLoadingTimeSlots(false);
     }
-  }, [selectedDate, step]);
+  }, [isInitialized, selectedDate, step, timeSlots, getAvailableTimeSlots]);
 
   // Get unique client names from appointments for suggestions
   const getClientSuggestions = async (input: string) => {
@@ -659,6 +671,18 @@ Aguardo confirmação!`;
           >
             Voltar à Página Inicial
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading spinner during initialization
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/70 mx-auto mb-4"></div>
+          <p className="text-white/70">Carregando...</p>
         </div>
       </div>
     );

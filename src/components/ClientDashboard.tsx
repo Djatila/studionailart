@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, Phone, MapPin, ArrowLeft, History, CalendarDays, Plus, X, Settings, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Calendar, Clock, User, Phone, MapPin, ArrowLeft, History, CalendarDays, Plus, X, Trash2 } from 'lucide-react';
 import { NailDesigner } from '../App';
+import { getSupabaseAppointments, getNailDesigners, updateAppointment } from '../utils/supabaseUtils';
 
 interface Appointment {
   id: string;
@@ -22,21 +23,45 @@ interface ClientDashboardProps {
 }
 
 export default function ClientDashboard({ client, onBack, onBookService }: ClientDashboardProps) {
-  const [currentView, setCurrentView] = useState<'current' | 'history' | 'profile'>('current');
+  const [currentView, setCurrentView] = useState<'current' | 'history'>('current');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [showBookingWarning, setShowBookingWarning] = useState(false);
   const [designers, setDesigners] = useState<NailDesigner[]>([]);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null);
+  const [showBookingWarning, setShowBookingWarning] = useState(false);
+  
   const [showPassword, setShowPassword] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  
+  // Estados para dados do cliente
+  const [clientData, setClientData] = useState({
+    name: client.name,
+    email: client.email || '',
+    phone: client.phone
+  });
+  
   const [profileData, setProfileData] = useState({
     name: client.name,
     email: client.email || '',
     phone: client.phone,
     password: ''
   });
-  const [isEditing, setIsEditing] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null);
+
+  // useEffect CORRETO - fora de qualquer função
+  useEffect(() => {
+    setClientData({
+      name: client.name,
+      email: client.email || '',
+      phone: client.phone
+    });
+    setProfileData({
+      name: client.name,
+      email: client.email || '',
+      phone: client.phone,
+      password: ''
+    });
+  }, [client.name, client.email, client.phone]);
 
   useEffect(() => {
     loadData();
@@ -177,36 +202,81 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     try {
-      // Atualizar dados no localStorage
-      const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
-      const updatedDesigners = savedDesigners.map((designer: NailDesigner) => {
-        if (designer.id === client.id) {
-          return {
-            ...designer,
-            name: profileData.name,
-            email: profileData.email,
-            phone: profileData.phone,
-            ...(profileData.password && { password: profileData.password })
-          };
+      console.log('🔄 Iniciando salvamento do perfil...');
+      
+      // Tentar salvar no Supabase primeiro
+      try {
+        const updatedDesigner = await updateNailDesigner(client.id, {
+          name: profileData.name,
+          email: profileData.email,
+          phone: profileData.phone,
+          ...(profileData.password && { password: profileData.password })
+        });
+        
+        if (updatedDesigner) {
+          console.log('✅ Dados salvos no Supabase:', updatedDesigner);
         }
-        return designer;
+      } catch (supabaseError) {
+        console.error('❌ Erro ao salvar no Supabase:', supabaseError);
+        
+        // Fallback para localStorage
+        const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+        const updatedDesigners = designers.map((d: NailDesigner) => {
+          if (d.id === client.id) {
+            return {
+              ...d,
+              name: profileData.name,
+              email: profileData.email,
+              phone: profileData.phone,
+              ...(profileData.password && { password: profileData.password })
+            };
+          }
+          return d;
+        });
+        
+        localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
+        console.log('📱 Dados salvos no localStorage (fallback)');
+      }
+      
+      // Atualizar agendamentos se o telefone mudou
+      if (profileData.phone !== client.phone) {
+        try {
+          const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+          const updatedAppointments = allAppointments.map((apt: Appointment) => {
+            if (apt.clientPhone === client.phone) {
+              return { ...apt, clientPhone: profileData.phone, clientName: profileData.name };
+            }
+            return apt;
+          });
+          localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+        } catch (error) {
+          console.error('❌ Erro ao atualizar agendamentos:', error);
+        }
+      }
+      
+      // Atualizar clientData com os novos dados
+      setClientData({
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone
       });
       
-      localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
+      // Criar objeto atualizado do cliente
+      const updatedClient = {
+        ...client,
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone
+      };
       
-      // Atualizar agendamentos com novo telefone se mudou
-      if (profileData.phone !== client.phone) {
-        const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-        const updatedAppointments = allAppointments.map((apt: Appointment) => {
-          if (apt.clientPhone === client.phone) {
-            return { ...apt, clientPhone: profileData.phone, clientName: profileData.name };
-          }
-          return apt;
-        });
-        localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
-      }
+      // Disparar evento para notificar o App.tsx
+      const event = new CustomEvent('designerUpdated', {
+        detail: updatedClient
+      });
+      window.dispatchEvent(event);
+      console.log('📡 Evento designerUpdated disparado:', updatedClient);
       
       setIsEditing(false);
       setSaveMessage('Dados salvos com sucesso!');
@@ -214,21 +284,24 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       
       // Recarregar dados
       loadData();
+      console.log('✅ Salvamento concluído com sucesso!');
+      
     } catch (error) {
+      console.error('❌ Erro ao salvar dados:', error);
       setSaveMessage('Erro ao salvar dados. Tente novamente.');
       setTimeout(() => setSaveMessage(''), 3000);
     }
   };
 
   const handleCancelEdit = () => {
-     setProfileData({
-       name: client.name,
-       email: client.email || '',
-       phone: client.phone,
-       password: ''
-     });
-     setIsEditing(false);
-   };
+    setProfileData({
+      name: clientData.name,
+      email: clientData.email,
+      phone: clientData.phone,
+      password: ''
+    });
+    setIsEditing(false);
+  };
 
   const handleCancelAppointment = (appointmentId: string) => {
     setAppointmentToCancel(appointmentId);
@@ -345,17 +418,6 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
             >
               <History className="w-5 h-5" />
               Histórico ({historyAppointments.length})
-            </button>
-            <button
-              onClick={() => setCurrentView('profile')}
-              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
-                currentView === 'profile'
-                  ? 'bg-white/20 text-white shadow-lg'
-                  : 'text-purple-200 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              Perfil
             </button>
           </div>
         </div>
@@ -477,7 +539,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                 {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center gap-2"
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-xl p-4 font-semibold text-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
                   >
                     <Settings className="w-4 h-4" />
                     Editar
@@ -511,7 +573,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                     />
                   ) : (
                     <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {client.name}
+                      {clientData.name}
                     </div>
                   )}
                 </div>
@@ -531,7 +593,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                     />
                   ) : (
                     <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {client.email || 'Não informado'}
+                      {clientData.email || 'Não informado'}
                     </div>
                   )}
                 </div>
@@ -551,7 +613,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                     />
                   ) : (
                     <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {client.phone}
+                      {clientData.phone}
                     </div>
                   )}
                 </div>

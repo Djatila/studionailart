@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Designer Update</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Diagnóstico - Atualização de Designer</h1>
+    <div id="results"></div>
+
+    <script>
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const { createClient } = supabase;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        async function debugDesignerUpdate() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Executando diagnóstico...</h2>';
+
+            try {
+                // 1. Verificar todos os designers na tabela
+                console.log('🔍 1. Verificando todos os designers...');
+                const { data: allDesigners, error: allError } = await supabaseClient
+                    .from('nail_designers')
+                    .select('*');
+
+                if (allError) {
+                    console.error('Erro ao buscar designers:', allError);
+                    results.innerHTML += `<p style="color: red;">❌ Erro ao buscar designers: ${allError.message}</p>`;
+                    return;
+                }
+
+                results.innerHTML += `<h3>📊 Total de designers na tabela: ${allDesigners?.length || 0}</h3>`;
+                
+                if (allDesigners && allDesigners.length > 0) {
+                    results.innerHTML += '<h4>Designers encontrados:</h4><ul>';
+                    allDesigners.forEach(designer => {
+                        results.innerHTML += `<li><strong>ID:</strong> ${designer.id} | <strong>Nome:</strong> ${designer.name} | <strong>Email:</strong> ${designer.email}</li>`;
+                    });
+                    results.innerHTML += '</ul>';
+
+                    // 2. Verificar localStorage
+                    const localDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+                    results.innerHTML += `<h3>📱 Designers no localStorage: ${localDesigners.length}</h3>`;
+                    
+                    if (localDesigners.length > 0) {
+                        results.innerHTML += '<h4>Designers no localStorage:</h4><ul>';
+                        localDesigners.forEach(designer => {
+                            results.innerHTML += `<li><strong>ID:</strong> ${designer.id} | <strong>Nome:</strong> ${designer.name} | <strong>Email:</strong> ${designer.email}</li>`;
+                        });
+                        results.innerHTML += '</ul>';
+
+                        // 3. Comparar IDs
+                        results.innerHTML += '<h3>🔍 Comparação de IDs:</h3>';
+                        localDesigners.forEach(localDesigner => {
+                            const supabaseMatch = allDesigners.find(d => d.id === localDesigner.id);
+                            if (supabaseMatch) {
+                                results.innerHTML += `<p style="color: green;">✅ ID ${localDesigner.id} encontrado em ambos</p>`;
+                            } else {
+                                results.innerHTML += `<p style="color: red;">❌ ID ${localDesigner.id} (localStorage) NÃO encontrado no Supabase</p>`;
+                            }
+                        });
+                    }
+
+                    // 4. Testar atualização com o primeiro designer
+                    if (allDesigners.length > 0) {
+                        const testDesigner = allDesigners[0];
+                        results.innerHTML += `<h3>🧪 Testando atualização com designer: ${testDesigner.name}</h3>`;
+                        
+                        try {
+                            const { data: updateResult, error: updateError } = await supabase
+                                .from('nail_designers')
+                                .update({ name: testDesigner.name + ' (teste)' })
+                                .eq('id', testDesigner.id)
+                                .select()
+                                .single();
+
+                            if (updateError) {
+                                results.innerHTML += `<p style="color: red;">❌ Erro na atualização: ${updateError.message}</p>`;
+                                console.error('Erro detalhado:', updateError);
+                            } else {
+                                results.innerHTML += `<p style="color: green;">✅ Atualização bem-sucedida!</p>`;
+                                console.log('Resultado da atualização:', updateResult);
+                                
+                                // Reverter a mudança
+                                await supabase
+                                    .from('nail_designers')
+                                    .update({ name: testDesigner.name })
+                                    .eq('id', testDesigner.id);
+                            }
+                        } catch (testError) {
+                            results.innerHTML += `<p style="color: red;">❌ Erro no teste: ${testError.message}</p>`;
+                            console.error('Erro no teste:', testError);
+                        }
+                    }
+                } else {
+                    results.innerHTML += '<p style="color: orange;">⚠️ Nenhum designer encontrado na tabela Supabase</p>';
+                }
+
+            } catch (error) {
+                console.error('Erro geral:', error);
+                results.innerHTML += `<p style="color: red;">❌ Erro geral: ${error.message}</p>`;
+            }
+        }
+
+        // Executar diagnóstico automaticamente
+        debugDesignerUpdate();
+    </script>
+</body>
+</html>

@@ -84,6 +84,8 @@ export const designerService = {
 
   // Update designer
   async update(id: string, updates: Database['public']['Tables']['nail_designers']['Update']): Promise<NailDesigner | null> {
+    console.log('🔍 DEBUG - Tentando atualizar designer:', { id, updates });
+    
     const { data, error } = await supabase
       .from('nail_designers')
       .update(updates)
@@ -92,10 +94,19 @@ export const designerService = {
       .single()
     
     if (error) {
-      console.error('Error updating designer:', error)
+      console.error('❌ Erro detalhado ao atualizar designer:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        id,
+        updates
+      });
       return null
     }
     
+    console.log('✅ Designer atualizado com sucesso:', data);
     return data
   },
 
@@ -595,8 +606,31 @@ export const getNailDesignerById = async (id: string) => {
   };
 };
 
-export const getAppointments = async () => await appointmentService.getAll();
-export const getSupabaseAppointments = async () => await appointmentService.getAll();
+export const getAppointments = async () => {
+  const appointments = await appointmentService.getAll();
+  
+  // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
+  return appointments.map(apt => ({
+    ...apt,
+    designerId: apt.designer_id,
+    clientName: apt.client_name,
+    clientPhone: apt.client_phone,
+    createdAt: apt.created_at
+  }));
+};
+
+export const getSupabaseAppointments = async () => {
+  const appointments = await appointmentService.getAll();
+  
+  // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
+  return appointments.map(apt => ({
+    ...apt,
+    designerId: apt.designer_id,
+    clientName: apt.client_name,
+    clientPhone: apt.client_phone,
+    createdAt: apt.created_at
+  }));
+};
 export const createAppointment = (appointment: Database['public']['Tables']['appointments']['Insert']) => appointmentService.create(appointment);
 export const updateAppointment = (id: string, updates: Database['public']['Tables']['appointments']['Update']) => appointmentService.update(id, updates);
 export const deleteAppointment = (id: string) => appointmentService.delete(id);
@@ -750,6 +784,226 @@ export const migrationService = {
       console.log('You can now remove localStorage data if everything works correctly.')
     } catch (error) {
       console.error('Migration failed:', error)
+    }
+  }
+}
+
+// Authentication Service with Supabase Auth
+export const authService = {
+  // Sign up new user
+  async signUp(email: string, password: string, userData: { name: string; phone: string }) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            phone: userData.phone
+          }
+        }
+      })
+      
+      if (error) {
+        console.error('Error signing up:', error)
+        return { success: false, error: error.message }
+      }
+      
+      // Create designer record in database with auth user ID
+      if (data.user) {
+        const designerData = {
+          id: data.user.id, // Use auth user ID
+          name: userData.name,
+          email,
+          password: '', // Don't store password in database when using auth
+          phone: userData.phone,
+          is_active: false // Pending approval
+        }
+        
+        await designerService.create(designerData)
+      }
+      
+      return { success: true, user: data.user }
+    } catch (error) {
+      console.error('Sign up error:', error)
+      return { success: false, error: 'Erro ao criar conta' }
+    }
+  },
+
+  // Sign in user
+  async signIn(email: string, password: string) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      
+      if (error) {
+        console.error('Error signing in:', error)
+        return { success: false, error: error.message }
+      }
+      
+      // Get designer data from database
+      if (data.user) {
+        const designer = await designerService.getById(data.user.id)
+        if (!designer) {
+          return { success: false, error: 'Designer não encontrado' }
+        }
+        
+        if (!designer.is_active) {
+          return { success: false, error: 'Conta não ativada. Aguarde aprovação do administrador.' }
+        }
+        
+        return { success: true, user: data.user, designer }
+      }
+      
+      return { success: false, error: 'Erro no login' }
+    } catch (error) {
+      console.error('Sign in error:', error)
+      return { success: false, error: 'Erro ao fazer login' }
+    }
+  },
+
+  // Sign out user
+  async signOut() {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (error) {
+      console.error('Sign out error:', error)
+      return { success: false, error: 'Erro ao fazer logout' }
+    }
+  },
+
+  // Get current user
+  async getCurrentUser() {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error('Error getting user:', error)
+        return null
+      }
+      return user
+    } catch (error) {
+      console.error('Get user error:', error)
+      return null
+    }
+  },
+
+  // Get current session
+  async getCurrentSession() {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error('Error getting session:', error)
+        return null
+      }
+      return session
+    } catch (error) {
+      console.error('Get session error:', error)
+      return null
+    }
+  },
+
+  // Listen to auth state changes
+  onAuthStateChange(callback: (event: string, session: any) => void) {
+    return supabase.auth.onAuthStateChange(callback)
+  },
+
+  // Reset password
+  async resetPassword(email: string) {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
+      if (error) {
+        console.error('Error resetting password:', error)
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (error) {
+      console.error('Reset password error:', error)
+      return { success: false, error: 'Erro ao redefinir senha' }
+    }
+  }
+}
+
+// Client Authentication Service
+export const clientAuthService = {
+  // Sign up new client
+  async signUp(email: string, password: string, userData: { name: string; phone: string }) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            phone: userData.phone,
+            user_type: 'client'
+          }
+        }
+      })
+      
+      if (error) {
+        console.error('Error signing up client:', error)
+        return { success: false, error: error.message }
+      }
+      
+      // Create client record in database with auth user ID
+      if (data.user) {
+        const clientData = {
+          id: data.user.id, // Use auth user ID
+          name: userData.name,
+          email,
+          password: '', // Don't store password in database when using auth
+          phone: userData.phone,
+          is_active: true
+        }
+        
+        await clientService.create(clientData)
+      }
+      
+      return { success: true, user: data.user }
+    } catch (error) {
+      console.error('Client sign up error:', error)
+      return { success: false, error: 'Erro ao criar conta' }
+    }
+  },
+
+  // Sign in client
+  async signIn(email: string, password: string) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      
+      if (error) {
+        console.error('Error signing in client:', error)
+        return { success: false, error: error.message }
+      }
+      
+      // Get client data from database
+      if (data.user) {
+        const client = await clientService.getById(data.user.id)
+        if (!client) {
+          return { success: false, error: 'Cliente não encontrado' }
+        }
+        
+        if (!client.is_active) {
+          return { success: false, error: 'Conta desativada' }
+        }
+        
+        return { success: true, user: data.user, client }
+      }
+      
+      return { success: false, error: 'Erro no login' }
+    } catch (error) {
+      console.error('Client sign in error:', error)
+      return { success: false, error: 'Erro ao fazer login' }
     }
   }
 }

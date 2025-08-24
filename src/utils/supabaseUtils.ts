@@ -958,12 +958,26 @@ export const clientAuthService = {
           id: data.user.id, // Use auth user ID
           name: userData.name,
           email,
-          password: '', // Don't store password in database when using auth
           phone: userData.phone,
           is_active: true
         }
         
-        await clientService.create(clientData)
+        const createdClient = await clientService.create(clientData)
+        
+        if (createdClient) {
+          // Return both user and profile
+          return { 
+            success: true, 
+            user: data.user,
+            profile: {
+              id: createdClient.id,
+              name: createdClient.name,
+              phone: createdClient.phone,
+              email: createdClient.email,
+              createdAt: createdClient.created_at
+            }
+          }
+        }
       }
       
       return { success: true, user: data.user }

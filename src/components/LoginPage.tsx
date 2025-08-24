@@ -10,7 +10,9 @@ import {
   getClients,
   getClientByPhone,
   createClientRecord,
-  updateClient
+  updateClient,
+  authService,
+  clientAuthService
 } from '../utils/supabaseUtils';
 
 interface LoginPageProps {
@@ -27,6 +29,11 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
   const [selectedDesigner, setSelectedDesigner] = useState<string>('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showClientPassword, setShowClientPassword] = useState(false);
+  const [showClientRegisterPassword, setShowClientRegisterPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSuperAdminPassword, setShowSuperAdminPassword] = useState(false);
   const [clickCount, setClickCount] = useState(0);
   const [showAccessDenied, setShowAccessDenied] = useState(false);
   const [lastClickTime, setLastClickTime] = useState(0);
@@ -130,27 +137,28 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     
     setLoading(true);
     
-    const newDesigner: NailDesigner = {
-      id: crypto.randomUUID(),
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      password: formData.password,
-      isActive: false, // Inativo até aprovação
-      createdAt: new Date().toISOString()
-    };
-    
-    const success = await saveDesigner(newDesigner);
-    
-    setLoading(false);
-    
-    if (success) {
-      // Mostrar mensagem de sucesso e voltar para login
-      alert('Cadastro realizado com sucesso! Aguarde a aprovação do administrador para acessar o sistema.');
-      setShowRegister(false);
-      setFormData({ name: '', phone: '', email: '', password: '', confirmPassword: '' });
-    } else {
+    try {
+      // Usar Supabase Auth para criar o usuário
+      const authResult = await authService.signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone
+      });
+      
+      if (authResult.success && authResult.user) {
+        // Mostrar mensagem de sucesso e voltar para login
+        alert('Cadastro realizado com sucesso! Aguarde a aprovação do administrador para acessar o sistema.');
+        setShowRegister(false);
+        setFormData({ name: '', phone: '', email: '', password: '', confirmPassword: '' });
+      } else {
+        alert(authResult.error || 'Erro ao realizar cadastro. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro no registro:', error);
       alert('Erro ao realizar cadastro. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,16 +168,33 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setLoginError('');
     
     try {
+      // Primeiro, obter o designer selecionado para pegar o email
       const designer = await getNailDesignerById(selectedDesigner);
       
-      if (designer && designer.password === password) {
-        if (!designer.isActive) {
-          setLoginError('Esta conta foi desativada.');
-          return;
+      if (!designer) {
+        setLoginError('Designer não encontrado!');
+        return;
+      }
+      
+      if (!designer.isActive) {
+        setLoginError('Esta conta foi desativada.');
+        return;
+      }
+      
+      // Usar Supabase Auth para fazer login
+      const authResult = await authService.signIn({
+        email: designer.email,
+        password: password
+      });
+      
+      if (authResult.success && authResult.user) {
+        // Login bem-sucedido, carregar dados completos do designer
+        const updatedDesigner = await getNailDesignerById(selectedDesigner);
+        if (updatedDesigner) {
+          onLogin(updatedDesigner);
         }
-        onLogin(designer);
       } else {
-        setLoginError('Senha incorreta!');
+        setLoginError(authResult.error || 'Senha incorreta!');
       }
     } catch (error) {
       console.error('Erro no login:', error);
@@ -278,11 +303,21 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setClientLoginError('');
     
     try {
-      // Verificar se o cliente existe no sistema de cadastros
-      const clients = await getClients();
-      const client = clients.find((c: any) => c.phone === clientPhone && c.password === clientPassword);
+      // Primeiro, verificar se o cliente existe e obter o email
+      const client = await getClientByPhone(clientPhone);
       
-      if (client) {
+      if (!client) {
+        setClientLoginError('Cliente não encontrado!');
+        return;
+      }
+      
+      // Usar Supabase Auth para fazer login
+      const authResult = await clientAuthService.signIn(
+        client.email,
+        clientPassword
+      );
+      
+      if (authResult.success && authResult.user) {
         // Login bem-sucedido
         const clientData = {
           id: client.id,
@@ -295,7 +330,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         };
         onLogin(clientData, true);
       } else {
-        setClientLoginError('Telefone ou senha incorretos.');
+        setClientLoginError(authResult.error || 'Telefone ou senha incorretos.');
       }
     } catch (error) {
       console.error('Erro no login do cliente:', error);
@@ -326,34 +361,33 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
 
-      // Criar novo cliente
-      const newClient = {
-        name: clientRegisterData.name,
-        phone: clientRegisterData.phone,
-        email: clientRegisterData.email || clientRegisterData.phone + '@nail.app',
-        password: clientRegisterData.password,
-        isActive: true,
-        createdAt: new Date().toISOString()
-      };
+      // Usar Supabase Auth para criar o usuário
+      const email = clientRegisterData.email || clientRegisterData.phone + '@nail.app';
       
-      // Salvar cliente no Supabase
-      const success = await saveClient(newClient);
+      const authResult = await clientAuthService.signUp(
+        email,
+        clientRegisterData.password,
+        {
+          name: clientRegisterData.name,
+          phone: clientRegisterData.phone
+        }
+      );
       
-      if (success) {
+      if (authResult.success && authResult.user && authResult.profile) {
         // Fazer login automático após cadastro
         const clientData: NailDesigner = {
-          id: newClient.id,
-          name: newClient.name,
-          phone: newClient.phone,
-          email: newClient.email,
-          password: newClient.password,
+          id: authResult.profile.id,
+          name: authResult.profile.name,
+          phone: authResult.profile.phone,
+          email: authResult.profile.email,
+          password: clientRegisterData.password,
           isActive: true,
-          createdAt: newClient.createdAt
+          createdAt: authResult.profile.createdAt
         };
         
         onLogin(clientData, true);
       } else {
-        setClientRegisterError('Erro ao criar conta. Tente novamente.');
+        setClientRegisterError(authResult.error || 'Erro ao criar conta. Tente novamente.');
       }
     } catch (error) {
       console.error('Erro no registro do cliente:', error);
@@ -497,17 +531,26 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                 <label className="block text-sm font-medium text-purple-100 mb-2">
                   Senha
                 </label>
-                <input
-                  type="password"
-                  value={clientPassword}
-                  onChange={(e) => {
-                    setClientPassword(e.target.value);
-                    setClientLoginError('');
-                  }}
-                  className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
-                  placeholder="Digite sua senha"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showClientPassword ? "text" : "password"}
+                    value={clientPassword}
+                    onChange={(e) => {
+                      setClientPassword(e.target.value);
+                      setClientLoginError('');
+                    }}
+                    className="w-full p-3 pr-12 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
+                    placeholder="Digite sua senha"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowClientPassword(!showClientPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
+                  >
+                    {showClientPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
                 {clientLoginError && (
                   <p className="text-red-400 text-sm mt-1">{clientLoginError}</p>
                 )}
@@ -629,17 +672,26 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                 <label className="block text-sm font-medium text-purple-100 mb-2">
                   Senha *
                 </label>
-                <input
-                  type="password"
-                  value={clientRegisterData.password}
-                  onChange={(e) => {
-                    setClientRegisterData({...clientRegisterData, password: e.target.value});
-                    setClientRegisterError('');
-                  }}
-                  className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
-                  placeholder="Digite sua senha"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showClientRegisterPassword ? "text" : "password"}
+                    value={clientRegisterData.password}
+                    onChange={(e) => {
+                      setClientRegisterData({...clientRegisterData, password: e.target.value});
+                      setClientRegisterError('');
+                    }}
+                    className="w-full p-3 pr-12 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
+                    placeholder="Digite sua senha"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowClientRegisterPassword(!showClientRegisterPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
+                  >
+                    {showClientRegisterPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               
               {clientRegisterError && (
@@ -714,36 +766,54 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                 
                 <div>
                   <label className="block text-sm font-medium text-purple-100 mb-2">
-                    Nova Senha *
+                    Nova Senha
                   </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => {
-                      setNewPassword(e.target.value);
-                      setRecoveryError('');
-                    }}
-                    className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
-                    placeholder="Digite sua nova senha"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setRecoveryError('');
+                      }}
+                      className="w-full p-3 pr-12 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
+                      placeholder="Digite a nova senha"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-purple-100 mb-2">
-                    Confirmar Nova Senha *
+                    Confirmar Nova Senha
                   </label>
-                  <input
-                    type="password"
-                    value={confirmNewPassword}
-                    onChange={(e) => {
-                      setConfirmNewPassword(e.target.value);
-                      setRecoveryError('');
-                    }}
-                    className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
-                    placeholder="Confirme sua nova senha"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmNewPassword}
+                      onChange={(e) => {
+                        setConfirmNewPassword(e.target.value);
+                        setRecoveryError('');
+                      }}
+                      className="w-full p-3 pr-12 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
+                      placeholder="Confirme a nova senha"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 
                 {recoveryError && (
@@ -1074,7 +1144,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         <div className="text-center mt-8">
           <button
             onClick={handleDeveloperContact}
-            className="text-xs text-gray-300 hover:text-pink-600 transition-colors"
+            className="text-xs text-gray-200 hover:text-pink-600 transition-colors"
           >
             Desenvolvido por Átila Azevedo - WhatsApp: 73988821486
           </button>

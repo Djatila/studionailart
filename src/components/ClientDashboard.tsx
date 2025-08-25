@@ -69,13 +69,14 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
 
   const loadData = async () => {
     try {
-      // Carregar agendamentos do Supabase primeiro (como o AdminDashboard)
+      console.log('🔄 ClientDashboard: Carregando dados do cliente:', client.phone);
       let clientAppointments: Appointment[] = [];
       
+      // Buscar agendamentos do Supabase
       try {
-        console.log('🔍 ClientDashboard: Buscando agendamentos do Supabase...');
         const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
         const supabaseAppointments = await getSupabaseAppointments();
+        console.log('📊 ClientDashboard: Total de agendamentos no Supabase:', supabaseAppointments.length);
         
         // Filtrar agendamentos do cliente pelo telefone
         clientAppointments = supabaseAppointments.filter((apt: any) => {
@@ -109,25 +110,24 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       
       setAppointments(clientAppointments);
 
-      // Carregar designers do localStorage
-      const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
-      
-      // Se não há designers no localStorage, tentar buscar do Supabase
-      if (savedDesigners.length === 0) {
-        console.log('🔍 ClientDashboard: Nenhuma designer no localStorage, buscando do Supabase...');
-        try {
-          const { getNailDesigners } = await import('../utils/supabaseUtils');
-          const supabaseDesigners = await getNailDesigners();
-          console.log('📊 ClientDashboard: Designers do Supabase:', supabaseDesigners.length);
-          
-          // Salvar no localStorage para próximas consultas
-          localStorage.setItem('nail_designers', JSON.stringify(supabaseDesigners));
-          setDesigners(supabaseDesigners);
-        } catch (error) {
-          console.error('❌ ClientDashboard: Erro ao buscar designers do Supabase:', error);
-          setDesigners(savedDesigners);
-        }
-      } else {
+      // SEMPRE buscar designers do Supabase (removendo dependência do localStorage)
+      console.log('🔍 ClientDashboard: Buscando designers diretamente do Supabase...');
+      try {
+        const { getNailDesigners } = await import('../utils/supabaseUtils');
+        const supabaseDesigners = await getNailDesigners();
+        console.log('📊 ClientDashboard: Designers do Supabase:', supabaseDesigners.length);
+        console.log('👥 ClientDashboard: Designers encontradas:', supabaseDesigners.map(d => `${d.name} (ID: ${d.id})`));
+        
+        setDesigners(supabaseDesigners);
+        
+        // Opcional: atualizar localStorage com dados atualizados
+        localStorage.setItem('nail_designers', JSON.stringify(supabaseDesigners));
+      } catch (error) {
+        console.error('❌ ClientDashboard: Erro ao buscar designers do Supabase:', error);
+        
+        // Fallback para localStorage apenas em caso de erro
+        const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+        console.log('📱 ClientDashboard: Usando designers do localStorage como fallback:', savedDesigners.length);
         setDesigners(savedDesigners);
       }
     } catch (error) {
@@ -139,19 +139,8 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     console.log('🔍 ClientDashboard: Buscando designer com ID:', designerId);
     console.log('📊 ClientDashboard: Designers disponíveis:', designers.length);
     
-    let designer = designers.find(d => d.id === designerId);
-    
-    // Se não encontrar, tentar buscar por nome similar (fallback)
-    if (!designer && designerId) {
-      designer = designers.find(d => 
-        d.name.toLowerCase().includes('kika') || 
-        d.name.toLowerCase().includes('klicia')
-      );
-      
-      if (designer) {
-        console.log('⚠️ ClientDashboard: Designer encontrada por nome similar:', designer.name);
-      }
-    }
+    // Buscar por ID exato
+    const designer = designers.find(d => d.id === designerId);
     
     if (designer) {
       console.log('✅ ClientDashboard: Designer encontrada:', designer.name);
@@ -160,7 +149,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     
     console.log('❌ ClientDashboard: Designer não encontrada para ID:', designerId);
     console.log('📋 ClientDashboard: IDs disponíveis:', designers.map(d => `${d.name}: ${d.id}`));
-    return 'Designer não encontrada';
+    return `Designer (${designerId})`;
   };
 
   const getCurrentMonthAppointments = () => {

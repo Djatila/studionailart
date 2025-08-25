@@ -701,6 +701,28 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   const handleConfirmBooking = async () => {
     if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime) return;
     
+    // Logs para verificar o ID da designer selecionada
+    console.log('🔍 Verificando designer selecionada:', {
+      designerId: selectedDesigner.id,
+      designerName: selectedDesigner.name,
+      selectedDesigner: selectedDesigner
+    });
+    
+    // Verificar se o ID é válido (não deve ser 'kika6')
+    if (selectedDesigner.id === 'kika6') {
+      console.warn('⚠️ ID incorreto detectado: kika6. Tentando corrigir...');
+      // Buscar o ID correto da Klicia
+      const kliciaDesigner = designers.find(d => 
+        d.name.toLowerCase().includes('klicia') || 
+        d.name.toLowerCase().includes('kika')
+      );
+      
+      if (kliciaDesigner && kliciaDesigner.id !== 'kika6') {
+        console.log('✅ ID correto encontrado para Klicia:', kliciaDesigner.id);
+        selectedDesigner.id = kliciaDesigner.id;
+      }
+    }
+    
     // Remover verificação de conflito - horários ocupados devem ser filtrados no passo 4
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
@@ -714,6 +736,16 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       price: selectedService.price,
       status: 'pending'
     };
+    
+    console.log('💾 Salvando agendamento com dados:', {
+      appointmentId: newAppointment.id,
+      designerId: newAppointment.designerId,
+      designerName: selectedDesigner.name,
+      clientName: newAppointment.clientName,
+      service: newAppointment.service,
+      date: newAppointment.date,
+      time: newAppointment.time
+    });
     
     try {
       await saveAppointment(newAppointment);
@@ -1067,7 +1099,33 @@ Aguardo confirmação!`;
                       <button
                         key={designer.id}
                         onClick={() => {
-                          setSelectedDesigner(designer);
+                          console.log('👆 Designer selecionada:', {
+                            id: designer.id,
+                            name: designer.name,
+                            specialty: designer.specialty
+                          });
+                          
+                          // Verificar se é o ID problemático 'kika6'
+                          if (designer.id === 'kika6') {
+                            console.warn('⚠️ ID problemático detectado na seleção: kika6');
+                            console.log('🔍 Buscando ID correto para Klicia...');
+                            
+                            // Buscar o designer correto da Klicia
+                            const correctDesigner = designers.find(d => 
+                              d.name.toLowerCase().includes('klicia') && d.id !== 'kika6'
+                            );
+                            
+                            if (correctDesigner) {
+                              console.log('✅ Designer correto encontrado:', correctDesigner);
+                              setSelectedDesigner(correctDesigner);
+                            } else {
+                              console.log('❌ Designer correto não encontrado, usando o selecionado');
+                              setSelectedDesigner(designer);
+                            }
+                          } else {
+                            setSelectedDesigner(designer);
+                          }
+                          
                           setStep(2);
                         }}
                         className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${

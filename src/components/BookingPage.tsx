@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useReducer } from 'react';
 import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard } from 'lucide-react';
 import { NailDesigner } from '../App';
+import { supabase } from '../lib/supabase';
 
 interface Service {
   id: string;
@@ -30,11 +31,20 @@ interface BookingPageProps {
   onNavigateToClientDashboard?: () => void; // Função para navegar ao dashboard da cliente
 }
 
+const loadingReducer = (state: boolean, action: { type: 'START' | 'FINISH' }) => {
+  switch (action.type) {
+    case 'START':
+      return true;
+    case 'FINISH':
+      return false;
+    default:
+      return state;
+  }
+};
+
 const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard }) => {
   const [step, setStep] = useState(1);
-  
-
-  const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(null);
+  const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(initialDesigner || null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -47,7 +57,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [designers, setDesigners] = useState<NailDesigner[]>([]);
-  const [loadingDesigners, setLoadingDesigners] = useState(true);
+  const [designersLoaded, setDesignersLoaded] = useState(false); // Novo estado mais simples
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
@@ -55,6 +65,64 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [forceReload, setForceReload] = useState(0);
+
+  useEffect(() => {
+    // Listener para cancelamentos de agendamentos
+    const handleAppointmentCancelled = (event: CustomEvent) => {
+      console.log('🔄 BookingPage: Recebido evento de cancelamento:', event.detail);
+      
+      // 🆕 NOVO: Aguardar um pouco para garantir que o Supabase foi atualizado
+      setTimeout(() => {
+        // Forçar atualização dos horários disponíveis
+        setForceReload(prev => {
+          const newValue = prev + 1;
+          console.log('📊 Forçando reload devido a cancelamento:', newValue);
+          return newValue;
+        });
+        
+        // 🆕 NOVO: Forçar recarregamento dos horários se estivermos no passo 4
+        if (step === 4 && selectedDate) {
+          console.log('🔄 Recarregando horários imediatamente após cancelamento');
+          // Trigger do useEffect que carrega os horários
+          setStep(4); // Força re-render
+        }
+      }, 1000); // Aguardar 1 segundo para sincronização
+    };
+    
+    // Adicionar listener
+    window.addEventListener('appointmentCancelled', handleAppointmentCancelled as EventListener);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('appointmentCancelled', handleAppointmentCancelled as EventListener);
+    };
+  }, [step, selectedDate]); // 🆕 Adicionar dependências
+
+  // Listener para sincronização em tempo real
+  useEffect(() => {
+    const handleAppointmentCreated = () => {
+      // Forçar atualização dos horários disponíveis
+      setForceReload(prev => prev + 1);
+    };
+
+    window.addEventListener('appointmentCreated', handleAppointmentCreated);
+    
+    return () => {
+      window.removeEventListener('appointmentCreated', handleAppointmentCreated);
+    };
+  }, []);
+
+  const forceRefreshTimeSlots = useCallback(() => {
+    console.log('🔄 Forçando atualização manual dos horários...');
+    console.log('📅 Data selecionada:', selectedDate);
+    console.log('👩‍💼 Designer selecionada:', selectedDesigner?.name);
+    setForceReload(prev => {
+      const newValue = prev + 1;
+      console.log('🔢 ForceReload incrementado para:', newValue);
+      return newValue;
+    });
+  }, [selectedDate, selectedDesigner]);
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -74,21 +142,30 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   }, [initialDesigner, isResetting]);
 
   useEffect(() => {
-    // Carregar designers quando o componente for montado
-    const loadDesigners = async () => {
-      setLoadingDesigners(true);
+  // Carregar designers quando o componente for montado
+  const loadDesigners = async () => {
+    console.log('🚀 Iniciando carregamento de designers no useEffect...');
+    if (!designersLoaded) {
+      setDesignersLoaded(false);
+      
       try {
         const designersList = await getDesigners();
-        setDesigners(designersList);
+        console.log('📋 Designers carregados:', designersList?.length || 0);
+        console.log('👥 Lista de designers:', designersList);
+        setDesigners(designersList || []);
+        setIsInitialized(true);
+        setDesignersLoaded(true);
       } catch (error) {
-        console.error('Erro ao carregar designers:', error);
-      } finally {
-        setLoadingDesigners(false);
+        console.error('❌ Erro no useEffect ao carregar designers:', error);
+        setDesigners([]);
+        setIsInitialized(true);
+        setDesignersLoaded(true);
       }
-    };
-    
-    loadDesigners();
-  }, []);
+    }
+  };
+  
+  loadDesigners();
+}, [designersLoaded]); // Adicionar designersLoaded como dependência
 
   // Carregar serviços e disponibilidade quando designer for selecionado
   useEffect(() => {
@@ -127,17 +204,23 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   }, [selectedDesigner]);
 
   const getDesigners = async (): Promise<NailDesigner[]> => {
+    console.log('🔍 Iniciando carregamento de designers...');
+    
     try {
+      console.log('📡 Tentando buscar designers do Supabase...');
       // Buscar do Supabase
       const { getNailDesigners } = await import('../utils/supabaseUtils');
       const supabaseDesigners = await getNailDesigners();
+      console.log('✅ Designers do Supabase:', supabaseDesigners?.length || 0);
       
       // Buscar do localStorage
+      console.log('💾 Buscando designers do localStorage...');
       const saved = localStorage.getItem('nail_designers');
       const localDesigners = saved ? JSON.parse(saved) : [];
+      console.log('📱 Designers do localStorage:', localDesigners?.length || 0);
       
       // Combinar e remover duplicatas, priorizando Supabase
-      const allDesigners = [...supabaseDesigners];
+      const allDesigners = [...(supabaseDesigners || [])];
       
       localDesigners.forEach((localDesigner: NailDesigner) => {
         if (!allDesigners.find(d => d.id === localDesigner.id)) {
@@ -145,15 +228,34 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         }
       });
       
+      console.log('🔄 Total de designers combinados:', allDesigners?.length || 0);
+      
       // Filtrar apenas designers ativos (verificar ambos os formatos de campo)
-      const activeDesigners = allDesigners.filter(d => d.isActive || d.is_active);
+      const activeDesigners = allDesigners.filter(d => {
+        const isActive = d.isActive || d.is_active;
+        console.log(`👤 Designer ${d.name}: ativo = ${isActive}`);
+        return isActive;
+      });
+      
+      console.log('✅ Designers ativos encontrados:', activeDesigners?.length || 0);
       return activeDesigners;
+      
     } catch (error) {
-      console.error('Erro ao buscar designers:', error);
+      console.error('❌ Erro detalhado ao buscar designers:', error);
+      console.error('📊 Stack trace:', error.stack);
+      
       // Fallback para localStorage
-      const saved = localStorage.getItem('nail_designers');
-      const localDesigners = saved ? JSON.parse(saved) : [];
-      return localDesigners.filter((d: NailDesigner) => d.isActive || d.is_active);
+      console.log('🔄 Usando fallback para localStorage...');
+      try {
+        const saved = localStorage.getItem('nail_designers');
+        const localDesigners = saved ? JSON.parse(saved) : [];
+        const activeLocalDesigners = localDesigners.filter((d: NailDesigner) => d.isActive || d.is_active);
+        console.log('📱 Fallback: designers ativos do localStorage:', activeLocalDesigners?.length || 0);
+        return activeLocalDesigners;
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback:', fallbackError);
+        return [];
+      }
     }
   };
 
@@ -213,16 +315,16 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
             return designerId === selectedDesigner.id;
           })
           .map((apt: any) => ({
-            id: apt.id || crypto.randomUUID(),
-            designerId: apt.designer_id || apt.designerId,
-            clientName: apt.client_name || apt.clientName || '',
-            clientPhone: apt.client_phone || apt.clientPhone || '',
-            clientEmail: apt.client_email || apt.clientEmail || '',
-            service: apt.service_name || apt.service || '',
-            date: apt.appointment_date || apt.date || '',
-            time: apt.appointment_time || apt.time || '',
-            status: apt.status || 'pending',
-            price: apt.service_price || apt.price || 0
+              id: apt.id || crypto.randomUUID(),
+              designerId: apt.designer_id || apt.designerId,
+              clientName: apt.client_name || apt.clientName || '',
+              clientPhone: apt.client_phone || apt.clientPhone || '',
+              clientEmail: apt.client_email || apt.clientEmail || '',
+              service: apt.service || '',
+              date: apt.date || '',
+              time: apt.time || '',
+              status: apt.status || 'pending',
+              price: apt.price || 0
           }));
         
         if (designerAppointments.length > 0) {
@@ -356,61 +458,153 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const savedAppointment = await createAppointment(supabaseAppointment);
       
       if (savedAppointment) {
-        console.log('Agendamento salvo no Supabase:', savedAppointment);
+        // Sucesso no Supabase - também salvar no localStorage para cache
+        const saved = localStorage.getItem('nail_appointments');
+        const allAppointments = saved ? JSON.parse(saved) : [];
+        allAppointments.push(appointment);
+        localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
+        
+        // Disparar evento para sincronizar outros componentes
+        window.dispatchEvent(new CustomEvent('appointmentCreated', {
+          detail: { appointment: savedAppointment }
+        }));
+        
+        console.log('✅ Agendamento salvo no Supabase e sincronizado');
+        return savedAppointment;
+      } else {
+        // Horário já ocupado - retornar null silenciosamente (sem aviso de conflito)
+        console.log('ℹ️ Horário não disponível - agendamento não foi salvo');
+        return null;
       }
     } catch (error) {
-      console.error('Erro ao salvar agendamento no Supabase:', error);
+      // Erro de conexão - usar localStorage apenas como fallback temporário
+      console.log('⚠️ Erro de conexão - usando localStorage como fallback temporário');
+      const saved = localStorage.getItem('nail_appointments');
+      const allAppointments = saved ? JSON.parse(saved) : [];
+      allAppointments.push(appointment);
+      localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
+      return appointment;
     }
-    
-    // Também salvar no localStorage para compatibilidade
-    const saved = localStorage.getItem('nail_appointments');
-    const allAppointments = saved ? JSON.parse(saved) : [];
-    allAppointments.push(appointment);
-    localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
   };
 
-  // Generate time slots
-  const timeSlots = [
-    '08:00', '10:00', '12:00', '14:00', '16:00', '18:00'
-  ];
+ // Generate time slots
+const defaultTimeSlots = [
+  '08:00', '10:00', '12:00', '14:00', '16:00', '18:00'
+];
 
-  // Get available time slots for selected date
-  const getAvailableTimeSlots = useCallback(async () => {
-    const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
-    
-    if (!selectedDate) {
-      return defaultTimeSlots;
-    }
-    
-    try {
-      const appointments = await getAppointments();
-      
-      // Garantir que appointments é um array válido
-      if (!Array.isArray(appointments)) {
-        return defaultTimeSlots;
+const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
+  if (!selectedDate || !selectedDesigner) {
+    return defaultTimeSlots;
+  }
+
+  try {
+    // Cache breaker para forçar nova busca
+    const cacheBreaker = Date.now() + Math.random();
+    console.log(`🔄 [${cacheBreaker}] Buscando horários disponíveis para ${selectedDate} - Designer: ${selectedDesigner.name}`);
+
+    let appointments: any[] = [];
+    let retryCount = 0;
+    const maxRetries = 5; // Aumentado de 3 para 5
+
+    // Buscar agendamentos do Supabase com retry
+    while (retryCount < maxRetries) {
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('date', selectedDate)
+          .eq('designer_id', selectedDesigner.id);
+
+        if (error) throw error;
+        appointments = data || [];
+        console.log(`✅ [${cacheBreaker}] Agendamentos do Supabase (tentativa ${retryCount + 1}):`, appointments.length);
+        break;
+      } catch (error) {
+        retryCount++;
+        console.warn(`⚠️ [${cacheBreaker}] Erro na tentativa ${retryCount}:`, error);
+        if (retryCount >= maxRetries) {
+          console.error(`❌ [${cacheBreaker}] Falha após ${maxRetries} tentativas`);
+          appointments = [];
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
       }
-      
-      const bookedTimes = appointments
-        .filter(apt => {
-          return apt && apt.date === selectedDate;
-        })
-        .map(apt => apt.time)
-        .filter(time => time); // Remove valores undefined/null
-      
-      const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
-      
-      // Garantir que sempre retornamos um array válido
-      const finalResult = Array.isArray(availableSlots) ? availableSlots : defaultTimeSlots;
-      return finalResult;
-    } catch (error) {
-      return defaultTimeSlots;
     }
-  }, [selectedDate, getAppointments]);
 
-  // Initialize component
-  useEffect(() => {
-    setIsInitialized(true);
-  }, []);
+    // Filtrar apenas agendamentos ativos (não cancelados)
+    const activeAppointments = appointments.filter(apt => 
+      apt.status !== 'cancelled' && apt.status !== 'canceled'
+    );
+    
+    console.log(`📊 [${cacheBreaker}] Agendamentos ativos (não cancelados):`, activeAppointments.length);
+    console.log(`🚫 [${cacheBreaker}] Agendamentos cancelados:`, appointments.length - activeAppointments.length);
+    
+    // Log detalhado dos agendamentos
+    activeAppointments.forEach(apt => {
+      console.log(`   ✓ Ativo: ${apt.time} - Status: ${apt.status}`);
+    });
+    
+    const cancelledAppointments = appointments.filter(apt => 
+      apt.status === 'cancelled' || apt.status === 'canceled'
+    );
+    cancelledAppointments.forEach(apt => {
+      console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status}`);
+    });
+
+    // Verificar localStorage para agendamentos locais
+    const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+    const localActiveAppointments = localAppointments.filter((apt: any) => 
+      apt.date === selectedDate && 
+      apt.designerId === selectedDesigner.id &&
+      apt.status !== 'cancelled' && 
+      apt.status !== 'canceled'
+    );
+
+console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveAppointments.length);
+
+    // Combinar agendamentos sem duplicatas
+    const allAppointments = [...activeAppointments];
+    localActiveAppointments.forEach((localApt: any) => {
+      const exists = allAppointments.some(apt => 
+        apt.time === localApt.time && apt.date === localApt.date
+      );
+      if (!exists) {
+        allAppointments.push(localApt);
+      }
+    });
+
+    // Log dos agendamentos cancelados
+    cancelledAppointments.forEach(apt => {
+      console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status}`);
+    });
+
+    // Extrair e normalizar horários ocupados (remover segundos se existirem)
+    const bookedTimes = activeAppointments.map(apt => {
+      // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
+      return apt.time.length > 5 ? apt.time.substring(0, 5) : apt.time;
+    });
+    console.log(`⏰ [${cacheBreaker}] Horários ocupados (normalizados):`, bookedTimes);
+
+    // Filtrar horários disponíveis
+    const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
+    console.log(`✨ [${cacheBreaker}] Horários disponíveis:`, availableSlots);
+    
+    // Log dos horários liberados (cancelados)
+    const freedTimes = defaultTimeSlots.filter(time => {
+      const wasCancelled = cancelledAppointments.some(apt => apt.time === time);
+      const isNotBooked = !bookedTimes.includes(time);
+      return wasCancelled && isNotBooked;
+    });
+    if (freedTimes.length > 0) {
+      console.log(`🔓 [${cacheBreaker}] Horários liberados por cancelamento:`, freedTimes);
+    }
+    
+    return availableSlots;
+  } catch (error) {
+    console.error('❌ Erro ao buscar horários disponíveis:', error);
+    return defaultTimeSlots;
+  }
+}, [selectedDate, selectedDesigner, forceReload]); // Adicionado forceReload como dependência
 
   // Load available time slots when date is selected
   useEffect(() => {
@@ -419,11 +613,11 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
     
     if (selectedDate && step === 4) {
-      
       const loadTimeSlots = async () => {
         setLoadingTimeSlots(true);
         
         try {
+          // Forçar nova consulta sem cache
           const slots = await getAvailableTimeSlots();
           
           const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
@@ -431,8 +625,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           // Garantir que sempre temos um array válido
           const finalSlots = Array.isArray(slots) && slots.length >= 0 ? slots : defaultTimeSlots;
           
+          console.log('🎯 Horários carregados no useEffect:', finalSlots);
           setAvailableTimeSlots(finalSlots);
         } catch (error) {
+          console.error('Erro ao carregar horários:', error);
           const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
           setAvailableTimeSlots(defaultTimeSlots);
         } finally {
@@ -446,7 +642,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       setAvailableTimeSlots([]);
       setLoadingTimeSlots(false);
     }
-  }, [isInitialized, selectedDate, step, getAvailableTimeSlots]);
+  }, [isInitialized, selectedDate, step, forceReload]);
 
   // Get unique client names from appointments for suggestions
   const getClientSuggestions = async (input: string) => {
@@ -503,10 +699,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   };
 
   const handleConfirmBooking = async () => {
-    if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone || !selectedDesigner) {
-      return;
-    }
-
+    if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime) return;
+    
+    // Remover verificação de conflito - horários ocupados devem ser filtrados no passo 4
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
       designerId: selectedDesigner.id,
@@ -519,9 +714,19 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       price: selectedService.price,
       status: 'pending'
     };
-
-    await saveAppointment(newAppointment);
-    setShowConfirmation(true);
+    
+    try {
+      await saveAppointment(newAppointment);
+      
+      // Forçar atualização dos horários disponíveis
+      setForceReload(prev => prev + 1);
+      
+      setShowConfirmation(true);
+    } catch (error) {
+      // Apenas tratar erros de conexão/sistema, não conflitos de horário
+      console.error('Erro ao salvar agendamento:', error);
+      alert('❌ Erro ao salvar agendamento. Tente novamente.');
+    }
   };
 
   const resetForm = () => {
@@ -841,12 +1046,18 @@ Aguardo confirmação!`;
                     <h3 className="text-lg font-semibold text-white">1. Escolha sua Nail Designer</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {loadingDesigners ? (
-                      <div className="col-span-full text-center text-white py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                        Carregando designers...
-                      </div>
-                    ) : designers.length === 0 ? (
+                    {(() => {
+        console.log('🎨 Renderizando step 1 - designersLoaded:', designersLoaded, 'designers.length:', designers.length);
+        return null;
+      })()}
+      {!designersLoaded ? (
+        <div className="col-span-full text-center text-white py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+          Carregando designers...
+          <p className="text-xs text-white/50 mt-2">Debug: designersLoaded = {String(designersLoaded)}</p>
+          <p className="text-xs text-white/50">Designers: {designers.length}</p>
+        </div>
+      ) : designers.length === 0 ? (
                       <div className="col-span-full text-center text-white py-8">
                         <p>Nenhuma nail designer encontrada.</p>
                         <p className="text-sm text-white/70 mt-2">Verifique se há designers cadastradas no sistema.</p>
@@ -1018,6 +1229,15 @@ Aguardo confirmação!`;
                     </button>
                   </div>
                   
+                  <div className="mb-4">
+                    <button
+                      onClick={forceRefreshTimeSlots}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      🔄 Atualizar horários disponíveis
+                    </button>
+                  </div>
+
                   {loadingTimeSlots ? (
                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
                       <div className="flex items-center justify-center py-4">

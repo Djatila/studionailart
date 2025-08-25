@@ -138,13 +138,15 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setLoading(true);
     
     try {
-      // Usar Supabase Auth para criar o usuário
-      const authResult = await authService.signUp({
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        phone: formData.phone
-      });
+      // Corrigir a chamada da função signUp
+      const authResult = await authService.signUp(
+        formData.email,
+        formData.password,
+        {
+          name: formData.name,
+          phone: formData.phone
+        }
+      );
       
       if (authResult.success && authResult.user) {
         // Mostrar mensagem de sucesso e voltar para login
@@ -181,21 +183,15 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
       
-      // Usar Supabase Auth para fazer login
-      const authResult = await authService.signIn({
-        email: designer.email,
-        password: password
-      });
-      
-      if (authResult.success && authResult.user) {
-        // Login bem-sucedido, carregar dados completos do designer
-        const updatedDesigner = await getNailDesignerById(selectedDesigner);
-        if (updatedDesigner) {
-          onLogin(updatedDesigner);
-        }
-      } else {
-        setLoginError(authResult.error || 'Senha incorreta!');
+      // Verificar senha diretamente com os dados da designer
+      if (designer.password !== password) {
+        setLoginError('Senha incorreta!');
+        return;
       }
+      
+      // Login bem-sucedido - usar dados da designer diretamente
+      onLogin(designer);
+      
     } catch (error) {
       console.error('Erro no login:', error);
       setLoginError('Erro ao fazer login. Tente novamente.');

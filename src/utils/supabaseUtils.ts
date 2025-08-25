@@ -265,7 +265,46 @@ export const appointmentService = {
   },
 
   // Create new appointment
+  // Verificar se existe conflito de horário
+  async checkTimeConflict(designerId: string, date: string, time: string, excludeId?: string): Promise<boolean> {
+    let query = supabase
+      .from('appointments')
+      .select('id')
+      .eq('designer_id', designerId)
+      .eq('date', date)
+      .eq('time', time)
+      .in('status', ['pending', 'confirmed']) // Incluir ambos os status
+      .limit(1)
+    
+    // Excluir o próprio agendamento da verificação
+    if (excludeId) {
+      query = query.neq('id', excludeId)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error checking time conflict:', error)
+      return true // Em caso de erro, assumir conflito por segurança
+    }
+    
+    return data && data.length > 0
+  },
+
   async create(appointment: Database['public']['Tables']['appointments']['Insert']): Promise<Appointment | null> {
+    // Verificar conflito excluindo o próprio agendamento
+    const hasConflict = await this.checkTimeConflict(
+      appointment.designer_id,
+      appointment.date,
+      appointment.time,
+      appointment.id // Excluir o próprio agendamento da verificação
+    )
+    
+    if (hasConflict) {
+      console.log('ℹ️ Horário já ocupado por outro agendamento')
+      return null
+    }
+
     const { data, error } = await supabase
       .from('appointments')
       .insert(appointment)
@@ -789,6 +828,43 @@ export const migrationService = {
 }
 
 // Authentication Service with Supabase Auth
+
+// Função para criar conta de autenticação para designer existente
+export const createAuthAccountForDesigner = async (designerId: string) => {
+  try {
+    const designer = await designerService.getById(designerId);
+    if (!designer) {
+      throw new Error('Designer não encontrado');
+    }
+    
+    // Criar conta no Supabase Auth
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: designer.email,
+      password: designer.password,
+      user_metadata: {
+        name: designer.name,
+        phone: designer.phone
+      }
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Atualizar o ID da designer para corresponder ao ID do Auth
+    if (data.user) {
+      await designerService.update(designerId, {
+        id: data.user.id
+      });
+    }
+    
+    return { success: true, user: data.user };
+  } catch (error) {
+    console.error('Erro ao criar conta de autenticação:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 export const authService = {
   // Sign up new user
   async signUp(email: string, password: string, userData: { name: string; phone: string }) {
@@ -815,12 +891,18 @@ export const authService = {
           id: data.user.id, // Use auth user ID
           name: userData.name,
           email,
-          password: '', // Don't store password in database when using auth
+          password: password, // ✅ Usar a senha fornecida ou hash
           phone: userData.phone,
           is_active: false // Pending approval
         }
         
-        await designerService.create(designerData)
+        const designerResult = await designerService.create(designerData)
+        
+        if (!designerResult) {
+          console.error('Failed to create designer record')
+          // Opcional: fazer rollback do usuário auth se necessário
+          return { success: false, error: 'Erro ao criar registro da designer' }
+        }
       }
       
       return { success: true, user: data.user }
@@ -931,6 +1013,10 @@ export const authService = {
 }
 
 // Client Authentication Service
+// Adicionar função de conveniência
+export const checkAppointmentConflict = (designerId: string, date: string, time: string) => 
+  appointmentService.checkTimeConflict(designerId, date, time)
+
 export const clientAuthService = {
   // Sign up new client
   async signUp(email: string, password: string, userData: { name: string; phone: string }) {

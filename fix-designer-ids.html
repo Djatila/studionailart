@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Correção de IDs de Designers</title>
+</head>
+<body>
+    <h1>Correção de IDs de Designers</h1>
+    <button onclick="fixDesignerIds()">Corrigir IDs Incorretos</button>
+    <div id="results"></div>
+
+    <script>
+        async function fixDesignerIds() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Iniciando correção...</p>';
+            
+            try {
+                // Mapear IDs incorretos para IDs corretos
+                const idMapping = {
+                    'klivia6': 'klicia-id-correto', // Substitua pelo ID real da Klicia
+                    'kika6': 'klicia-id-correto'    // Substitua pelo ID real da Klicia
+                };
+                
+                // Corrigir localStorage
+                const appointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+                let correctedCount = 0;
+                
+                appointments.forEach(apt => {
+                    if (idMapping[apt.designerId]) {
+                        apt.designerId = idMapping[apt.designerId];
+                        correctedCount++;
+                    }
+                });
+                
+                localStorage.setItem('nail_appointments', JSON.stringify(appointments));
+                
+                results.innerHTML += `<p>✅ Corrigidos ${correctedCount} agendamentos no localStorage</p>`;
+                results.innerHTML += '<p>✅ Correção concluída!</p>';
+                
+            } catch (error) {
+                results.innerHTML += `<p>❌ Erro: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

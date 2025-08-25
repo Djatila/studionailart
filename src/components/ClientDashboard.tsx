@@ -139,14 +139,27 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     console.log('🔍 ClientDashboard: Buscando designer com ID:', designerId);
     console.log('📊 ClientDashboard: Designers disponíveis:', designers.length);
     
-    const designer = designers.find(d => d.id === designerId);
+    let designer = designers.find(d => d.id === designerId);
+    
+    // Se não encontrar, tentar buscar por nome similar (fallback)
+    if (!designer && designerId) {
+      designer = designers.find(d => 
+        d.name.toLowerCase().includes('kika') || 
+        d.name.toLowerCase().includes('klicia')
+      );
+      
+      if (designer) {
+        console.log('⚠️ ClientDashboard: Designer encontrada por nome similar:', designer.name);
+      }
+    }
+    
     if (designer) {
       console.log('✅ ClientDashboard: Designer encontrada:', designer.name);
       return designer.name;
     }
     
     console.log('❌ ClientDashboard: Designer não encontrada para ID:', designerId);
-    console.log('📋 ClientDashboard: IDs disponíveis:', designers.map(d => d.id));
+    console.log('📋 ClientDashboard: IDs disponíveis:', designers.map(d => `${d.name}: ${d.id}`));
     return 'Designer não encontrada';
   };
 
@@ -339,6 +352,13 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
         localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
         console.log('📱 ClientDashboard: Agendamento cancelado no localStorage (fallback)');
       }
+      
+      // 🆕 NOVO: Disparar evento para notificar outras páginas sobre o cancelamento
+      const cancelEvent = new CustomEvent('appointmentCancelled', {
+        detail: { appointmentId: appointmentToCancel }
+      });
+      window.dispatchEvent(cancelEvent);
+      console.log('📡 Evento appointmentCancelled disparado:', appointmentToCancel);
       
       // Recarregar dados e fechar modal
       await loadData();

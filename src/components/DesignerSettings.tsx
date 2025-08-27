@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { NailDesigner } from '../App';
+import { updateNailDesigner } from '../utils/supabaseUtils'; // ✅ Adicionar import
 
 interface DesignerSettingsProps {
   designer: NailDesigner;
@@ -18,55 +19,78 @@ export default function DesignerSettings({ designer, onBack }: DesignerSettingsP
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false); // ✅ Adicionar estado de loading
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => { // ✅ Tornar função async
     setError('');
     setSuccess(false);
+    setLoading(true); // ✅ Ativar loading
 
-    // Validações
-    if (!passwords.current || !passwords.new || !passwords.confirm) {
-      setError('Por favor, preencha todos os campos.');
-      return;
+    try {
+      // Validações
+      if (!passwords.current || !passwords.new || !passwords.confirm) {
+        setError('Por favor, preencha todos os campos.');
+        return;
+      }
+
+      if (passwords.current !== designer.password) {
+        setError('Senha atual incorreta.');
+        return;
+      }
+
+      if (passwords.new.length < 6) {
+        setError('A nova senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+
+      if (passwords.new !== passwords.confirm) {
+        setError('A confirmação da nova senha não confere.');
+        return;
+      }
+
+      if (passwords.new === passwords.current) {
+        setError('A nova senha deve ser diferente da senha atual.');
+        return;
+      }
+
+      // ✅ ATUALIZAR NO SUPABASE PRIMEIRO
+      const updateResult = await updateNailDesigner(designer.id, {
+        password: passwords.new
+      });
+
+      if (!updateResult) {
+        setError('Erro ao atualizar senha no servidor. Tente novamente.');
+        return;
+      }
+
+      // ✅ Atualizar senha no localStorage (manter compatibilidade)
+      const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+      const updatedDesigners = designers.map((d: NailDesigner) => 
+        d.id === designer.id ? { ...d, password: passwords.new } : d
+      );
+      
+      localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
+      
+      // ✅ Limpar campos e mostrar sucesso
+      setPasswords({ current: '', new: '', confirm: '' });
+      setSuccess(true);
+      
+      // ✅ Disparar evento para atualizar dados no componente pai
+      const updatedDesigner = { ...designer, password: passwords.new };
+      window.dispatchEvent(new CustomEvent('designerUpdated', { 
+        detail: updatedDesigner 
+      }));
+      
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      setError('Erro interno. Tente novamente mais tarde.');
+    } finally {
+      setLoading(false); // ✅ Desativar loading
     }
-
-    if (passwords.current !== designer.password) {
-      setError('Senha atual incorreta.');
-      return;
-    }
-
-    if (passwords.new.length < 6) {
-      setError('A nova senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-
-    if (passwords.new !== passwords.confirm) {
-      setError('A confirmação da nova senha não confere.');
-      return;
-    }
-
-    if (passwords.new === passwords.current) {
-      setError('A nova senha deve ser diferente da senha atual.');
-      return;
-    }
-
-    // Atualizar senha no localStorage
-    const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
-    const updatedDesigners = designers.map((d: NailDesigner) => 
-      d.id === designer.id ? { ...d, password: passwords.new } : d
-    );
-    
-    localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
-    
-    // Limpar campos e mostrar sucesso
-    setPasswords({ current: '', new: '', confirm: '' });
-    setSuccess(true);
-    
-    // Disparar evento para atualizar dados
-    window.dispatchEvent(new Event('storage'));
-    
-    setTimeout(() => {
-      setSuccess(false);
-    }, 3000);
   };
 
   return (
@@ -195,14 +219,16 @@ export default function DesignerSettings({ designer, onBack }: DesignerSettingsP
             <button
               onClick={onBack}
               className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              disabled={loading} // ✅ Desabilitar durante loading
             >
               Cancelar
             </button>
             <button
               onClick={handlePasswordChange}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-all duration-200"
+              disabled={loading} // ✅ Desabilitar durante loading
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Alterar Senha
+              {loading ? 'Alterando...' : 'Alterar Senha'} {/* ✅ Mostrar estado de loading */}
             </button>
           </div>
         </div>

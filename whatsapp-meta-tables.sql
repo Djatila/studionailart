@@ -66,9 +66,9 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date_status ON appointments(date, st
 -- Inserir templates padrão (serão aprovados pela Meta)
 INSERT INTO whatsapp_templates (name, category, template_body, parameters_count) VALUES
 ('appointment_confirmation', 'UTILITY', '🌸 Olá {{1}}! Seu agendamento foi confirmado para {{2}} às {{3}} com {{4}}. Nos vemos em breve! 💖', 4),
-('appointment_reminder_24h', 'UTILITY', '⏰ Oi {{1}}! Lembrando que você tem agendamento amanhã {{2}} às {{3}} com {{4}}. Estamos ansiosas! ✨', 4),
-('appointment_reminder_2h', 'UTILITY', '🚨 {{1}}, seu agendamento é hoje às {{2}} com {{3}}! Em 2 horas. Já está se arrumando? 💖', 3),
-('appointment_cancellation', 'UTILITY', '❌ Olá {{1}}, seu agendamento do dia {{2}} às {{3}} foi cancelado. Entre em contato para reagendar! 📞', 3)
+('appointment_reminder_24h', 'UTILITY', '⏰ Oi {{1}}! Lembrando que você tem agendamento amanhã {{2}} às {{3}} com {{4}}. Até lá! ✨', 4),
+('appointment_reminder_2h', 'UTILITY', '🚨 {{1}}, seu agendamento é hoje às {{2}} com {{3}}! Em 2 horas. Te aguardo! 💖', 3),
+('appointment_cancellation', 'UTILITY', '🔴 Olá {{1}}! Seu agendamento do dia {{2}} às {{3}} foi cancelado. Obrigada!', 3)
 ON CONFLICT (name) DO NOTHING;
 
 -- Configuração inicial (será preenchida via interface)

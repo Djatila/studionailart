@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, User, UserPlus, Palette, Eye, EyeOff, Shield } from 'lucide-react';
 import { NailDesigner } from '../App';
+import { supabase } from '../lib/supabase';
 import { 
   getNailDesigners, 
   createNailDesigner, 
@@ -299,7 +300,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setClientLoginError('');
     
     try {
-      // Primeiro, verificar se o cliente existe e obter o email
+      // ✅ CORREÇÃO: Autenticação simples usando apenas tabela clients
       const client = await getClientByPhone(clientPhone);
       
       if (!client) {
@@ -307,27 +308,30 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
       
-      // Usar Supabase Auth para fazer login
-      const authResult = await clientAuthService.signIn(
-        client.email,
-        clientPassword
-      );
-      
-      if (authResult.success && authResult.user) {
-        // Login bem-sucedido
-        const clientData = {
-          id: client.id,
-          name: client.name,
-          phone: client.phone,
-          email: client.email,
-          password: client.password,
-          isActive: true,
-          createdAt: client.createdAt
-        };
-        onLogin(clientData, true);
-      } else {
-        setClientLoginError(authResult.error || 'Telefone ou senha incorretos.');
+      // Verificar senha diretamente na tabela clients
+      if (client.password !== clientPassword) {
+        setClientLoginError('Telefone ou senha incorretos.');
+        return;
       }
+      
+      // Verificar se cliente está ativo
+      if (!client.is_active) {
+        setClientLoginError('Conta desativada. Entre em contato com o suporte.');
+        return;
+      }
+      
+      // Login bem-sucedido - usar dados da tabela clients
+      const clientData = {
+        id: client.id,
+        name: client.name,
+        phone: client.phone,
+        email: client.email,
+        password: client.password,
+        isActive: client.is_active,
+        createdAt: client.created_at
+      };
+      
+      onLogin(clientData, true);
     } catch (error) {
       console.error('Erro no login do cliente:', error);
       setClientLoginError('Erro ao fazer login. Tente novamente.');
@@ -357,33 +361,32 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
 
-      // Usar Supabase Auth para criar o usuário
+      // ✅ CORREÇÃO: Criar cliente apenas na tabela clients
       const email = clientRegisterData.email || clientRegisterData.phone + '@nail.app';
       
-      const authResult = await clientAuthService.signUp(
-        email,
-        clientRegisterData.password,
-        {
-          name: clientRegisterData.name,
-          phone: clientRegisterData.phone
-        }
-      );
+      const newClient = await createClientRecord({
+        name: clientRegisterData.name,
+        phone: clientRegisterData.phone,
+        email: email,
+        password: clientRegisterData.password,
+        isActive: true
+      });
       
-      if (authResult.success && authResult.user && authResult.profile) {
+      if (newClient) {
         // Fazer login automático após cadastro
-        const clientData: NailDesigner = {
-          id: authResult.profile.id,
-          name: authResult.profile.name,
-          phone: authResult.profile.phone,
-          email: authResult.profile.email,
+        const clientData = {
+          id: newClient.id,
+          name: newClient.name,
+          phone: newClient.phone,
+          email: newClient.email,
           password: clientRegisterData.password,
           isActive: true,
-          createdAt: authResult.profile.createdAt
+          createdAt: newClient.created_at
         };
         
         onLogin(clientData, true);
       } else {
-        setClientRegisterError(authResult.error || 'Erro ao criar conta. Tente novamente.');
+        setClientRegisterError('Erro ao criar conta. Tente novamente.');
       }
     } catch (error) {
       console.error('Erro no registro do cliente:', error);
@@ -424,21 +427,24 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
 
-      // Atualizar a senha do cliente
-      const updatedClient = {
-        ...existingClient,
+      // ✅ CORREÇÃO: Atualizar senha apenas na tabela clients
+      const success = await updateClient(existingClient.id, {
         password: newPassword
-      };
-      
-      // Salvar cliente atualizado
-      const success = await saveClient(updatedClient);
+      });
       
       if (success) {
-        // Mostrar sucesso
+        // Também atualizar no localStorage para compatibilidade
+        const registeredClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
+        const updatedClients = registeredClients.map((client: any) => 
+          client.phone === recoveryPhone 
+            ? { ...client, password: newPassword }
+            : client
+        );
+        localStorage.setItem('registered_clients', JSON.stringify(updatedClients));
+        
         setRecoverySuccess(true);
         setRecoveryError('');
         
-        // Limpar campos após 2 segundos e voltar ao login
         setTimeout(() => {
           setShowPasswordRecovery(false);
           setRecoveryPhone('');

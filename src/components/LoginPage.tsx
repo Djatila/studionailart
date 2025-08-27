@@ -300,7 +300,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setClientLoginError('');
     
     try {
-      // ✅ CORREÇÃO: Autenticação simples usando apenas tabela clients
+      // ✅ SEMPRE consultar Supabase primeiro (não localStorage)
       const client = await getClientByPhone(clientPhone);
       
       if (!client) {
@@ -308,19 +308,18 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
       
-      // Verificar senha diretamente na tabela clients
+      // Verificar senha diretamente do Supabase
       if (client.password !== clientPassword) {
         setClientLoginError('Telefone ou senha incorretos.');
         return;
       }
       
-      // Verificar se cliente está ativo
       if (!client.is_active) {
         setClientLoginError('Conta desativada. Entre em contato com o suporte.');
         return;
       }
       
-      // Login bem-sucedido - usar dados da tabela clients
+      // Login bem-sucedido
       const clientData = {
         id: client.id,
         name: client.name,
@@ -418,7 +417,6 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setRecoveryError('');
 
     try {
-      // Verificar se o telefone existe no sistema
       const existingClient = await getClientByPhone(recoveryPhone);
       
       if (!existingClient) {
@@ -427,20 +425,23 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
 
-      // ✅ CORREÇÃO: Atualizar senha apenas na tabela clients
       const success = await updateClient(existingClient.id, {
         password: newPassword
       });
       
       if (success) {
-        // Também atualizar no localStorage para compatibilidade
-        const registeredClients = JSON.parse(localStorage.getItem('registered_clients') || '[]');
-        const updatedClients = registeredClients.map((client: any) => 
-          client.phone === recoveryPhone 
-            ? { ...client, password: newPassword }
-            : client
-        );
-        localStorage.setItem('registered_clients', JSON.stringify(updatedClients));
+        // ✅ CORREÇÃO: Limpar COMPLETAMENTE o localStorage
+        localStorage.removeItem('registered_clients');
+        localStorage.removeItem('clientData');
+        localStorage.removeItem('currentUser');
+        
+        // Forçar limpeza de qualquer cache relacionado a clientes
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes('client') || key.includes('user') || key.includes('auth')) {
+            localStorage.removeItem(key);
+          }
+        });
         
         setRecoverySuccess(true);
         setRecoveryError('');

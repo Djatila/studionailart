@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, User, UserPlus, Palette, Eye, EyeOff, Shield } from 'lucide-react';
+import TermsOfService from './TermsOfService';
 import { NailDesigner } from '../App';
 import { supabase } from '../lib/supabase';
 import { 
@@ -42,6 +43,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
   const [superAdminCredentials, setSuperAdminCredentials] = useState({ username: '', password: '' });
   const [orbitalClickCount, setOrbitalClickCount] = useState(0);
   const [lastOrbitalClick, setLastOrbitalClick] = useState(0);
+  const [showTerms, setShowTerms] = useState(false);
   const [clientPhone, setClientPhone] = useState('');
   const [clientPassword, setClientPassword] = useState('');
   const [clientLoginError, setClientLoginError] = useState('');
@@ -467,6 +469,10 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
 
   // designers já está sendo carregado no useEffect e filtrado no loadDesigners
 
+  if (showTerms) {
+    return <TermsOfService onBack={() => setShowTerms(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -564,6 +570,14 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                   💡 <strong>Dica:</strong> Use o mesmo número de telefone que você usou para fazer seus agendamentos.
                 </p>
               </div>
+              
+              <button
+                type="button"
+                onClick={() => setShowTerms(true)}
+                className="w-full mb-4 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-2 px-4 rounded-lg font-medium transition-colors text-sm border border-white/30"
+              >
+                📜 Termos de Uso
+              </button>
               
               <div className="text-center mb-4 space-y-2">
                 <button

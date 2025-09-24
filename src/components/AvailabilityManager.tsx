@@ -14,8 +14,8 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     specificDate: '',
-    startTime: '09:00',
-    endTime: '18:00'
+    startTime: '00:00',
+    endTime: '23:59'
   });
 
   // Load availability data on component mount
@@ -37,11 +37,9 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
 
   const getAvailability = async (): Promise<Availability[]> => {
     try {
-      // Buscar do Supabase primeiro
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
       
-      // Mapear campos do Supabase para o formato esperado
       const filteredAvailability = supabaseAvailability.filter(avail => avail.specific_date);
       const mappedAvailability = filteredAvailability.map(avail => {
         return {
@@ -50,7 +48,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           specificDate: avail.specific_date!,
           startTime: avail.start_time,
           endTime: avail.end_time,
-          isActive: avail.is_available
+          isActive: !avail.is_available // isActive = bloqueio ativo
         };
       });
       
@@ -74,19 +72,15 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
 
   const saveAvailability = async (availability: Availability) => {
     try {
-      // Salvar no Supabase
       const { availabilityService } = await import('../utils/supabaseUtils');
-      
-      // Mapear para o formato do Supabase
       const supabaseAvailability = {
         designer_id: availability.designerId,
         day_of_week: availability.specificDate ? new Date(availability.specificDate).getDay() : 0,
         start_time: availability.startTime,
         end_time: availability.endTime,
-        is_available: availability.isActive,
+        is_available: false, // criar como BLOQUEADO
         specific_date: availability.specificDate
       };
-      
       const savedAvailability = await availabilityService.create(supabaseAvailability);
       
       if (savedAvailability) {
@@ -127,34 +121,30 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
 
   const toggleAvailability = async (availabilityId: string) => {
     try {
-      // Buscar a disponibilidade atual
       const saved = localStorage.getItem('nail_availability');
       const allAvailability = saved ? JSON.parse(saved) : [];
       const currentAvail = allAvailability.find((avail: Availability) => avail.id === availabilityId);
       
       if (currentAvail) {
-        // Atualizar no Supabase
         const { availabilityService } = await import('../utils/supabaseUtils');
+        // Se bloqueado (isActive = true), ao alternar vira liberado => is_available: true
         const updated = await availabilityService.update(availabilityId, {
-          is_available: !currentAvail.isActive
+          is_available: currentAvail.isActive ? true : false
         });
-        
         if (updated) {
-          console.log('Disponibilidade atualizada no Supabase:', updated);
+          console.log('Disponibilidade (bloqueio) atualizada no Supabase:', updated);
         }
       }
     } catch (error) {
       console.error('Erro ao atualizar disponibilidade no Supabase:', error);
     }
-    
-    // Também atualizar no localStorage
+    // Atualizar localStorage (inverter bloqueio)
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
     const updated = allAvailability.map((avail: Availability) => 
       avail.id === availabilityId ? { ...avail, isActive: !avail.isActive } : avail
     );
     localStorage.setItem('nail_availability', JSON.stringify(updated));
-    // Reload availability data
     await loadAvailability();
   };
 
@@ -207,7 +197,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           >
             <ArrowLeft className="w-5 h-5 text-pink-600" />
           </button>
-          <h1 className="text-xl font-semibold text-gray-800">Horários de Atendimento</h1>
+          <h1 className="text-xl font-semibold text-gray-800">Bloqueios de Dias</h1>
         </div>
         
         {!showForm && (
@@ -216,7 +206,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
           >
             <Plus className="w-4 h-4" />
-            Novo
+            Novo Bloqueio
           </button>
         )}
       </div>
@@ -225,10 +215,10 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
         <h3 className="font-semibold text-blue-800 mb-2">💡 Como funciona</h3>
         <ul className="text-blue-700 text-sm space-y-1">
-          <li>• Configure os dias e horários que você atende</li>
-          <li>• Clientes só verão datas/horários disponíveis</li>
-          <li>• Você pode ativar/desativar horários temporariamente</li>
-          <li>• Horários são gerados de 30 em 30 minutos</li>
+          <li>• O calendário fica liberado por padrão</li>
+          <li>• Bloqueie os dias em que você não vai atender</li>
+          <li>• Você pode desbloquear dias temporariamente</li>
+          <li>• Por padrão, o bloqueio é para o dia inteiro</li>
         </ul>
       </div>
 
@@ -236,7 +226,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       {showForm && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-pink-100">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Novo Horário de Atendimento
+            Novo Bloqueio de Dia
           </h2>
           
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -345,26 +335,26 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                         </span>
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           avail.isActive 
-                            ? 'bg-green-100 text-green-600' 
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-red-100 text-red-600' 
+                            : 'bg-green-100 text-green-600'
                         }`}>
-                          {avail.isActive ? 'Ativo' : 'Inativo'}
+                          {avail.isActive ? 'Bloqueado' : 'Liberado'}
                         </span>
                       </div>
                       
                       <div className="flex gap-2">
                         <button
-                          onClick={() => toggleAvailability(avail.id)}
+                          onClick={() => toggleAvailability(avail.id!)}
                           className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
                             avail.isActive
-                              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                           }`}
                         >
-                          {avail.isActive ? 'Desativar' : 'Ativar'}
+                          {avail.isActive ? 'Desbloquear' : 'Bloquear'}
                         </button>
                         <button
-                          onClick={() => deleteAvailability(avail.id)}
+                          onClick={() => deleteAvailability(avail.id!)}
                           className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />

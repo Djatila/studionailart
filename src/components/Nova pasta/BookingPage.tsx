@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard } from 'lucide-react';
-import { NailDesigner } from '../App';
+import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard, Plus } from 'lucide-react';
+import { NailDesigner, Service as AppService } from '../App';
 import { serviceService } from '../utils/supabaseUtils';
 
 interface Service {
@@ -9,6 +9,7 @@ interface Service {
   duration: number;
   price: number;
   designerId: string;
+  category?: 'services' | 'extras'; // Adicionando categoria
 }
 
 interface Appointment {
@@ -35,6 +36,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [step, setStep] = useState(1);
   const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedExtraService, setSelectedExtraService] = useState<Service | null>(null); // Novo estado para serviço extra
+  const [showExtraServiceOption, setShowExtraServiceOption] = useState(false); // Controla se mostra a opção de serviço extra
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [clientName, setClientName] = useState('');
@@ -47,6 +50,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [isResetting, setIsResetting] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
+  const [regularServices, setRegularServices] = useState<Service[]>([]); // Serviços principais
+  const [extraServices, setExtraServices] = useState<Service[]>([]); // Serviços extras
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
@@ -70,6 +75,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const loadServices = async () => {
     if (!selectedDesigner) {
       setServices([]);
+      setRegularServices([]);
+      setExtraServices([]);
       setServicesLoading(false);
       return;
     }
@@ -81,7 +88,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       
       if (supabaseServices && supabaseServices.length > 0) {
         // Converte os dados do Supabase para o formato local
-        const convertedServices = supabaseServices.map(service => ({
+        const convertedServices: Service[] = supabaseServices.map((service: AppService) => ({
           id: service.id,
           designerId: service.designer_id,
           name: service.name,
@@ -91,20 +98,29 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           category: service.category || 'services'
         }));
         setServices(convertedServices);
+        // Separar serviços por categoria
+        setRegularServices(convertedServices.filter(s => s.category === 'services' || !s.category));
+        setExtraServices(convertedServices.filter(s => s.category === 'extras'));
       } else {
         // Fallback para localStorage se não houver dados no Supabase
         const saved = localStorage.getItem('nail_services');
         const allServices = saved ? JSON.parse(saved) : [];
-        const localServices = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+        const localServices: Service[] = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
         setServices(localServices);
+        // Separar serviços por categoria
+        setRegularServices(localServices.filter((s: Service) => s.category === 'services' || !s.category));
+        setExtraServices(localServices.filter((s: Service) => s.category === 'extras'));
       }
     } catch (error) {
       console.error('Erro ao carregar serviços:', error);
       // Em caso de erro, usa localStorage como fallback
       const saved = localStorage.getItem('nail_services');
       const allServices = saved ? JSON.parse(saved) : [];
-      const localServices = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+      const localServices: Service[] = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
       setServices(localServices);
+      // Separar serviços por categoria
+      setRegularServices(localServices.filter((s: Service) => s.category === 'services' || !s.category));
+      setExtraServices(localServices.filter((s: Service) => s.category === 'extras'));
     } finally {
       setServicesLoading(false);
     }
@@ -194,8 +210,26 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   };
 
   const handleConfirmBooking = () => {
-    if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone || !selectedDesigner) {
+    if ((!selectedService && !selectedExtraService) || !selectedDate || !selectedTime || !clientName || !clientPhone || !selectedDesigner) {
       return;
+    }
+
+    // Calcular preço total
+    let totalPrice = 0;
+    if (selectedService) {
+      totalPrice += selectedService.price;
+    }
+    if (selectedExtraService) {
+      totalPrice += selectedExtraService.price;
+    }
+
+    // Criar descrição dos serviços
+    let serviceDescription = '';
+    if (selectedService) {
+      serviceDescription += selectedService.name;
+    }
+    if (selectedExtraService) {
+      serviceDescription += selectedExtraService.name ? ` + ${selectedExtraService.name}` : '';
     }
 
     const newAppointment: Appointment = {
@@ -204,10 +238,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       clientName,
       clientPhone,
       clientEmail,
-      service: selectedService.name,
+      service: serviceDescription, // Usar a descrição combinada
       date: selectedDate,
       time: selectedTime,
-      price: selectedService.price,
+      price: totalPrice, // Usar o preço total
       status: 'pending'
     };
 
@@ -218,12 +252,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const resetForm = () => {
     setIsResetting(true); // Marca que estamos resetando
     setShowConfirmation(false);
+    setShowExtraServiceOption(false); // Resetar opção de serviço extra
+    setSelectedExtraService(null); // Resetar serviço extra selecionado
+    setSelectedService(null); // Resetar serviço principal selecionado
     
     // Força o reset completo
     setTimeout(() => {
       setStep(1); // Sempre volta para o step 1 (seleção de designer)
       setSelectedDesigner(null); // Sempre reseta a designer selecionada
-      setSelectedService(null);
       setSelectedDate('');
       setSelectedTime('');
       
@@ -268,10 +304,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
 👤 Cliente: ${clientName}
 💅 Designer: ${selectedDesigner?.name}
-🎨 Serviço: ${selectedService?.name}
+🎨 Serviço: ${selectedService?.name}${selectedExtraService ? ` + ${selectedExtraService.name}` : ''}
 📅 Data: ${formatDate(selectedDate)}
 ⏰ Horário: ${selectedTime}
-💰 Valor: R$ ${selectedService?.price.toFixed(2)}
+💰 Valor: R$ ${((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
 
 Aguardo confirmação!`;
     
@@ -340,7 +376,14 @@ Aguardo confirmação!`;
                   <div className="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
                   Serviços:
                 </div>
-                <span className="text-white font-medium">{selectedService?.name}</span>
+                <div className="text-right">
+                  {selectedService && (
+                    <div className="text-white font-medium">{selectedService.name}</div>
+                  )}
+                  {selectedExtraService && (
+                    <div className="text-white/80 text-sm mt-1">+ {selectedExtraService.name}</div>
+                  )}
+                </div>
               </div>
               
               <div className="flex justify-between items-center">
@@ -365,7 +408,7 @@ Aguardo confirmação!`;
                   Valor Total:
                 </div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-yellow-400 bg-clip-text text-transparent">
-                  R$ {selectedService?.price.toFixed(2)}
+                  R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -579,37 +622,137 @@ Aguardo confirmação!`;
                     <div className="text-center py-8">
                       <p className="text-white/70">Carregando serviços...</p>
                     </div>
-                  ) : getServices().length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-white/70 mb-4">
-                        Esta designer ainda não cadastrou nenhum serviço.
-                      </p>
-                      <p className="text-white/50 text-sm">
-                        Entre em contato diretamente com a designer para mais informações.
-                      </p>
-                    </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {getServices().map((service) => (
-                        <button
-                          key={service.id}
-                          onClick={() => {
-                            setSelectedService(service);
-                            setStep(3);
-                          }}
-                          className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105"
-                        >
-                          <h4 className="font-semibold text-white mb-2">{service.name}</h4>
-                          <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
-                          <p className="text-pink-400 font-bold text-lg">R$ {service.price.toFixed(2)}</p>
-                        </button>
-                      ))}
+                    <div>
+                      {/* Mostrar apenas serviços principais inicialmente */}
+                      {!selectedService && (
+                        <div>
+                          <h4 className="text-white font-medium mb-4">Serviços Principais</h4>
+                          {regularServices.length === 0 ? (
+                            <div className="text-center py-8">
+                              <p className="text-white/70 mb-4">
+                                Esta designer ainda não cadastrou nenhum serviço.
+                              </p>
+                              <p className="text-white/50 text-sm">
+                                Entre em contato diretamente com a designer para mais informações.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {regularServices.map((service) => (
+                                <button
+                                  key={service.id}
+                                  onClick={() => {
+                                    setSelectedService(service);
+                                    // Mostrar opção de serviço extra após selecionar serviço principal
+                                    setShowExtraServiceOption(true);
+                                    // Não avançar automaticamente para o próximo step
+                                  }}
+                                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105"
+                                >
+                                  <h4 className="font-semibold text-white mb-2">{service.name}</h4>
+                                  <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
+                                  <p className="text-pink-400 font-bold text-lg">R$ {service.price.toFixed(2)}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Mostrar serviços extras apenas após selecionar serviço principal */}
+                      {selectedService && showExtraServiceOption && (
+                        <div className="mt-8">
+                          <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6">
+                            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                              <Plus className="w-5 h-5 mr-2 text-pink-400" />
+                              Deseja serviço extra?
+                            </h3>
+                            <p className="text-white/80 mb-4">
+                              Você selecionou "{selectedService.name}" por R$ {selectedService.price.toFixed(2)}. 
+                              Deseja adicionar um serviço extra?
+                            </p>
+                            
+                            {/* Serviços Extras */}
+                            {extraServices.length > 0 ? (
+                              <div className="mb-6">
+                                <h4 className="text-white font-medium mb-3">Serviços Extras Disponíveis</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {extraServices.map((service) => (
+                                    <button
+                                      key={service.id}
+                                      onClick={() => {
+                                        setSelectedExtraService(service);
+                                        setStep(3); // Prosseguir para próximo passo após selecionar serviço extra
+                                      }}
+                                      className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-left hover:bg-white/20 transition-all ${
+                                        selectedExtraService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                                      }`}
+                                    >
+                                      <h4 className="font-semibold text-white mb-1">{service.name}</h4>
+                                      <p className="text-white/70 text-sm mb-1">{service.duration} minutos</p>
+                                      <p className="text-pink-400 font-bold">R$ {service.price.toFixed(2)}</p>
+                                    </button>
+                                  ))}
+                                </div>
+                                
+                                {/* Botão para continuar sem serviço extra */}
+                                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
+                                  <button
+                                    onClick={() => {
+                                      // Prosseguir sem serviço extra
+                                      setSelectedExtraService(null);
+                                      setStep(3);
+                                    }}
+                                    className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white py-3 px-4 rounded-lg hover:bg-white/20 transition-all"
+                                  >
+                                    Não, continuar sem serviço extra
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-4">
+                                <p className="text-white/70 mb-4">Esta designer não possui serviços extras cadastrados.</p>
+                                <button
+                                  onClick={() => setStep(3)}
+                                  className="bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all"
+                                >
+                                  Continuar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Resumo da seleção */}
+                      {(selectedService) && (
+                        <div className="mt-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+                          <h4 className="text-white font-medium mb-3">Resumo da Seleção</h4>
+                          <div className="space-y-2">
+                            {selectedService && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-white/80">{selectedService.name}</span>
+                                <span className="text-white">R$ {selectedService.price.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {selectedExtraService && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-white/80">{selectedExtraService.name}</span>
+                                <span className="text-white">R$ {selectedExtraService.price.toFixed(2)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-medium pt-2 border-t border-white/10">
+                              <span>Total</span>
+                              <span className="text-pink-400">R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
-
-
 
               {/* Step 3: Date Selection */}
               {step === 3 && (
@@ -831,6 +974,12 @@ Aguardo confirmação!`;
                     <span>Serviço:</span>
                     <span className="text-white">{selectedService.name}</span>
                   </div>
+                  {selectedExtraService && (
+                    <div className="flex justify-between text-white/80">
+                      <span>Serviço Extra:</span>
+                      <span className="text-white">{selectedExtraService.name}</span>
+                    </div>
+                  )}
                   {selectedDate && (
                     <div className="flex justify-between text-white/80">
                       <span>Data:</span>
@@ -845,7 +994,7 @@ Aguardo confirmação!`;
                   )}
                   <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
                     <span>Total:</span>
-                    <span>R$ {selectedService.price.toFixed(2)}</span>
+                    <span>R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -853,7 +1002,8 @@ Aguardo confirmação!`;
           </div>
         </div>
       </div>
-    );
+    </div>
+  );
 };
 
 export default BookingPage;

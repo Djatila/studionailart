@@ -12,6 +12,7 @@ import SuperAdminDashboard from './components/SuperAdminDashboard';
 import ClientDashboard from './components/ClientDashboard';
 
 import { cleanOldAppointments } from './utils/appointmentUtils';
+import { notificationService } from './services/notificationService';
 
 export interface NailDesigner {
   id: string;
@@ -136,10 +137,17 @@ function App() {
       setInterval(cleanOldAppointments, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
     
+    // 🆕 NOVO: Iniciar serviço de notificações
+    console.log('🚀 Iniciando serviço de notificações');
+    notificationService.startQueueProcessing();
+    
     return () => {
       clearTimeout(timeoutId);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('designerUpdated', handleDesignerUpdate as EventListener);
+      // 🆕 NOVO: Parar serviço de notificações
+      console.log('⏹️ Parando serviço de notificações');
+      notificationService.stopQueueProcessing();
     };
   }, []);
 

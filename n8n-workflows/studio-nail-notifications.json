@@ -1,0 +1,303 @@
+{
+  "name": "Studio Nail - Notificações de Agendamento",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "path": "3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p",
+        "responseMode": "onReceived",
+        "authentication": "basicAuth",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "webhookId": "3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "type",
+              "value": "={{ $json[\"type\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json[\"type\"] }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "appointment_created",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "name": "IF - Novo Agendamento",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json[\"type\"] }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "schedule_reminder",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "name": "IF - Agendar Lembrete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.uazapi.com/v1/messages",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "={{ $env.UAZAPI_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "responseFormat": "json",
+        "requestMethod": "POST",
+        "bodyContentType": "raw",
+        "rawBody": "={\n  \"to\": \"{{ $json[\"appointment\"][\"client_phone\"].replace(/\\D/g, '') }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json[\"message\"].replace(/\\n/g, '\\\\n') }}\"\n  }\n}"
+      },
+      "name": "UAZAPI - Enviar para Cliente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.uazapi.com/v1/messages",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "={{ $env.UAZAPI_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "responseFormat": "json",
+        "requestMethod": "POST",
+        "bodyContentType": "raw",
+        "rawBody": "={\n  \"to\": \"{{ $json[\"designer_phone\"].replace(/\\D/g, '') }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json[\"message\"].replace(/\\n/g, '\\\\n') }}\"\n  }\n}"
+      },
+      "name": "UAZAPI - Enviar para Designer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "name": "Cron - Verificar Lembretes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        450,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const reminders = [];\n\n// Aqui você pode consultar um banco de dados ou API para obter lembretes agendados\n// Por enquanto, vamos simular com dados de exemplo\n\nconst now = new Date();\nconst in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);\nconst in6Hours = new Date(now.getTime() + 6 * 60 * 60 * 1000);\n\n// Simular lembretes\nreminders.push({\n  type: 'reminder_24h',\n  appointment: {\n    id: '123',\n    client_name: 'Maria Silva',\n    client_phone: '+5511999999999',\n    service: 'Manicure Completa',\n    date: '2023-12-20',\n    time: '14:00',\n    price: 80.00\n  }\n});\n\nreminders.push({\n  type: 'reminder_6h',\n  appointment: {\n    id: '456',\n    client_name: 'Ana Costa',\n    client_phone: '+5511988888888',\n    service: 'Pedicure',\n    date: '2023-12-20',\n    time: '16:00',\n    price: 60.00\n  }\n});\n\nreturn reminders.map(reminder => ({ json: reminder }));"
+      },
+      "name": "Function - Obter Lembretes",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        650,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.uazapi.com/v1/messages",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "={{ $env.UAZAPI_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "responseFormat": "json",
+        "requestMethod": "POST",
+        "bodyContentType": "raw",
+        "rawBody": "={\n  \"to\": \"{{ $json[\"appointment\"][\"client_phone\"].replace(/\\D/g, '') }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Lembrete: Seu agendamento é {{ $json[\"type\"].includes('24h') ? 'amanhã' : 'hoje' }} às {{ $json[\"appointment\"][\"time\"] }}!\\n\\nServiço: {{ $json[\"appointment\"][\"service\"] }}\\nValor: R$ {{ (Number($json[\"appointment\"][\"price\"]) || 0).toFixed(2) }}\\n\\nEstamos ansiosos para te ver! 💅✨\"\n  }\n}"
+      },
+      "name": "UAZAPI - Enviar Lembrete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        700
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "IF - Novo Agendamento",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Agendar Lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Novo Agendamento": {
+      "main": [
+        [
+          {
+            "node": "UAZAPI - Enviar para Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "UAZAPI - Enviar para Designer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Agendar Lembrete": {
+      "main": [
+        [
+          {
+            "node": "Function - Obter Lembretes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron - Verificar Lembretes": {
+      "main": [
+        [
+          {
+            "node": "Function - Obter Lembretes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Obter Lembretes": {
+      "main": [
+        [
+          {
+            "node": "UAZAPI - Enviar Lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

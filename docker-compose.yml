@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5679:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=djatila.azevedo@gmail.com
+      - N8N_BASIC_AUTH_PASSWORD=76yST!aMd@vRQB7
+      - N8N_CORS_ENABLED=true
+      - N8N_CORS_ORIGIN=http://localhost:5176
+      - WEBHOOK_URL=http://localhost:5679
+      - N8N_EDITOR_BASE_URL=http://localhost:5679
+    volumes:
+      - ./n8n-data:/home/node/.n8n

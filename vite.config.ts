@@ -8,4 +8,15 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    proxy: {
+      '/webhook': {
+        target: 'http://localhost:5679',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/webhook/, '/webhook')
+      }
+    },
+    cors: true
+  }
 });

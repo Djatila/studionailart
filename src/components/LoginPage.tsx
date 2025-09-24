@@ -492,7 +492,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
           <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
             Studio Nail Art
           </h1>
-          <p className="text-purple-100">Sistema de agendamento profissional</p>
+          <p className="text-purple-100">Sistema de agendamento profissional.</p>
         </div>
 
         {/* Access Denied Popup */}

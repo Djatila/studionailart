@@ -9,6 +9,7 @@ interface Service {
   duration: number;
   price: number;
   designerId: string;
+  category?: 'services' | 'extras';
 }
 
 interface Appointment {
@@ -66,6 +67,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [forceReload, setForceReload] = useState(0);
+
+  // Novos estados para serviços extras
+  const [selectedExtraService, setSelectedExtraService] = useState<Service | null>(null);
+  const [showExtraServiceOption, setShowExtraServiceOption] = useState(false);
+  const [regularServices, setRegularServices] = useState<Service[]>([]);
+  const [extraServices, setExtraServices] = useState<Service[]>([]);
 
   useEffect(() => {
     // Listener para cancelamentos de agendamentos
@@ -176,9 +183,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         try {
           const designerServices = await getServices();
           setServices(designerServices);
+          // Separar serviços principais e extras
+          setRegularServices(designerServices.filter(s => s.category === 'services' || !s.category));
+          setExtraServices(designerServices.filter(s => s.category === 'extras'));
         } catch (error) {
           console.error('Erro ao carregar serviços:', error);
           setServices([]);
+          setRegularServices([]);
+          setExtraServices([]);
         } finally {
           setLoadingServices(false);
         }
@@ -200,6 +212,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     } else {
       setServices([]);
       setAvailability([]);
+      // Resetar listas quando não houver designer
+      setRegularServices([]);
+      setExtraServices([]);
     }
   }, [selectedDesigner]);
 
@@ -222,7 +237,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       // Combinar e remover duplicatas, priorizando Supabase
       const allDesigners = [...(supabaseDesigners || [])];
       
-      localDesigners.forEach((localDesigner: NailDesigner) => {
+      localDesigners.forEach((localDesigner: any) => {
         if (!allDesigners.find(d => d.id === localDesigner.id)) {
           allDesigners.push(localDesigner);
         }
@@ -232,15 +247,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       
       // Filtrar apenas designers ativos (verificar ambos os formatos de campo)
       const activeDesigners = allDesigners.filter(d => {
-        const isActive = d.isActive || d.is_active;
+        const isActive = (d as any).isActive || (d as any).is_active;
         console.log(`👤 Designer ${d.name}: ativo = ${isActive}`);
         return isActive;
       });
       
       console.log('✅ Designers ativos encontrados:', activeDesigners?.length || 0);
-      return activeDesigners;
+      return activeDesigners as NailDesigner[];
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro detalhado ao buscar designers:', error);
       console.error('📊 Stack trace:', error.stack);
       
@@ -266,13 +281,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const { serviceService } = await import('../utils/supabaseUtils');
       const supabaseServices = await serviceService.getByDesignerId(selectedDesigner.id);
       
-      // Mapear campos do Supabase para o formato esperado
+      // Mapear campos do Supabase para o formato esperado (inclui category)
       const mappedServices = supabaseServices.map(service => ({
         id: service.id,
         name: service.name,
         duration: service.duration,
         price: service.price,
-        designerId: service.designer_id
+        designerId: service.designer_id,
+        category: (service as any).category || undefined
       }));
       
       if (mappedServices.length > 0) {
@@ -355,63 +371,52 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   }, [selectedDesigner]);
 
-  // Get designer's availability settings
+  // Get designer's availability settings - agora retorna dias BLOQUEADOS
   const getDesignerAvailability = async () => {
     if (!selectedDesigner) return [];
     try {
-      // Buscar do Supabase
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(selectedDesigner.id);
       
-      // Garantir que supabaseAvailability é um array válido
       if (!Array.isArray(supabaseAvailability)) {
         console.warn('⚠️ getDesignerAvailability: supabaseAvailability is not an array:', supabaseAvailability);
         throw new Error('Invalid availability data from Supabase');
       }
       
-      // Mapear campos do Supabase para o formato esperado
+      // Mapear como bloqueios (isActive = dia bloqueado)
       const mappedAvailability = supabaseAvailability
-        .filter(avail => avail && avail.is_available)
+        .filter(avail => avail && avail.specific_date)
         .map(avail => ({
           id: avail.id,
           designerId: avail.designer_id,
           dayOfWeek: avail.day_of_week,
           startTime: avail.start_time,
           endTime: avail.end_time,
-          isActive: avail.is_available,
+          isActive: !avail.is_available, // bloqueado quando is_available = false
           specificDate: avail.specific_date
         }));
       
-      if (mappedAvailability.length > 0) {
-        return mappedAvailability;
+      // Apenas dias bloqueados
+      const blockedDates = mappedAvailability.filter(avail => avail.isActive);
+      if (blockedDates.length > 0) {
+        return blockedDates;
       }
       
-      // Fallback para localStorage se não houver dados no Supabase
+      // Fallback para localStorage: interpretar isActive como bloqueio
       const saved = localStorage.getItem('nail_availability');
       const allAvailability = saved ? JSON.parse(saved) : [];
-      
-      // Garantir que allAvailability é um array válido
       if (!Array.isArray(allAvailability)) {
         console.warn('⚠️ getDesignerAvailability: localStorage availability is not an array');
         return [];
       }
-      
       return allAvailability.filter((avail: any) => 
-        avail && avail.designerId === selectedDesigner.id && avail.isActive
+        avail && avail.designerId === selectedDesigner.id && avail.isActive // isActive = bloqueado
       );
     } catch (error) {
       console.error('❌ Erro ao buscar disponibilidade:', error);
-      // Fallback para localStorage em caso de erro
       try {
         const saved = localStorage.getItem('nail_availability');
         const allAvailability = saved ? JSON.parse(saved) : [];
-        
-        // Garantir que allAvailability é um array válido
-        if (!Array.isArray(allAvailability)) {
-          console.warn('⚠️ getDesignerAvailability fallback: localStorage availability is not an array');
-          return [];
-        }
-        
         return allAvailability.filter((avail: any) => 
           avail && avail.designerId === selectedDesigner.id && avail.isActive
         );
@@ -422,18 +427,18 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
-  // Check if a specific date is available
+  // Check if a specific date is available - disponível se NÃO estiver bloqueada
   const isDateAvailable = async (date: string) => {
-    const availability = await getDesignerAvailability();
-    if (availability.length === 0) return false; // No availability configured
+    const blocked = await getDesignerAvailability();
+    if (blocked.length === 0) return true; // sem bloqueios, calendário livre
     
-    // Normalizar datas para comparação (remover problemas de timezone)
-    const normalizedDate = date.split('T')[0]; // Remove timezone se existir
-    return availability.some((avail: any) => {
+    const normalizedDate = date.split('T')[0];
+    const isBlocked = blocked.some((avail: any) => {
       if (!avail || !avail.specificDate) return false;
-      const normalizedAvailDate = avail.specificDate.split('T')[0]; // Remove timezone se existir
+      const normalizedAvailDate = avail.specificDate.split('T')[0];
       return normalizedAvailDate === normalizedDate;
     });
+    return !isBlocked;
   };
 
   const saveAppointment = async (appointment: Appointment) => {
@@ -463,12 +468,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         const allAppointments = saved ? JSON.parse(saved) : [];
         allAppointments.push(appointment);
         localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
-        
+      
         // Disparar evento para sincronizar outros componentes
         window.dispatchEvent(new CustomEvent('appointmentCreated', {
           detail: { appointment: savedAppointment }
         }));
-        
+      
+        // 🆕 NOVO: Enviar notificação imediata e agendar lembretes
+        await sendAppointmentNotifications(savedAppointment);
+      
         console.log('✅ Agendamento salvo no Supabase e sincronizado');
         return savedAppointment;
       } else {
@@ -487,6 +495,221 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     }
   };
 
+  // 🆕 NOVA FUNÇÃO: Enviar notificações de agendamento
+  const sendAppointmentNotifications = async (appointment: any) => {
+    try {
+      console.log('📤 Enviando notificações para agendamento:', appointment);
+
+      const okClient = await sendImmediateNotificationToClient(appointment);
+      const okDesigner = await sendImmediateNotificationToDesigner(appointment);
+      const okReminders = await scheduleReminders(appointment);
+
+      if (okClient && okDesigner && okReminders) {
+        console.log('✅ Todas as notificações enviadas com sucesso');
+      } else {
+        console.warn('⚠️ Notificações parcialmente enviadas. Itens pendentes foram enfileirados para reprocessamento.');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao enviar notificações:', error);
+    }
+  };
+
+  // 🆕 NOVA FUNÇÃO: Enviar notificação imediata para a cliente
+  const sendImmediateNotificationToClient = async (appointment: any): Promise<boolean> => {
+    const message = `Olá ${appointment.client_name}! 
+
+Seu agendamento foi confirmado:
+
+💅 *Serviço:* ${appointment.service}
+📅 *Data:* ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+⏰ *Horário:* ${appointment.time}
+💰 *Valor:* R$ ${appointment.price.toFixed(2)}
+
+Nos vemos em breve! 💖`;
+
+    // Enviar via webhook para n8n
+    return await sendToN8nWebhook({
+      type: 'appointment_created',
+      recipient: 'client',
+      appointment: appointment,
+      message: message
+    });
+  };
+
+// 🆕 NOVA FUNÇÃO: Enviar notificação imediata para a designer
+const sendImmediateNotificationToDesigner = async (appointment: any): Promise<boolean> => {
+  // Primeiro, obter dados da designer
+  const { getNailDesignerById } = await import('../utils/supabaseUtils');
+  const designer = await getNailDesignerById(appointment.designer_id);
+  
+  if (designer) {
+    const message = `Olá ${designer.name}!
+
+Você tem um novo agendamento:
+
+👤 *Cliente:* ${appointment.client_name}
+📞 *Telefone:* ${appointment.client_phone}
+💅 *Serviço:* ${appointment.service}
+📅 *Data:* ${new Date(appointment.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+⏰ *Horário:* ${appointment.time}
+💰 *Valor:* R$ ${appointment.price.toFixed(2)}`;
+
+    // Enviar via webhook para n8n
+    return await sendToN8nWebhook({
+      type: 'appointment_created',
+      recipient: 'designer',
+      appointment: appointment,
+      designer_phone: designer.phone, // Assumindo que a designer tem um campo phone
+      message: message
+    });
+  }
+  return true; // sem designer: não é um erro crítico neste contexto
+};
+
+// 🆕 NOVA FUNÇÃO: Agendar lembretes
+const scheduleReminders = async (appointment: any): Promise<boolean> => {
+  const ok24 = await sendToN8nWebhook({
+    type: 'schedule_reminder',
+    reminder_type: '24h',
+    appointment: appointment,
+    scheduled_time: calculateReminderTime(appointment.date, appointment.time, -24) // 24h antes
+  });
+  
+  const ok6 = await sendToN8nWebhook({
+    type: 'schedule_reminder',
+    reminder_type: '6h',
+    appointment: appointment,
+    scheduled_time: calculateReminderTime(appointment.date, appointment.time, -6) // 6h antes
+  });
+
+  return ok24 && ok6;
+};
+
+// 🆕 NOVA FUNÇÃO: Calcular horário do lembrete
+const calculateReminderTime = (date: string, time: string, hoursBefore: number): string => {
+  try {
+    // Normalizar o formato do time para remover segundos se existirem
+    let normalizedTime = time;
+    if (time.split(':').length > 2) {
+      // Se tiver segundos, remover (ex: "14:00:00" -> "14:00")
+      normalizedTime = time.split(':').slice(0, 2).join(':');
+    }
+    
+    // Combinar data e hora
+    const dateTimeString = `${date}T${normalizedTime}:00`;
+    const appointmentDateTime = new Date(dateTimeString);
+    
+    // Verificar se a data é válida
+    if (isNaN(appointmentDateTime.getTime())) {
+      console.error('❌ Data inválida:', dateTimeString);
+      // Retornar uma data padrão se a data for inválida
+      return new Date().toISOString();
+    }
+    
+    // Subtrair horas
+    const reminderDateTime = new Date(appointmentDateTime.getTime() + (hoursBefore * 60 * 60 * 1000));
+    
+    // Verificar se a data resultante é válida
+    if (isNaN(reminderDateTime.getTime())) {
+      console.error('❌ Data de lembrete inválida:', reminderDateTime);
+      // Retornar uma data padrão se a data for inválida
+      return new Date().toISOString();
+    }
+    
+    return reminderDateTime.toISOString();
+  } catch (error) {
+    console.error('❌ Erro ao calcular horário do lembrete:', error);
+    // Retornar uma data padrão em caso de erro
+    return new Date().toISOString();
+  }
+};
+
+// 🆕 NOVA FUNÇÃO: Enviar dados para webhook do n8n
+const sendToN8nWebhook = async (data: any): Promise<boolean> => {
+  try {
+    // URL do webhook do n8n (você precisará configurar isso)
+    // 🆕 NOVO: Usar variável de ambiente ou URL padrão
+    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
+    
+    // Para desenvolvimento local, usar o proxy do Vite
+    // Se for uma URL completa, usar diretamente; caso contrário, usar o proxy
+    const url = webhookUrl.startsWith('http') ? webhookUrl : `/webhook${webhookUrl.split('/webhook')[1] || ''}`;
+    
+    // Configuração de autenticação básica para n8n
+    const username = import.meta.env.VITE_N8N_USERNAME || 'seu_usuario_aqui';
+    const password = import.meta.env.VITE_N8N_PASSWORD || 'sua_senha_aqui';
+    const credentials = btoa(`${username}:${password}`);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: JSON.stringify(data)
+    });
+
+    // 🆕 Diagnóstico: capturar corpo de erro para entender o 500
+    if (!response.ok) {
+      let errorBody: any = '';
+      try {
+        // tenta JSON
+        errorBody = await response.json();
+      } catch {
+        try {
+          // tenta texto
+          errorBody = await response.text();
+        } catch {
+          errorBody = '<sem corpo>';
+        }
+      }
+      console.error('❌ n8n respondeu com erro', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody
+      });
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // 🆕 Sucesso: tentar JSON, se não der, tentar texto
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch {
+      try {
+        result = await response.text();
+      } catch {
+        result = null;
+      }
+    }
+    console.log('✅ Dados enviados para n8n:', result ?? '<sem corpo>');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao enviar para n8n:', error);
+    // Em caso de erro, salvar em uma fila para reprocessamento
+    await saveToRetryQueue(data);
+    return false; // ← Indicar falha
+  }
+};
+
+// 🆕 NOVA FUNÇÃO: Salvar em fila para reprocessamento
+const saveToRetryQueue = async (data: any) => {
+  try {
+    const queue = JSON.parse(localStorage.getItem('notification_queue') || '[]');
+    queue.push({
+      id: Date.now(),
+      data: data,
+      timestamp: new Date().toISOString(),
+      retries: 0
+    });
+    localStorage.setItem('notification_queue', JSON.stringify(queue));
+    console.log('📥 Dados salvos na fila para reprocessamento');
+  } catch (error) {
+    console.error('❌ Erro ao salvar na fila:', error);
+  }
+};
+
  // Generate time slots
 const defaultTimeSlots = [
   '08:00', '10:00', '12:00', '14:00', '16:00', '18:00'
@@ -495,6 +718,23 @@ const defaultTimeSlots = [
 const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
   if (!selectedDate || !selectedDesigner) {
     return defaultTimeSlots;
+  }
+
+  // Checar bloqueio antes de buscar agendamentos
+  try {
+    const blocked = await getDesignerAvailability();
+    const normalizedSelectedDate = selectedDate;
+    const isBlocked = Array.isArray(blocked) && blocked.some((avail: any) => {
+      if (!avail || !avail.specificDate) return false;
+      const normalizedAvailDate = String(avail.specificDate).split('T')[0];
+      return normalizedAvailDate === normalizedSelectedDate;
+    });
+    if (isBlocked) {
+      console.log('🚫 Dia bloqueado pela designer; sem horários disponíveis:', normalizedSelectedDate);
+      return [];
+    }
+  } catch (err) {
+    // Silencioso: em erro, segue para lógica padrão
   }
 
   try {
@@ -724,16 +964,22 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
     }
     
     // Remover verificação de conflito - horários ocupados devem ser filtrados no passo 4
+    const serviceDescription = selectedExtraService
+      ? `${selectedService.name} + ${selectedExtraService.name}`
+      : selectedService.name;
+
+    const totalPrice = (selectedService.price || 0) + (selectedExtraService?.price || 0);
+
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
       designerId: selectedDesigner.id,
       clientName,
       clientPhone,
       clientEmail,
-      service: selectedService.name,
+      service: serviceDescription,
       date: selectedDate,
       time: selectedTime,
-      price: selectedService.price,
+      price: totalPrice,
       status: 'pending'
     };
     
@@ -770,6 +1016,8 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       setStep(1); // Sempre volta para o step 1 (seleção de designer)
       setSelectedDesigner(null); // Sempre reseta a designer selecionada
       setSelectedService(null);
+      setSelectedExtraService(null); // Resetar serviço extra selecionado
+      setShowExtraServiceOption(false); // Resetar opção de extra
       setSelectedDate('');
       setSelectedTime('');
       
@@ -912,7 +1160,7 @@ Aguardo confirmação!`;
                   Valor Total:
                 </div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-yellow-400 bg-clip-text text-transparent">
-                  R$ {selectedService?.price.toFixed(2)}
+                  R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1101,8 +1349,7 @@ Aguardo confirmação!`;
                         onClick={() => {
                           console.log('👆 Designer selecionada:', {
                             id: designer.id,
-                            name: designer.name,
-                            specialty: designer.specialty
+                            name: designer.name
                           });
                           
                           // Verificar se é o ID problemático 'kika6'
@@ -1138,7 +1385,7 @@ Aguardo confirmação!`;
                           </div>
                           <div>
                             <h4 className="font-semibold text-white mb-1">{designer.name}</h4>
-                            <p className="text-white/70 text-sm">{designer.specialty}</p>
+                            <p className="text-white/70 text-sm">Especialista em unhas</p>
                           </div>
                         </div>
                         <p className="text-pink-400 font-medium text-sm">
@@ -1175,19 +1422,21 @@ Aguardo confirmação!`;
                           <p>Carregando serviços...</p>
                         </div>
                       </div>
-                    ) : services.length === 0 ? (
+                    ) : regularServices.length === 0 ? (
                       <div className="col-span-full text-center py-8">
                         <p className="text-white/70">Nenhum serviço disponível para esta designer.</p>
                       </div>
                     ) : (
-                      services.map((service) => (
+                      regularServices.map((service) => (
                         <button
                           key={service.id}
                           onClick={() => {
                             setSelectedService(service);
-                            setStep(3);
+                            setShowExtraServiceOption(true);
                           }}
-                          className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105"
+                          className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
+                            selectedService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                          }`}
                         >
                           <h4 className="font-semibold text-white mb-2">{service.name}</h4>
                           <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
@@ -1196,6 +1445,75 @@ Aguardo confirmação!`;
                       ))
                     )}
                   </div>
+
+                  {selectedService && showExtraServiceOption && (
+                    <div className="mt-8">
+                      <h4 className="text-white font-semibold mb-3">Deseja serviço extra?</h4>
+                      
+                      {extraServices.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {extraServices.map((service) => (
+                            <button
+                              key={service.id}
+                              onClick={() =>
+                                setSelectedExtraService(
+                                  selectedExtraService?.id === service.id ? null : service
+                                )
+                              }
+                              className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
+                                selectedExtraService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                              }`}
+                            >
+                              <h5 className="font-semibold text-white mb-1">{service.name}</h5>
+                              <p className="text-white/70 text-sm mb-1">{service.duration} minutos</p>
+                              <p className="text-pink-400 font-bold">R$ {service.price.toFixed(2)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-2 p-4 bg-white/10 border border-white/20 rounded-xl text-white/80">
+                          Esta designer não possui serviços extras cadastrados.
+                        </div>
+                      )}
+
+                      <div className="mt-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+                        <div className="flex justify-between text-white/80 text-sm mb-2">
+                          <span>Serviço selecionado:</span>
+                          <span className="text-white">{selectedService.name}</span>
+                        </div>
+                        {selectedExtraService && (
+                          <div className="flex justify-between text-white/80 text-sm mb-2">
+                            <span>Serviço extra:</span>
+                            <span className="text-white">+ {selectedExtraService.name}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-white font-semibold pt-3 border-t border-white/10">
+                          <span>Total provisório:</span>
+                          <span>
+                            R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => setStep(3)}
+                          className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                        >
+                          Continuar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedExtraService(null);
+                            setStep(3);
+                          }}
+                          className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 border border-white/20"
+                        >
+                          Não, continuar sem extra
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1223,19 +1541,16 @@ Aguardo confirmação!`;
                       value={selectedDate}
                       onChange={(e) => {
                         const selectedDateValue = e.target.value;
-                        // Garantir que availability é um array válido antes de usar .some()
+                        // Se houver bloqueios, impedir avanço em dia bloqueado
                         if (selectedDateValue && Array.isArray(availability) && availability.length > 0) {
-                          // Normalizar datas para comparação (remover problemas de timezone)
                           const normalizedSelectedDate = selectedDateValue;
-                          const hasAvailableDate = availability.some((avail: any) => {
+                          const isBlocked = availability.some((avail: any) => {
                             if (!avail || !avail.specificDate) return false;
-                            // Normalizar a data de disponibilidade
-                            const normalizedAvailDate = avail.specificDate.split('T')[0]; // Remove timezone se existir
+                            const normalizedAvailDate = String(avail.specificDate).split('T')[0];
                             return normalizedAvailDate === normalizedSelectedDate;
                           });
-                          
-                          if (!hasAvailableDate) {
-                            alert('Esta data não está disponível. A designer só liberou datas específicas para agendamento.');
+                          if (isBlocked) {
+                            alert('Este dia está bloqueado pela designer e não pode ser agendado.');
                             return;
                           }
                         }
@@ -1253,19 +1568,19 @@ Aguardo confirmação!`;
                         </div>
                       </div>
                     ) : Array.isArray(availability) && availability.length > 0 ? (
-                      <div className="mt-3 p-3 bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 rounded-xl">
-                        <p className="text-blue-100 text-sm font-medium mb-2">📅 Datas Disponíveis:</p>
+                      <div className="mt-3 p-3 bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl">
+                        <p className="text-red-100 text-sm font-medium mb-2">🚫 Dias indisponíveis (bloqueados):</p>
                         <div className="flex flex-wrap gap-2">
                           {availability.filter(avail => avail && avail.specificDate).map((avail: any) => (
-                            <span key={avail.id} className="bg-blue-400/30 text-blue-100 px-2 py-1 rounded-lg text-xs">
-                              {new Date(avail.specificDate + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            <span key={avail.id} className="bg-red-400/30 text-red-100 px-2 py-1 rounded-lg text-xs">
+                              {new Date(String(avail.specificDate) + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </span>
                           ))}
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-3 p-3 bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/30 rounded-xl">
-                        <p className="text-yellow-100 text-sm">⚠️ Esta designer ainda não configurou datas disponíveis para agendamento.</p>
+                      <div className="mt-3 p-3 bg-green-500/20 backdrop-blur-sm border border-green-400/30 rounded-xl">
+                        <p className="text-green-100 text-sm">✅ Calendário liberado. Nenhum dia bloqueado pela designer.</p>
                       </div>
                     )}
                   </div>
@@ -1425,11 +1740,14 @@ Aguardo confirmação!`;
                         </div>
                         <div className="flex justify-between text-white/80">
                           <span>Serviços:</span>
-                          <span>{selectedService?.name}</span>
+                          <span>
+                            {selectedService?.name}
+                            {selectedExtraService ? ` + ${selectedExtraService.name}` : ''}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-white font-medium pt-2 border-t border-white/20">
+                        <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
                           <span>Total:</span>
-                          <span>R$ {selectedService?.price.toFixed(2)}</span>
+                          <span>R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -1461,6 +1779,12 @@ Aguardo confirmação!`;
                     <span>Serviço:</span>
                     <span className="text-white">{selectedService.name}</span>
                   </div>
+                  {selectedExtraService && (
+                    <div className="flex justify-between text-white/80">
+                      <span>Serviço extra:</span>
+                      <span className="text-white">+ {selectedExtraService.name}</span>
+                    </div>
+                  )}
                   {selectedDate && (
                     <div className="flex justify-between text-white/80">
                       <span>Data:</span>
@@ -1475,7 +1799,7 @@ Aguardo confirmação!`;
                   )}
                   <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
                     <span>Total:</span>
-                    <span>R$ {selectedService.price.toFixed(2)}</span>
+                    <span>R$ {((selectedService.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
                   </div>
                 </div>
               )}

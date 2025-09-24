@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, Phone, MapPin, ArrowLeft, History, CalendarDays, Plus, X, Trash2 } from 'lucide-react';
 import { NailDesigner } from '../App';
-import { getSupabaseAppointments, getNailDesigners, updateAppointment } from '../utils/supabaseUtils';
+import { getSupabaseAppointments, getNailDesigners, updateAppointment, updateNailDesigner } from '../utils/supabaseUtils';
 
 interface Appointment {
   id: string;
@@ -23,7 +23,7 @@ interface ClientDashboardProps {
 }
 
 export default function ClientDashboard({ client, onBack, onBookService }: ClientDashboardProps) {
-  const [currentView, setCurrentView] = useState<'current' | 'history'>('current');
+  const [currentView, setCurrentView] = useState<'current' | 'history' | 'cancelled' | 'profile'>('current');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [designers, setDesigners] = useState<NailDesigner[]>([]);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -48,7 +48,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     password: ''
   });
 
-  // useEffect CORRETO - fora de qualquer função
+  // Atualizar dados quando a prop client mudar
   useEffect(() => {
     setClientData({
       name: client.name,
@@ -61,7 +61,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       phone: client.phone,
       password: ''
     });
-  }, [client.name, client.email, client.phone]);
+  }, [client]);
 
   useEffect(() => {
     loadData();
@@ -210,6 +210,8 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       
       // Tentar salvar no Supabase primeiro
       try {
+        // ✅ Corrigir a chamada da função updateNailDesigner
+        const { updateNailDesigner } = await import('../utils/supabaseUtils');
         const updatedDesigner = await updateNailDesigner(client.id, {
           name: profileData.name,
           email: profileData.email,
@@ -363,8 +365,14 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
     setAppointmentToCancel(null);
   };
 
+  const getCancelledAppointments = () => {
+    return appointments.filter(apt => apt.status === 'cancelled')
+      .sort((a, b) => new Date(b.date + 'T00:00:00').getTime() - new Date(a.date + 'T00:00:00').getTime());
+  };
+
   const currentMonthAppointments = getCurrentMonthAppointments();
   const historyAppointments = getHistoryAppointments();
+  const cancelledAppointments = getCancelledAppointments();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600 p-4">
@@ -418,6 +426,17 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
               Próximos ({currentMonthAppointments.length})
             </button>
             <button
+              onClick={() => setCurrentView('cancelled')}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
+                currentView === 'cancelled'
+                  ? 'bg-white/20 text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <X className="w-5 h-5" />
+              Cancelados ({cancelledAppointments.length})
+            </button>
+            <button
               onClick={() => setCurrentView('history')}
               className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
                 currentView === 'history'
@@ -427,6 +446,17 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
             >
               <History className="w-5 h-5" />
               Histórico ({historyAppointments.length})
+            </button>
+            <button
+              onClick={() => setCurrentView('profile')}
+              className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-semibold transition-all ${
+                currentView === 'profile'
+                  ? 'bg-white/20 text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <User className="w-5 h-5" />
+              Perfil
             </button>
           </div>
         </div>
@@ -495,6 +525,49 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
             </>
           )}
 
+          {currentView === 'cancelled' && (
+            <>
+              {cancelledAppointments.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-8 text-center">
+                  <X className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Nenhum agendamento cancelado</h3>
+                  <p className="text-purple-200">Você não possui agendamentos cancelados.</p>
+                </div>
+              ) : (
+                cancelledAppointments.map((appointment) => (
+                  <div key={appointment.id} className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-white mb-1">{appointment.service}</h3>
+                        <div className="flex items-center gap-2 text-purple-200 mb-2">
+                          <User className="w-4 h-4" />
+                          <span>{getDesignerName(appointment.designerId)}</span>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
+                        {getStatusText(appointment.status)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-purple-100">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-sm">{formatDate(appointment.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-sm">{appointment.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-green-300">R$ {appointment.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
           {currentView === 'history' && (
             <>
               {historyAppointments.length === 0 ? (
@@ -542,18 +615,9 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                  <Settings className="w-6 h-6" />
+                  <User className="w-6 h-6" />
                   Meus Dados
                 </h3>
-                {!isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-xl p-4 font-semibold text-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Editar
-                  </button>
-                )}
               </div>
 
               {saveMessage && (
@@ -572,19 +636,13 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                   <label className="block text-purple-200 text-sm font-semibold mb-2">
                     Nome Completo
                   </label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={profileData.name}
-                      onChange={(e) => setProfileData({...profileData, name: e.target.value})}
-                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      placeholder="Digite seu nome completo"
-                    />
-                  ) : (
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {clientData.name}
-                    </div>
-                  )}
+                  <input
+                    type="text"
+                    value={profileData.name}
+                    onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Digite seu nome completo"
+                  />
                 </div>
 
                 {/* Email */}
@@ -592,19 +650,13 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                   <label className="block text-purple-200 text-sm font-semibold mb-2">
                     Email
                   </label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      placeholder="Digite seu email"
-                    />
-                  ) : (
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {clientData.email || 'Não informado'}
-                    </div>
-                  )}
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Digite seu email"
+                  />
                 </div>
 
                 {/* Telefone */}
@@ -612,63 +664,24 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                   <label className="block text-purple-200 text-sm font-semibold mb-2">
                     Telefone
                   </label>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={profileData.phone}
-                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                      className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      placeholder="Digite seu telefone"
-                    />
-                  ) : (
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/20 text-white">
-                      {clientData.phone}
-                    </div>
-                  )}
+                  <input
+                    type="tel"
+                    value={profileData.phone}
+                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                    className="w-full p-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Digite seu telefone"
+                  />
                 </div>
 
-                {/* Senha */}
-                {isEditing && (
-                  <div>
-                    <label className="block text-purple-200 text-sm font-semibold mb-2">
-                      Nova Senha (deixe em branco para manter a atual)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={profileData.password}
-                        onChange={(e) => setProfileData({...profileData, password: e.target.value})}
-                        className="w-full p-3 pr-12 rounded-xl bg-white/20 border border-white/30 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                        placeholder="Digite uma nova senha"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-200 hover:text-white transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Botões de Ação */}
-                {isEditing && (
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={handleSaveProfile}
-                      className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all"
-                    >
-                      Salvar Alterações
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                )}
+                {/* Botão de Salvar */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleSaveProfile}
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
               </div>
             </div>
           )}

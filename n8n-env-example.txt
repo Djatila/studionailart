@@ -1,0 +1,7 @@
+# Exemplo de arquivo .env para n8n
+
+# Substitua 'sua_chave_api_aqui' pela sua chave real do UAZAPI
+UAZAPI_KEY="Bearer u1JuQWRc5op8p2jTUYYmoCWsFPXsEKDUmoiUytc3rxVp1K6Fd"
+
+# Exemplo:
+# UAZAPI_KEY="Bearer Bearer u1JuQWRc5op8p2jTUYYmoCWsFPXsEKDUmoiUytc3rxVp1K6Fd"

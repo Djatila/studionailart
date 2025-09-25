@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useReducer } from 'react';
+import React, { useState, useEffect, useCallback, useReducer, useRef } from 'react';
 import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard } from 'lucide-react';
 import { NailDesigner } from '../App';
 import { supabase } from '../lib/supabase';
@@ -73,6 +73,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [showExtraServiceOption, setShowExtraServiceOption] = useState(false);
   const [regularServices, setRegularServices] = useState<Service[]>([]);
   const [extraServices, setExtraServices] = useState<Service[]>([]);
+
+  const extraServiceRef = useRef<HTMLDivElement>(null); // Adicionado useRef para a seção de serviço extra
 
   useEffect(() => {
     // Listener para cancelamentos de agendamentos
@@ -217,6 +219,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       setExtraServices([]);
     }
   }, [selectedDesigner]);
+
+  useEffect(() => {
+    if (selectedService && extraServiceRef.current) {
+      extraServiceRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedService]); // Rola para a seção de serviço extra quando um serviço principal é selecionado
 
   const getDesigners = async (): Promise<NailDesigner[]> => {
     console.log('🔍 Iniciando carregamento de designers...');
@@ -712,7 +720,7 @@ const saveToRetryQueue = async (data: any) => {
 
  // Generate time slots
 const defaultTimeSlots = [
-  '08:00', '10:00', '12:00', '14:00', '16:00', '18:00'
+  '08:00', '10:00', '13:00', '15:00', '17:00'
 ];
 
 const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
@@ -1447,7 +1455,7 @@ Aguardo confirmação!`;
                   </div>
 
                   {selectedService && showExtraServiceOption && (
-                    <div className="mt-8">
+                    <div className="mt-8" ref={extraServiceRef}> {/* Adicionado ref aqui */}
                       <h4 className="text-white font-semibold mb-3">Deseja serviço extra?</h4>
                       
                       {extraServices.length > 0 ? (

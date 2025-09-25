@@ -690,11 +690,11 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
 
       {/* Booking Warning Modal */}
       {showBookingWarning && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-4 w-full max-w-sm max-h-[90vh] overflow-y-auto relative"> {/* Alterado de p-6 para p-4 e max-w-md para max-w-sm */}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-start z-50 p-2 pt-16 pl-4">
+          <div className="bg-white rounded-3xl shadow-xl p-4 max-w-sm w-full">
             <button
               onClick={() => setShowBookingWarning(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
             >
               <X className="w-5 h-5" />
             </button>
@@ -705,7 +705,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                 <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Calendar className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                <h2 className="text-xl font-bold text-gray-700 mb-4">
                   ATENÇÃO LEIA ANTES DE AGENDAR!!! ✨🙏🏼
                 </h2>
               </div>

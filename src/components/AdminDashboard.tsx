@@ -39,16 +39,28 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   const [error, setError] = useState<string>('');
   // Adicionando estados para serviços e tipo de cliente
   const [services, setServices] = useState<Service[]>([]);
-  const [clientType, setClientType] = useState<'existing' | 'new'>('new');
+  const [regularServices, setRegularServices] = useState<Service[]>([]); // NOVO: Estado para serviços regulares
+  const [extraServices, setExtraServices] = useState<Service[]>([]);     // NOVO: Estado para serviços extras
+  const [selectedExtraServices, setSelectedExtraServices] = useState<Service[]>([]); // NOVO: Estado para serviços extras selecionados
+  const [clientType, setClientType] = useState<'existing' | 'new'>('existing');
   const [newClientData, setNewClientData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    service: '',
-    date: '',
-    time: '',
-    price: ''
+    name: '', phone: '', email: '', service: '', date: '', time: '', price: ''
   });
+
+  // NOVO: useEffect para recalcular o preço total
+  useEffect(() => {
+    const mainService = regularServices.find(s => s.name === newClientData.service);
+    let totalPrice = mainService ? mainService.price : 0;
+
+    selectedExtraServices.forEach(extra => {
+      totalPrice += extra.price;
+    });
+
+    setNewClientData(prev => ({
+      ...prev,
+      price: totalPrice.toFixed(2) // Formata para 2 casas decimais
+    }));
+  }, [newClientData.service, selectedExtraServices, regularServices]); // Dependências para recalcular quando mudarem
   
   // Estados para horários disponíveis
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -105,6 +117,9 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       
       console.log('📊 Serviços convertidos:', convertedServices);
       setServices(convertedServices);
+      // NOVO: Separar serviços por categoria
+      setRegularServices(convertedServices.filter(s => s.category === 'services' || !s.category));
+      setExtraServices(convertedServices.filter(s => s.category === 'extras'));
     } catch (err) {
       console.error('Erro ao carregar serviços:', err);
       setError('Erro ao carregar serviços');
@@ -674,7 +689,7 @@ Nos vemos em breve! 💖`;
   const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
     const selectedDate = newClientData.date;
     if (!selectedDate) {
-      return ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+      return ['08:00', '10:00', '13:00', '15:00', '17:00'];
     }
 
     try {
@@ -726,7 +741,7 @@ Nos vemos em breve! 💖`;
       console.log(`⏰ [${cacheBreaker}] Horários ocupados (normalizados):`, bookedTimes);
 
       // Horários padrão
-      const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+      const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
       
       // Filtrar horários disponíveis
       const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
@@ -952,7 +967,7 @@ Você tem um novo agendamento:
           setAvailableTimeSlots(slots);
         } catch (error) {
           console.error('Erro ao carregar horários:', error);
-          setAvailableTimeSlots(['08:00', '10:00', '12:00', '14:00', '16:00', '18:00']);
+          setAvailableTimeSlots(['08:00', '10:00', '13:00', '15:00', '17:00']);
         } finally {
           setLoadingTimeSlots(false);
         }
@@ -1227,13 +1242,15 @@ Você tem um novo agendamento:
                     setNewClientData(prev => ({
                       ...prev,
                       service: e.target.value,
-                      price: selectedService ? selectedService.price.toString() : prev.price
+                      // O preço será calculado pelo useEffect, então não precisamos definir aqui
+                      // price: selectedService ? selectedService.price.toString() : prev.price
                     }));
+                    setSelectedExtraServices([]); // Limpa serviços extras ao mudar o serviço principal
                   }}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                 >
                   <option value="">Selecione um serviço</option>
-                  {services.map((service) => (
+                  {regularServices.map((service) => ( // Alterado para regularServices
                     <option key={service.id} value={service.name}>
                       {service.name} - R$ {service.price.toFixed(2)}
                     </option>
@@ -1241,6 +1258,36 @@ Você tem um novo agendamento:
                 </select>
               </div>
               
+              {/* NOVO: Seção de Serviços Extras */}
+              {newClientData.service && extraServices.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 mt-4">Serviços Extras (Opcional)</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {extraServices.map((service) => (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedExtraServices(prev =>
+                            prev.some(s => s.id === service.id)
+                              ? prev.filter(s => s.id !== service.id)
+                              : [...prev, service]
+                          );
+                        }}
+                        className={`p-3 border rounded-lg text-left transition-colors ${
+                          selectedExtraServices.some(s => s.id === service.id)
+                            ? 'border-pink-500 bg-pink-50 text-pink-700'
+                            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <h4 className="font-semibold">{service.name}</h4>
+                        <p className="text-sm text-gray-600">R$ {service.price.toFixed(2)}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Data *</label>

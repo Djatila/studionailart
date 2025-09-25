@@ -691,11 +691,10 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       {/* Booking Warning Modal */}
       {showBookingWarning && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/95 backdrop-blur-md rounded-3xl p-8 w-full max-w-md mx-auto shadow-2xl border border-white/30 relative">
-            {/* Close Button */}
+          <div className="bg-white rounded-2xl p-4 w-full max-w-sm max-h-[90vh] overflow-y-auto relative"> {/* Alterado de p-6 para p-4 e max-w-md para max-w-sm */}
             <button
               onClick={() => setShowBookingWarning(false)}
-              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
               <X className="w-5 h-5" />
             </button>
@@ -722,7 +721,7 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
                   AGENDAMENTOS COM UMA SEMANA DE ANTECEDÊNCIA!
                 </p>
                 <p className="font-semibold text-pink-600">
-                  ATRASO DE TOLERÂNCIA 10 MINUTOS
+                  TOLERÂNCIA DE ATRASO DE 10 MINUTOS
                 </p>
               </div>
 

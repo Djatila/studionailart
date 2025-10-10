@@ -65,6 +65,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
+  // Estados atualizados para suportar dois serviços extras
+  const [selectedExtraServices, setSelectedExtraServices] = useState<Service[]>([]); // Array para múltiplos serviços extras
+  const [showExtraServiceOption, setShowExtraServiceOption] = useState(false);
+  const [regularServices, setRegularServices] = useState<Service[]>([]);
+  const [extraServices, setExtraServices] = useState<Service[]>([]);
+
   // Função auxiliar para formatar o número de telefone
   const formatPhoneNumber = (phoneNumber: string): string => {
     if (!phoneNumber) return '';
@@ -121,12 +127,16 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [isInitialized, setIsInitialized] = useState(false);
   const [forceReload, setForceReload] = useState(0);
 
-  // Novos estados para serviços extras
-  const [selectedExtraService, setSelectedExtraService] = useState<Service | null>(null);
-  const [showExtraServiceOption, setShowExtraServiceOption] = useState(false);
-  const [regularServices, setRegularServices] = useState<Service[]>([]);
-  const [extraServices, setExtraServices] = useState<Service[]>([]);
+  // Remover a declaração duplicada:
+  // // Estados atualizados para suportar dois serviços extras
+  // const [selectedExtraServices, setSelectedExtraServices] = useState<Service[]>([]); // Array para múltiplos serviços extras
+  // const [showExtraServiceOption, setShowExtraServiceOption] = useState(false);
+  // const [regularServices, setRegularServices] = useState<Service[]>([]);
+  // const [extraServices, setExtraServices] = useState<Service[]>([]);
 
+  // Remover o estado duplicado:
+  // const [selectedExtraService, setSelectedExtraService] = useState<Service | null>(null);
+  
   const extraServiceRef = useRef<HTMLDivElement>(null); // Adicionado useRef para a seção de serviço extra
 
   useEffect(() => {
@@ -1338,11 +1348,15 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
     }
     
     // Remover verificação de conflito - horários ocupados devem ser filtrados no passo 4
-    const serviceDescription = selectedExtraService
-      ? `${selectedService.name} + ${selectedExtraService.name}`
-      : selectedService.name;
+    // Construir descrição com todos os serviços selecionados
+    let serviceDescription = selectedService.name;
+    if (selectedExtraServices.length > 0) {
+      serviceDescription += ' + ' + selectedExtraServices.map(service => service.name).join(' + ');
+    }
 
-    const totalPrice = (selectedService.price || 0) + (selectedExtraService?.price || 0);
+    // Calcular preço total
+    const totalPrice = (selectedService.price || 0) + 
+                    selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
 
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
@@ -1391,7 +1405,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       setStep(1); // Sempre volta para o step 1 (seleção de designer)
       setSelectedDesigner(null); // Sempre reseta a designer selecionada
       setSelectedService(null);
-      setSelectedExtraService(null); // Resetar serviço extra selecionado
+      setSelectedExtraServices([]); // Resetar serviços extras selecionados
       setShowExtraServiceOption(false); // Resetar opção de extra
       setSelectedDate('');
       setSelectedTime('');
@@ -1436,14 +1450,24 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   const generateWhatsAppMessage = () => {
     if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime || !clientName) return '';
     
+    // Construir descrição dos serviços
+    let serviceDescription = selectedService.name;
+    if (selectedExtraServices.length > 0) {
+      serviceDescription += ' + ' + selectedExtraServices.map(service => service.name).join(' + ');
+    }
+    
+    // Calcular preço total
+    const totalPrice = (selectedService.price || 0) + 
+                      selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
+    
     const message = `Olá! Gostaria de confirmar meu agendamento:
     
 👤 Cliente: ${clientName}
 💅 Profissional: ${selectedDesigner.name}
-✨ Serviço: ${selectedService.name}
+✨ Serviço: ${serviceDescription}
 📅 Data: ${formatDate(selectedDate)}
 ⏰ Horário: ${selectedTime}
-💰 Valor: R$ ${selectedService.price.toFixed(2)}
+💰 Valor: R$ ${totalPrice.toFixed(2)}
 
 Aguardo confirmação!`;
     
@@ -1511,7 +1535,14 @@ Aguardo confirmação!`;
                   <div className="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
                   Serviços:
                 </div>
-                <span className="text-white font-medium">{selectedService?.name}</span>
+                <span className="text-white font-medium text-right">
+                  {selectedService?.name}
+                  {selectedExtraServices.length > 0 && (
+                    <div className="text-sm text-white/80 mt-1">
+                      + {selectedExtraServices.map(service => service.name).join(' + ')}
+                    </div>
+                  )}
+                </span>
               </div>
               
               <div className="flex justify-between items-center">
@@ -1536,7 +1567,7 @@ Aguardo confirmação!`;
                   Valor Total:
                 </div>
                 <span className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-yellow-400 bg-clip-text text-transparent">
-                  R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
+                  R$ {((selectedService?.price || 0) + selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -1826,23 +1857,45 @@ Aguardo confirmação!`;
                       
                       {extraServices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {extraServices.map((service) => (
-                            <button
-                              key={service.id}
-                              onClick={() =>
-                                setSelectedExtraService(
-                                  selectedExtraService?.id === service.id ? null : service
-                                )
-                              }
-                              className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
-                                selectedExtraService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
-                              }`}
-                            >
-                              <h5 className="font-semibold text-white mb-1">{service.name}</h5>
-                              <p className="text-white/70 text-sm mb-1">{service.duration} minutos</p>
-                              <p className="text-pink-400 font-bold">R$ {service.price.toFixed(2)}</p>
-                            </button>
-                          ))}
+                          {extraServices.map((service) => {
+                            const isSelected = selectedExtraServices.some(s => s.id === service.id);
+                            return (
+                              <button
+                                key={service.id}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    // Remover serviço se já estiver selecionado
+                                    setSelectedExtraServices(prev => prev.filter(s => s.id !== service.id));
+                                  } else {
+                                    // Adicionar serviço se tiver menos de 2 selecionados
+                                    if (selectedExtraServices.length < 2) {
+                                      setSelectedExtraServices(prev => [...prev, service]);
+                                    } else {
+                                      alert('Você pode selecionar no máximo 2 serviços extras.');
+                                    }
+                                  }
+                                }}
+                                className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
+                                  isSelected ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                                }`}
+                                disabled={!isSelected && selectedExtraServices.length >= 2}
+                              >
+                                <h5 className="font-semibold text-white mb-1">{service.name}</h5>
+                                <p className="text-white/70 text-sm mb-1">{service.duration} minutos</p>
+                                <p className="text-pink-400 font-bold">R$ {service.price.toFixed(2)}</p>
+                                {isSelected && (
+                                  <div className="mt-2 text-xs text-pink-300">
+                                    ✓ Selecionado
+                                  </div>
+                                )}
+                                {!isSelected && selectedExtraServices.length >= 2 && (
+                                  <div className="mt-2 text-xs text-yellow-300">
+                                    Limite atingido (2)
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="mt-2 p-4 bg-white/10 border border-white/20 rounded-xl text-white/80">
@@ -1855,16 +1908,18 @@ Aguardo confirmação!`;
                           <span>Serviço selecionado:</span>
                           <span className="text-white">{selectedService.name}</span>
                         </div>
-                        {selectedExtraService && (
-                          <div className="flex justify-between text-white/80 text-sm mb-2">
-                            <span>Serviço extra:</span>
-                            <span className="text-white">+ {selectedExtraService.name}</span>
-                          </div>
+                        {selectedExtraServices.length > 0 && (
+                          selectedExtraServices.map((extraService, index) => (
+                            <div key={extraService.id} className="flex justify-between text-white/80 text-sm mb-2">
+                              <span>Serviço extra {index + 1}:</span>
+                              <span className="text-white">+ {extraService.name}</span>
+                            </div>
+                          ))
                         )}
                         <div className="flex justify-between text-white font-semibold pt-3 border-t border-white/10">
                           <span>Total provisório:</span>
                           <span>
-                            R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}
+                            R$ {((selectedService?.price || 0) + selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0)).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -1878,7 +1933,7 @@ Aguardo confirmação!`;
                         </button>
                         <button
                           onClick={() => {
-                            setSelectedExtraService(null);
+                            setSelectedExtraServices([]);
                             setStep(3);
                           }}
                           className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 border border-white/20"
@@ -2146,12 +2201,12 @@ Aguardo confirmação!`;
                           <span>Serviços:</span>
                           <span>
                             {selectedService?.name}
-                            {selectedExtraService ? ` + ${selectedExtraService.name}` : ''}
+                            {selectedExtraServices.length > 0 ? ` + ${selectedExtraServices.map(service => service.name).join(' + ')}` : ''}
                           </span>
                         </div>
                         <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
                           <span>Total:</span>
-                          <span>R$ {((selectedService?.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
+                          <span>R$ {((selectedService?.price || 0) + selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0)).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -2183,12 +2238,12 @@ Aguardo confirmação!`;
                     <span>Serviço:</span>
                     <span className="text-white">{selectedService.name}</span>
                   </div>
-                  {selectedExtraService && (
-                    <div className="flex justify-between text-white/80">
-                      <span>Serviço extra:</span>
-                      <span className="text-white">+ {selectedExtraService.name}</span>
+                  {selectedExtraServices.map((extraService, index) => (
+                    <div key={extraService.id} className="flex justify-between text-white/80">
+                      <span>Serviço extra {index + 1}:</span>
+                      <span className="text-white">+ {extraService.name}</span>
                     </div>
-                  )}
+                  ))}
                   {selectedDate && (
                     <div className="flex justify-between text-white/80">
                       <span>Data:</span>
@@ -2203,7 +2258,7 @@ Aguardo confirmação!`;
                   )}
                   <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
                     <span>Total:</span>
-                    <span>R$ {((selectedService.price || 0) + (selectedExtraService?.price || 0)).toFixed(2)}</span>
+                    <span>R$ {((selectedService.price || 0) + selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0)).toFixed(2)}</span>
                   </div>
                 </div>
               )}

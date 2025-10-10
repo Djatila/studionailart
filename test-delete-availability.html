@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Exclusão de Disponibilidade</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Teste de Exclusão de Disponibilidade</h1>
+        
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Supabase URL:</label>
+            <input type="text" id="supabaseUrl" class="w-full p-2 border border-gray-300 rounded-md" placeholder="https://seu-projeto.supabase.co">
+        </div>
+        
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Supabase Anon Key:</label>
+            <input type="text" id="supabaseKey" class="w-full p-2 border border-gray-300 rounded-md" placeholder="sua-chave-anonima">
+        </div>
+        
+        <button onclick="initializeSupabase()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-6">
+            Inicializar Supabase
+        </button>
+        
+        <div id="testSection" class="hidden">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">ID do Designer:</label>
+                <input type="text" id="designerId" class="w-full p-2 border border-gray-300 rounded-md" placeholder="ID do designer">
+            </div>
+            
+            <button onclick="loadAvailability()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mb-4">
+                Carregar Disponibilidade
+            </button>
+            
+            <button onclick="createTestAvailability()" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mb-4">
+                Criar Bloqueio de Teste
+            </button>
+            
+            <div id="availabilityList" class="mt-6"></div>
+        </div>
+        
+        <div id="log" class="mt-6 bg-gray-800 text-green-400 p-4 rounded-md font-mono text-sm whitespace-pre-wrap"></div>
+    </div>
+
+    <script>
+        let supabase;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            logElement.textContent += `${new Date().toISOString()} - ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function initializeSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                alert('Por favor, preencha a URL e a chave do Supabase');
+                return;
+            }
+            
+            supabase = supabase.createClient(url, key);
+            log('Supabase inicializado com sucesso');
+            document.getElementById('testSection').classList.remove('hidden');
+        }
+        
+        async function loadAvailability() {
+            const designerId = document.getElementById('designerId').value;
+            
+            if (!designerId) {
+                alert('Por favor, preencha o ID do designer');
+                return;
+            }
+            
+            try {
+                log('Carregando disponibilidade...');
+                
+                const { data, error } = await supabase
+                    .from('availability')
+                    .select('*')
+                    .eq('designer_id', designerId)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                log(`Encontrados ${data.length} registros de disponibilidade`);
+                
+                const listElement = document.getElementById('availabilityList');
+                listElement.innerHTML = '';
+                
+                if (data.length === 0) {
+                    listElement.innerHTML = '<p class="text-gray-500">Nenhum registro encontrado</p>';
+                    return;
+                }
+                
+                data.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'border border-gray-200 rounded-md p-4 mb-3';
+                    itemElement.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold">${item.specific_date || 'Data não definida'}</h3>
+                                <p class="text-sm text-gray-600">${item.start_time} - ${item.end_time}</p>
+                                <p class="text-sm ${item.is_available ? 'text-green-600' : 'text-red-600'}">
+                                    ${item.is_available ? 'Disponível' : 'Bloqueado'}
+                                </p>
+                            </div>
+                            <button onclick="deleteAvailability('${item.id}')" class="bg-red-500 hover:bg-red-700 text-white py-1 px-3 rounded text-sm">
+                                Excluir
+                            </button>
+                        </div>
+                    `;
+                    listElement.appendChild(itemElement);
+                });
+            } catch (error) {
+                log(`Erro ao carregar disponibilidade: ${error.message}`);
+            }
+        }
+        
+        async function createTestAvailability() {
+            const designerId = document.getElementById('designerId').value;
+            
+            if (!designerId) {
+                alert('Por favor, preencha o ID do designer');
+                return;
+            }
+            
+            try {
+                log('Criando bloqueio de teste...');
+                
+                // Criar uma data para amanhã
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const dateString = tomorrow.toISOString().split('T')[0];
+                
+                const testAvailability = {
+                    designer_id: designerId,
+                    specific_date: dateString,
+                    start_time: '08:00',
+                    end_time: '09:00',
+                    is_available: false, // Bloqueado
+                    day_of_week: tomorrow.getDay()
+                };
+                
+                const { data, error } = await supabase
+                    .from('availability')
+                    .insert([testAvailability])
+                    .select();
+                
+                if (error) throw error;
+                
+                log(`Bloqueio de teste criado com sucesso: ${data[0].id}`);
+                loadAvailability(); // Recarregar a lista
+            } catch (error) {
+                log(`Erro ao criar bloqueio de teste: ${error.message}`);
+            }
+        }
+        
+        async function deleteAvailability(id) {
+            if (!confirm('Tem certeza que deseja excluir este bloqueio?')) {
+                return;
+            }
+            
+            try {
+                log(`Excluindo bloqueio ${id}...`);
+                
+                const { error } = await supabase
+                    .from('availability')
+                    .delete()
+                    .eq('id', id);
+                
+                if (error) throw error;
+                
+                log(`Bloqueio ${id} excluído com sucesso`);
+                loadAvailability(); // Recarregar a lista
+            } catch (error) {
+                log(`Erro ao excluir bloqueio: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

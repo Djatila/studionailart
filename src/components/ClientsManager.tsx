@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Phone, Mail, Calendar, CheckCircle, XCircle, Clock, Eye, Key, RotateCcw } from 'lucide-react';
 import { NailDesigner, Appointment } from '../App';
 import { getClients } from '../utils/supabaseUtils';
+import { supabase } from '../lib/supabase';
 
 interface RegisteredClient {
   id: string;
@@ -636,4 +637,31 @@ export default function ClientsManager({ designer, onBack }: ClientsManagerProps
       )}
     </div>
   );
-}
+
+  const handleDeleteClient = async (clientId: string, clientName: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir a cliente ${clientName}? Esta ação é irreversível.`)) {
+      try {
+        setLoading(true);
+        const { error } = await supabase
+          .from('clients')
+          .delete()
+          .eq('id', clientId);
+
+        if (error) {
+          throw error;
+        }
+
+        // Atualiza a lista de clientes após a exclusão
+        setRegisteredClients(prevClients => prevClients.filter(client => client.id !== clientId));
+        alert(`Cliente ${clientName} excluída com sucesso!`);
+      } catch (err: any) {
+        console.error('Erro ao excluir cliente:', err.message);
+        setError('Erro ao excluir cliente. Tente novamente.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+};
+
+export default ClientsManager;

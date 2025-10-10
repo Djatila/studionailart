@@ -162,6 +162,39 @@ export interface Database {
           updated_at?: string
         }
       }
+      // Adicionando a definição da tabela clients
+      clients: {
+        Row: {
+          id: string
+          name: string
+          email: string
+          password: string
+          phone: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          email: string
+          password: string
+          phone: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          email?: string
+          password?: string
+          phone?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }

@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, Phone, MapPin, ArrowLeft, History, CalendarDays, Plus, X, Trash2 } from 'lucide-react';
-import { NailDesigner } from '../App';
 import { getSupabaseAppointments, getNailDesigners, updateAppointment, updateNailDesigner } from '../utils/supabaseUtils';
+
+// Definir a interface Client
+interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  isActive: boolean;
+  createdAt: string;
+}
 
 interface Appointment {
   id: string;
@@ -16,8 +26,19 @@ interface Appointment {
   createdAt: string;
 }
 
+interface NailDesigner {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  pixKey?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 interface ClientDashboardProps {
-  client: NailDesigner;
+  client: Client;
   onBack: () => void;
   onBookService?: () => void;
 }
@@ -69,7 +90,9 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
 
   const loadData = async () => {
     try {
-      console.log('🔄 ClientDashboard: Carregando dados do cliente:', client.phone);
+      console.log('🔄 ClientDashboard: Carregando dados do cliente:', client);
+      console.log('🔍 ClientDashboard: Telefone do cliente:', client.phone);
+      console.log('🔍 ClientDashboard: Tipo do telefone:', typeof client.phone);
       let clientAppointments: Appointment[] = [];
       
       // Buscar agendamentos do Supabase
@@ -77,34 +100,61 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
         const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
         const supabaseAppointments = await getSupabaseAppointments();
         console.log('📊 ClientDashboard: Total de agendamentos no Supabase:', supabaseAppointments.length);
+        console.log('📋 ClientDashboard: Todos os agendamentos do Supabase (primeiros 5):', JSON.stringify(supabaseAppointments.slice(0, 5), null, 2));
         
         // Filtrar agendamentos do cliente pelo telefone
         clientAppointments = supabaseAppointments.filter((apt: any) => {
-          // Verificar tanto client_phone (Supabase) quanto clientPhone (localStorage)
-          const phone = apt.client_phone || apt.clientPhone;
-          return phone === client.phone;
+          // Verificação mais robusta para o telefone
+          const clientPhoneFromDB = apt.client_phone || apt.clientPhone || '';
+          // Normalizar ambos os telefones para comparação
+          const normalizedDBPhone = String(clientPhoneFromDB).replace(/\D/g, '');
+          const normalizedClientPhone = String(client.phone).replace(/\D/g, '');
+          
+          const matchesPhone = normalizedDBPhone === normalizedClientPhone;
+          console.log(`🔍 ClientDashboard: Verificando agendamento ${apt.id}:`, {
+            dbPhone: clientPhoneFromDB,
+            dbPhoneNormalized: normalizedDBPhone,
+            clientPhone: client.phone,
+            clientPhoneNormalized: normalizedClientPhone,
+            matches: matchesPhone
+          });
+          return matchesPhone;
         }).map((apt: any) => ({
           id: apt.id,
-          designerId: apt.designer_id || apt.designerId,
-          clientName: apt.client_name || apt.clientName,
-          clientPhone: apt.client_phone || apt.clientPhone,
-          service: apt.service_name || apt.service,
-          date: apt.appointment_date || apt.date,
-          time: apt.appointment_time || apt.time,
+          designerId: apt.designer_id || apt.designerId || '',
+          clientName: apt.client_name || apt.clientName || '',
+          clientPhone: apt.client_phone || apt.clientPhone || '',
+          service: apt.service || '',
+          date: apt.date || '',
+          time: apt.time || '',
           status: apt.status || 'pending',
-          price: apt.service_price || apt.price || 0,
-          createdAt: apt.created_at || apt.createdAt
+          price: apt.price || 0,
+          createdAt: apt.created_at || apt.createdAt || new Date().toISOString()
         }));
         
         console.log(`✅ ClientDashboard: ${clientAppointments.length} agendamentos encontrados no Supabase`);
+        console.log('📋 ClientDashboard: Agendamentos filtrados (primeiros 5):', JSON.stringify(clientAppointments.slice(0, 5), null, 2));
       } catch (supabaseError) {
         console.error('❌ ClientDashboard: Erro ao buscar do Supabase, usando localStorage:', supabaseError);
         
         // Fallback para localStorage se Supabase falhar
         const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-        clientAppointments = allAppointments.filter((apt: Appointment) => 
-          apt.clientPhone === client.phone
-        );
+        console.log('📱 ClientDashboard: Todos os agendamentos do localStorage:', JSON.stringify(allAppointments, null, 2));
+        clientAppointments = allAppointments.filter((apt: Appointment) => {
+          // Normalizar telefones para comparação
+          const normalizedAptPhone = String(apt.clientPhone || '').replace(/\D/g, '');
+          const normalizedClientPhone = String(client.phone).replace(/\D/g, '');
+          const matchesPhone = normalizedAptPhone === normalizedClientPhone;
+          
+          console.log(`🔍 ClientDashboard: Verificando agendamento localStorage ${apt.id}:`, {
+            aptPhone: apt.clientPhone,
+            aptPhoneNormalized: normalizedAptPhone,
+            clientPhone: client.phone,
+            clientPhoneNormalized: normalizedClientPhone,
+            matches: matchesPhone
+          });
+          return matchesPhone;
+        });
         console.log(`📱 ClientDashboard: ${clientAppointments.length} agendamentos encontrados no localStorage (fallback)`);
       }
       
@@ -206,55 +256,61 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
 
   const handleSaveProfile = async () => {
     try {
-      console.log('🔄 Iniciando salvamento do perfil...');
+      console.log('🔄 Iniciando salvamento do perfil do cliente...');
       
       // Tentar salvar no Supabase primeiro
       try {
-        // ✅ Corrigir a chamada da função updateNailDesigner
-        const { updateNailDesigner } = await import('../utils/supabaseUtils');
-        const updatedDesigner = await updateNailDesigner(client.id, {
+        const { updateClient } = await import('../utils/supabaseUtils');
+        const updatedClient = await updateClient(client.id, {
           name: profileData.name,
           email: profileData.email,
           phone: profileData.phone,
           ...(profileData.password && { password: profileData.password })
         });
         
-        if (updatedDesigner) {
-          console.log('✅ Dados salvos no Supabase:', updatedDesigner);
+        if (updatedClient) {
+          console.log('✅ Dados do cliente salvos no Supabase:', updatedClient);
         }
       } catch (supabaseError) {
-        console.error('❌ Erro ao salvar no Supabase:', supabaseError);
-        
-        // Fallback para localStorage
-        const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
-        const updatedDesigners = designers.map((d: NailDesigner) => {
-          if (d.id === client.id) {
-            return {
-              ...d,
-              name: profileData.name,
-              email: profileData.email,
-              phone: profileData.phone,
-              ...(profileData.password && { password: profileData.password })
-            };
-          }
-          return d;
-        });
-        
-        localStorage.setItem('nail_designers', JSON.stringify(updatedDesigners));
-        console.log('📱 Dados salvos no localStorage (fallback)');
+        console.error('❌ Erro ao salvar cliente no Supabase:', supabaseError);
       }
       
       // Atualizar agendamentos se o telefone mudou
       if (profileData.phone !== client.phone) {
         try {
-          const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-          const updatedAppointments = allAppointments.map((apt: Appointment) => {
-            if (apt.clientPhone === client.phone) {
-              return { ...apt, clientPhone: profileData.phone, clientName: profileData.name };
+          // Atualizar agendamentos no Supabase
+          try {
+            const { getSupabaseAppointments, updateAppointment } = await import('../utils/supabaseUtils');
+            const allAppointments = await getSupabaseAppointments();
+            const clientAppointments = allAppointments.filter((apt: any) => {
+              const normalizedDBPhone = String(apt.client_phone || apt.clientPhone || '').replace(/\D/g, '');
+              const normalizedOldPhone = String(client.phone).replace(/\D/g, '');
+              return normalizedDBPhone === normalizedOldPhone;
+            });
+            
+            // Atualizar cada agendamento do cliente com o novo telefone
+            for (const apt of clientAppointments) {
+              await updateAppointment(apt.id, {
+                client_phone: profileData.phone,
+                client_name: profileData.name
+              });
             }
-            return apt;
-          });
-          localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+            
+            console.log(`✅ ${clientAppointments.length} agendamentos atualizados no Supabase`);
+          } catch (supabaseError) {
+            console.error('❌ Erro ao atualizar agendamentos no Supabase:', supabaseError);
+            
+            // Fallback para localStorage se Supabase falhar
+            const allAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+            const updatedAppointments = allAppointments.map((apt: Appointment) => {
+              if (apt.clientPhone === client.phone) {
+                return { ...apt, clientPhone: profileData.phone, clientName: profileData.name };
+              }
+              return apt;
+            });
+            localStorage.setItem('nail_appointments', JSON.stringify(updatedAppointments));
+            console.log('📱 Agendamentos atualizados no localStorage (fallback)');
+          }
         } catch (error) {
           console.error('❌ Erro ao atualizar agendamentos:', error);
         }
@@ -276,11 +332,11 @@ export default function ClientDashboard({ client, onBack, onBookService }: Clien
       };
       
       // Disparar evento para notificar o App.tsx
-      const event = new CustomEvent('designerUpdated', {
+      const event = new CustomEvent('clientUpdated', {
         detail: updatedClient
       });
       window.dispatchEvent(event);
-      console.log('📡 Evento designerUpdated disparado:', updatedClient);
+      console.log('📡 Evento clientUpdated disparado:', updatedClient);
       
       setIsEditing(false);
       setSaveMessage('Dados salvos com sucesso!');

@@ -163,7 +163,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   // Generate time slots
   const timeSlots = [
-    '08:00', '10:00', '12:00', '14:00', '16:00', '18:00'
+    '08:00', '10:00', '13:00', '15:00', '17:00'
   ];
 
   // Get available time slots for selected date

@@ -321,7 +321,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
         return;
       }
       
-      // Login bem-sucedido
+      // Login bem-sucedido - passar cliente no formato correto
       const clientData = {
         id: client.id,
         name: client.name,
@@ -374,7 +374,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
       });
       
       if (newClient) {
-        // Fazer login automático após cadastro
+        // Fazer login automático após cadastro - passar cliente no formato correto
         const clientData = {
           id: newClient.id,
           name: newClient.name,

@@ -421,7 +421,7 @@ export default function SuperAdminDashboard({ onBack }: SuperAdminDashboardProps
              }`}
            >
              <User className="w-4 h-4 inline mr-2" />
-             Clientes Cadastrados
+             Clientes Cadastradas
            </button>
         </div>
 

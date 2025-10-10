@@ -48,6 +48,7 @@ export interface Appointment {
   date: string;
   time: string;
   price: number;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   createdAt: string;
 }
 
@@ -65,14 +66,15 @@ export interface Client {
   name: string;
   phone: string;
   email: string;
-  designerId: string;
+  password: string;
+  isActive: boolean;
   createdAt: string;
-  lastAppointment?: string;
 }
 
 function App() {
   const [currentView, setCurrentView] = useState<'login' | 'booking' | 'admin' | 'services' | 'stats' | 'availability' | 'settings' | 'superadmin' | 'client'>('login');
   const [currentDesigner, setCurrentDesigner] = useState<NailDesigner | null>(null);
+  const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [isClient, setIsClient] = useState(false);
 // Removed unused state variable isSuperAdmin
   const [designerSlug, setDesignerSlug] = useState<string | null>(null);
@@ -167,14 +169,18 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   };
 
-  const handleLogin = (designer: NailDesigner, asClient: boolean = false) => {
-    setCurrentDesigner(designer);
-    setIsClient(asClient);
-    
+  const handleLogin = (user: NailDesigner | Client, asClient: boolean = false) => {
     if (asClient) {
-      // Se for cliente logando pelo sistema de login, vai para o painel do cliente
+      // Se for cliente, armazenar como currentClient
+      setCurrentClient(user as Client);
+      setCurrentDesigner(null);
+      setIsClient(true);
       setCurrentView('client');
     } else {
+      // Se for designer, armazenar como currentDesigner
+      setCurrentDesigner(user as NailDesigner);
+      setCurrentClient(null);
+      setIsClient(false);
       setCurrentView('admin');
     }
   };
@@ -228,11 +234,10 @@ function App() {
   if (currentView === 'client') {
     return (
       <ClientDashboard 
-        client={currentDesigner!} 
+        client={currentClient!} 
         onBack={handleLogout}
         onBookService={() => {
           setCurrentView('booking');
-          // Não passa designer quando cliente agenda novo serviço
         }}
       />
     );
@@ -243,7 +248,7 @@ function App() {
       <BookingPage 
         designer={undefined} // Não passa designer para começar sempre no step 1
         onBack={handleLogout}
-        loggedClient={isClient ? currentDesigner : undefined}
+        loggedClient={isClient ? currentClient : undefined}
       />
     );
   }
@@ -309,14 +314,16 @@ function App() {
             designer={undefined} // Sempre undefined para começar no step 1 (seleção de designer)
             onBack={() => {
               // Se é uma cliente logada, volta para o painel da cliente
-            if (isClient && currentDesigner) {
-              setCurrentView('client');
-            } else {
-              // Se não é cliente ou não está logada, faz logout
-              handleLogout();
-            }
+              if (isClient && currentClient) {
+                console.log('🔙 Voltando ao dashboard do cliente');
+                setCurrentView('client');
+              } else {
+                // Se não é cliente ou não está logada, faz logout
+                console.log('🔚 Fazendo logout');
+                handleLogout();
+              }
             }}
-            loggedClient={isClient ? currentDesigner : undefined}
+            loggedClient={isClient ? currentClient : undefined}
             onNavigateToClientDashboard={() => setCurrentView('client')}
           />
         )}

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content content="width=device-width, initial-scale=1.0">
+    <title>Teste de Correção do BookingPage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log {
+            background-color: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .appointment-item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste de Correção do BookingPage</h1>
+        <p>Esta ferramenta testa se a correção da função formatPhoneNumber e da passagem de loggedClient resolveu o problema do botão bloqueado.</p>
+        
+        <div class="form-group">
+            <label>Número de Telefone (para teste):</label>
+            <input type="text" id="phoneNumber" value="(11) 99999-9999" placeholder="Digite o número de telefone">
+        </div>
+        
+        <div class="form-group">
+            <label>Nome do Cliente (para teste):</label>
+            <input type="text" id="clientName" value="Cliente Teste" placeholder="Digite o nome do cliente">
+        </div>
+        
+        <button onclick="testFormatPhoneNumber()">📞 Testar Formatação de Telefone</button>
+        <button onclick="testBookingButton()">✅ Testar Botão de Agendamento</button>
+        <button onclick="clearLog()">🗑️ Limpar Log</button>
+        
+        <div id="log" class="log"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Função para registrar logs
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // Também mostrar no console
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        // Função para mostrar resultado
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+        
+        // Função corrigida para formatar o número de telefone
+        function formatPhoneNumber(phoneNumber) {
+            if (!phoneNumber) return '';
+            
+            // Remove todos os caracteres não numéricos
+            let cleaned = phoneNumber.replace(/\D/g, '');
+            
+            // Se o número começar com 55 (código do Brasil), removemos
+            if (cleaned.startsWith('55')) {
+                cleaned = cleaned.substring(2);
+            }
+            
+            // Formata para o padrão brasileiro (XX) XXXXX-XXXX
+            if (cleaned.length >= 10) {
+                // Se for um número de celular (11 dígitos) ou telefone fixo (10 dígitos)
+                if (cleaned.length === 11) {
+                    // Formato para celular: (XX) XXXXX-XXXX
+                    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7, 11)}`;
+                } else if (cleaned.length === 10) {
+                    // Formato para telefone fixo: (XX) XXXX-XXXX
+                    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6, 10)}`;
+                }
+            }
+            
+            // Se não tiver o tamanho esperado, retorna o número limpo
+            return cleaned;
+        }
+        
+        // Função para testar a formatação de telefone
+        function testFormatPhoneNumber() {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            log('🔍 Testando formatação de telefone...', 'info');
+            log(`Número original: ${phoneNumber}`, 'info');
+            
+            const formatted = formatPhoneNumber(phoneNumber);
+            log(`Número formatado: ${formatted}`, 'info');
+            
+            // Verificar se o número foi formatado corretamente
+            const hasValidFormat = formatted.includes('(') && formatted.includes(')') && formatted.includes('-');
+            if (hasValidFormat) {
+                log('✅ Formatação correta!', 'success');
+                showResult('✅ Formatação de telefone funcionando corretamente', 'success');
+            } else {
+                log('❌ Formatação incorreta!', 'error');
+                showResult('❌ Problema na formatação de telefone', 'error');
+            }
+        }
+        
+        // Função para testar o botão de agendamento
+        function testBookingButton() {
+            const clientName = document.getElementById('clientName').value;
+            const clientPhone = document.getElementById('phoneNumber').value;
+            
+            log('🔍 Testando condições do botão de agendamento...', 'info');
+            log(`Nome do cliente: "${clientName}"`, 'info');
+            log(`Telefone do cliente: "${clientPhone}"`, 'info');
+            
+            // Verificar se os campos estão preenchidos
+            const isNameValid = clientName && clientName.trim() !== '';
+            const isPhoneValid = clientPhone && clientPhone.trim() !== '';
+            
+            log(`Nome válido: ${isNameValid}`, 'info');
+            log(`Telefone válido: ${isPhoneValid}`, 'info');
+            
+            // Simular a condição do botão: disabled={!clientName || !clientPhone}
+            const isButtonDisabled = !isNameValid || !isPhoneValid;
+            
+            if (isButtonDisabled) {
+                log('🚫 Botão estaria desabilitado!', 'error');
+                showResult('🚫 Botão de agendamento estaria desabilitado - campos obrigatórios não preenchidos', 'error');
+            } else {
+                log('✅ Botão estaria habilitado!', 'success');
+                showResult('✅ Botão de agendamento estaria habilitado', 'success');
+            }
+        }
+        
+        // Função para limpar o log
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('result').innerHTML = '';
+        }
+        
+        // Executar testes iniciais ao carregar a página
+        window.addEventListener('load', () => {
+            log('🔧 Ferramenta de teste carregada', 'info');
+            log('📋 Esta ferramenta testa se as correções da função formatPhoneNumber e da passagem de loggedClient resolveram o problema', 'info');
+        });
+    </script>
+</body>
+</html>

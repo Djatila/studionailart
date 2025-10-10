@@ -478,8 +478,8 @@ export const availabilityService = {
       .order('start_time', { ascending: true })
     
     if (error) {
-      console.error('Error fetching availability:', error)
-      return []
+      console.error('Error fetching availability:', error);
+      return [];
     }
     
     return data || []
@@ -520,17 +520,38 @@ export const availabilityService = {
 
   // Delete availability
   async delete(id: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('availability')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      console.error('Error deleting availability:', error)
-      return false
+    try {
+      console.log('=== Iniciando exclusão no Supabase ===');
+      console.log('ID a ser excluído:', id);
+      console.log('Tipo do ID:', typeof id);
+      
+      // Verificar se o ID está no formato UUID válido
+      const isUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      console.log('ID está no formato UUID válido:', isUuidFormat);
+      
+      if (!isUuidFormat) {
+        console.warn('ID não está no formato UUID válido. Pulando exclusão no Supabase.');
+        return false;
+      }
+      
+      const { error } = await supabase
+        .from('availability')
+        .delete()
+        .eq('id', id);
+      
+      console.log('Resultado da exclusão:', { error });
+      
+      if (error) {
+        console.error('Error deleting availability:', error);
+        return false;
+      }
+      
+      console.log('Registro excluído com sucesso');
+      return true;
+    } catch (error) {
+      console.error('Erro inesperado ao deletar disponibilidade:', error);
+      return false;
     }
-    
-    return true
   },
 
   // Bulk update availability for a designer
@@ -663,11 +684,27 @@ export const getSupabaseAppointments = async () => {
   
   // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
   return appointments.map(apt => ({
-    ...apt,
-    designerId: apt.designer_id,
-    clientName: apt.client_name,
-    clientPhone: apt.client_phone,
-    createdAt: apt.created_at
+    // Campos originais do Supabase (snake_case) - garantir que existam
+    id: apt.id || '',
+    designer_id: apt.designer_id || '',
+    client_name: apt.client_name || '',
+    client_phone: apt.client_phone || '',
+    client_email: apt.client_email || null,
+    service: apt.service || '',
+    date: apt.date || '',
+    time: apt.time || '',
+    price: apt.price || 0,
+    status: apt.status || 'pending',
+    created_at: apt.created_at || new Date().toISOString(),
+    updated_at: apt.updated_at || new Date().toISOString(),
+    
+    // Campos mapeados para camelCase (compatibilidade com frontend)
+    designerId: apt.designer_id || '',
+    clientName: apt.client_name || '',
+    clientPhone: apt.client_phone || '',
+    clientEmail: apt.client_email || null,
+    createdAt: apt.created_at || new Date().toISOString(),
+    updatedAt: apt.updated_at || new Date().toISOString()
   }));
 };
 export const createAppointment = (appointment: Database['public']['Tables']['appointments']['Insert']) => appointmentService.create(appointment);
@@ -720,6 +757,7 @@ export const updateClient = async (id: string, updates: any) => {
 // New client management functions
 export const createClientRecord = async (client: any) => {
   const clientData = {
+    id: client.id || undefined, // Adicionar ID se existir, caso contrário deixar undefined
     name: client.name,
     email: client.email,
     password: client.password,
@@ -859,9 +897,9 @@ export const createAuthAccountForDesigner = async (designerId: string) => {
     }
     
     return { success: true, user: data.user };
-  } catch (error) {
+  } catch (error: any) { // Adicionar tipagem explícita para o erro
     console.error('Erro ao criar conta de autenticação:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || 'Erro desconhecido' };
   }
 };
 
@@ -885,30 +923,39 @@ export const authService = {
         return { success: false, error: error.message }
       }
       
-      // Create designer record in database with auth user ID
+      // Create client record in database with auth user ID
       if (data.user) {
-        const designerData = {
+        const clientData = {
           id: data.user.id, // Use auth user ID
           name: userData.name,
           email,
-          password: password, // ✅ Usar a senha fornecida ou hash
+          password: password, // ✅ Usar a senha fornecida
           phone: userData.phone,
-          is_active: false // Pending approval
+          is_active: true
         }
         
-        const designerResult = await designerService.create(designerData)
+        const createdClient = await clientService.create(clientData)
         
-        if (!designerResult) {
-          console.error('Failed to create designer record')
-          // Opcional: fazer rollback do usuário auth se necessário
-          return { success: false, error: 'Erro ao criar registro da designer' }
+        if (createdClient) {
+          // Return both user and profile
+          return { 
+            success: true, 
+            user: data.user,
+            profile: {
+              id: createdClient.id,
+              name: createdClient.name,
+              phone: createdClient.phone,
+              email: createdClient.email,
+              createdAt: createdClient.created_at
+            }
+          }
         }
       }
       
       return { success: true, user: data.user }
-    } catch (error) {
+    } catch (error: any) { // Adicionar tipagem explícita para o erro
       console.error('Sign up error:', error)
-      return { success: false, error: 'Erro ao criar conta' }
+      return { success: false, error: error.message || 'Erro ao criar conta' }
     }
   },
 
@@ -1005,9 +1052,9 @@ export const authService = {
         return { success: false, error: error.message }
       }
       return { success: true }
-    } catch (error) {
+    } catch (error: any) { // Adicionar tipagem explícita para o erro
       console.error('Reset password error:', error)
-      return { success: false, error: 'Erro ao redefinir senha' }
+      return { success: false, error: error.message || 'Erro ao redefinir senha' }
     }
   }
 }
@@ -1040,10 +1087,11 @@ export const clientAuthService = {
       
       // Create client record in database with auth user ID
       if (data.user) {
-        const clientData = {
+        const clientData: Omit<Client, 'created_at' | 'updated_at'> = {
           id: data.user.id, // Use auth user ID
           name: userData.name,
           email,
+          password, // ✅ Usar a senha fornecida
           phone: userData.phone,
           is_active: true
         }
@@ -1067,9 +1115,9 @@ export const clientAuthService = {
       }
       
       return { success: true, user: data.user }
-    } catch (error) {
+    } catch (error: any) { // Adicionar tipagem explícita para o erro
       console.error('Client sign up error:', error)
-      return { success: false, error: 'Erro ao criar conta' }
+      return { success: false, error: error.message || 'Erro ao criar conta' }
     }
   },
 
@@ -1101,9 +1149,9 @@ export const clientAuthService = {
       }
       
       return { success: false, error: 'Erro no login' }
-    } catch (error) {
+    } catch (error: any) { // Adicionar tipagem explícita para o erro
       console.error('Client sign in error:', error)
-      return { success: false, error: 'Erro ao fazer login' }
+      return { success: false, error: error.message || 'Erro ao fazer login' }
     }
   }
 }

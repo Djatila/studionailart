@@ -25,10 +25,21 @@ interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
 }
 
+// Definir a interface Client
+interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 interface BookingPageProps {
   designer?: NailDesigner;
   onBack: () => void;
-  loggedClient?: NailDesigner; // Cliente logada no sistema
+  loggedClient?: Client; // Cliente logada no sistema (corrigido o tipo)
   onNavigateToClientDashboard?: () => void; // Função para navegar ao dashboard da cliente
 }
 
@@ -44,6 +55,8 @@ const loadingReducer = (state: boolean, action: { type: 'START' | 'FINISH' }) =>
 };
 
 const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard }) => {
+  console.log('🔧 BookingPage montado. Props recebidas:', { initialDesigner, loggedClient });
+  
   const [step, setStep] = useState(1);
   const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(initialDesigner || null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -51,6 +64,45 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [selectedTime, setSelectedTime] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+
+  // Função auxiliar para formatar o número de telefone
+  const formatPhoneNumber = (phoneNumber: string): string => {
+    if (!phoneNumber) return '';
+    
+    // Remove todos os caracteres não numéricos
+    let cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // Se o número começar com 55 (código do Brasil), removemos
+    if (cleaned.startsWith('55')) {
+      cleaned = cleaned.substring(2);
+    }
+    
+    // Formata para o padrão brasileiro (XX) XXXXX-XXXX
+    if (cleaned.length >= 10) {
+      // Se for um número de celular (11 dígitos) ou telefone fixo (10 dígitos)
+      if (cleaned.length === 11) {
+        // Formato para celular: (XX) XXXXX-XXXX
+        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7, 11)}`;
+      } else if (cleaned.length === 10) {
+        // Formato para telefone fixo: (XX) XXXX-XXXX
+        return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6, 10)}`;
+      }
+    }
+    
+    // Se não tiver o tamanho esperado, retorna o número limpo
+    return cleaned;
+  };
+
+  // 🆕 NOVA FUNÇÃO: Adiciona minutos a um horário
+  const addMinutes = (time: string, minsToAdd: number): string => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours);
+    date.setMinutes(minutes + minsToAdd);
+    return date.toTimeString().slice(0, 5);
+  };
+
+
   const [clientEmail, setClientEmail] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showPixCopied, setShowPixCopied] = useState(false);
@@ -61,6 +113,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const [designersLoaded, setDesignersLoaded] = useState(false); // Novo estado mais simples
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<any[]>([]);
+  const [blockedDatesPreview, setBlockedDatesPreview] = useState<any[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -135,27 +188,44 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   useEffect(() => {
     // Preenche dados do cliente se estiver logado
+    console.log('🔍 useEffect loggedClient chamado. loggedClient:', loggedClient);
     if (loggedClient) {
-      setClientName(loggedClient.name);
-      setClientPhone(loggedClient.phone);
-      setClientEmail(loggedClient.email || '');
+      console.log('👤 Cliente logada detectada:', loggedClient);
+      console.log('📝 Nome do cliente:', loggedClient.name);
+      console.log('📞 Telefone do cliente:', loggedClient.phone);
+      const formattedName = loggedClient.name || '';
+      const formattedPhone = formatPhoneNumber(loggedClient.phone || '');
+      const formattedEmail = loggedClient.email || '';
+      console.log('📄 Dados formatados - Nome:', formattedName, 'Telefone:', formattedPhone, 'Email:', formattedEmail);
+      setClientName(formattedName);
+      setClientPhone(formattedPhone); // Aplica a formatação aqui
+      setClientEmail(formattedEmail);
+      console.log('✅ Campos do cliente preenchidos');
+    } else {
+      console.log('⚠️ Nenhum cliente logado detectado');
     }
   }, [loggedClient]);
+  
+  // Adicionar um useEffect para monitorar as mudanças nos campos
+  useEffect(() => {
+    console.log('🔄 Campos atualizados - Nome:', clientName, 'Telefone:', clientPhone, 'Email:', clientEmail);
+  }, [clientName, clientPhone, clientEmail]);
 
   // Define o designer inicial se fornecido (mas não durante reset)
   useEffect(() => {
+    console.log('🔍 Verificando designer inicial:', { initialDesigner, isResetting });
     if (initialDesigner && !isResetting) {
+      console.log('🎯 Definindo designer inicial:', initialDesigner.name);
       setSelectedDesigner(initialDesigner);
       setStep(2); // Pula para a seleção de serviços
     }
   }, [initialDesigner, isResetting]);
 
   useEffect(() => {
-  // Carregar designers quando o componente for montado
-  const loadDesigners = async () => {
-    console.log('🚀 Iniciando carregamento de designers no useEffect...');
-    if (!designersLoaded) {
-      setDesignersLoaded(false);
+    // Carregar designers quando o componente for montado
+    const loadDesigners = async () => {
+      console.log('🚀 Iniciando carregamento de designers no useEffect...');
+      setDesignersLoaded(false); // Sempre resetar para garantir carregamento
       
       try {
         const designersList = await getDesigners();
@@ -164,32 +234,37 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         setDesigners(designersList || []);
         setIsInitialized(true);
         setDesignersLoaded(true);
+        console.log('✅ Carregamento de designers concluído');
       } catch (error) {
         console.error('❌ Erro no useEffect ao carregar designers:', error);
         setDesigners([]);
         setIsInitialized(true);
         setDesignersLoaded(true);
       }
-    }
-  };
-  
-  loadDesigners();
-}, [designersLoaded]); // Adicionar designersLoaded como dependência
+    };
+    
+    loadDesigners();
+  }, []); // Remover designersLoaded como dependência para forçar carregamento
 
   // Carregar serviços e disponibilidade quando designer for selecionado
   useEffect(() => {
     if (selectedDesigner) {
       const loadDesignerData = async () => {
+        console.log('🚀 Iniciando carregamento de dados para designer:', selectedDesigner.id);
         // Carregar serviços
         setLoadingServices(true);
         try {
           const designerServices = await getServices();
+          console.log('📋 Serviços carregados:', designerServices?.length || 0);
           setServices(designerServices);
           // Separar serviços principais e extras
-          setRegularServices(designerServices.filter(s => s.category === 'services' || !s.category));
-          setExtraServices(designerServices.filter(s => s.category === 'extras'));
+          const regular = designerServices.filter(s => s.category === 'services' || !s.category);
+          const extras = designerServices.filter(s => s.category === 'extras');
+          setRegularServices(regular);
+          setExtraServices(extras);
+          console.log('📊 Serviços principais:', regular.length, 'Serviços extras:', extras.length);
         } catch (error) {
-          console.error('Erro ao carregar serviços:', error);
+          console.error('❌ Erro ao carregar serviços:', error);
           setServices([]);
           setRegularServices([]);
           setExtraServices([]);
@@ -201,10 +276,19 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         setLoadingAvailability(true);
         try {
           const designerAvailability = await getDesignerAvailability();
+          console.log('📋 Disponibilidade carregada (completo):', designerAvailability?.length || 0);
+          console.log('📋 Dados de disponibilidade (completo):', JSON.stringify(designerAvailability, null, 2));
           setAvailability(designerAvailability);
+          
+          // Carregar prévia de datas bloqueadas
+          const blockedPreview = await getBlockedDatesPreview();
+          console.log('📋 Datas bloqueadas carregadas (completo):', blockedPreview?.length || 0);
+          console.log('📋 Dados de bloqueio (completo):', JSON.stringify(blockedPreview, null, 2));
+          setBlockedDatesPreview(blockedPreview);
         } catch (error) {
-          console.error('Erro ao carregar disponibilidade:', error);
+          console.error('❌ Erro ao carregar disponibilidade:', error);
           setAvailability([]);
+          setBlockedDatesPreview([]);
         } finally {
           setLoadingAvailability(false);
         }
@@ -212,8 +296,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
       loadDesignerData();
     } else {
+      console.log('🧹 Resetando dados do designer');
       setServices([]);
       setAvailability([]);
+      setBlockedDatesPreview([]);
       // Resetar listas quando não houver designer
       setRegularServices([]);
       setExtraServices([]);
@@ -243,18 +329,17 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       console.log('📱 Designers do localStorage:', localDesigners?.length || 0);
       
       // Combinar e remover duplicatas, priorizando Supabase
-      const allDesigners = [...(supabaseDesigners || [])];
+      const allDesigners = [...(supabaseDesigners || []), ...localDesigners];
       
-      localDesigners.forEach((localDesigner: any) => {
-        if (!allDesigners.find(d => d.id === localDesigner.id)) {
-          allDesigners.push(localDesigner);
-        }
-      });
+      // Remover duplicatas baseado no ID
+      const uniqueDesigners = allDesigners.filter((designer, index, self) =>
+        index === self.findIndex(d => d.id === designer.id)
+      );
       
-      console.log('🔄 Total de designers combinados:', allDesigners?.length || 0);
+      console.log('🔄 Total de designers combinados (únicos):', uniqueDesigners?.length || 0);
       
       // Filtrar apenas designers ativos (verificar ambos os formatos de campo)
-      const activeDesigners = allDesigners.filter(d => {
+      const activeDesigners = uniqueDesigners.filter(d => {
         const isActive = (d as any).isActive || (d as any).is_active;
         console.log(`👤 Designer ${d.name}: ativo = ${isActive}`);
         return isActive;
@@ -272,7 +357,13 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       try {
         const saved = localStorage.getItem('nail_designers');
         const localDesigners = saved ? JSON.parse(saved) : [];
-        const activeLocalDesigners = localDesigners.filter((d: NailDesigner) => d.isActive || d.is_active);
+        console.log('📱 Designers do localStorage:', localDesigners?.length || 0);
+        const activeLocalDesigners = localDesigners.filter((d: any) => {
+          // Verificar ambos os formatos de campo isActive
+          const isActive = d.isActive || d.is_active;
+          console.log(`📱 Designer ${d.name}: isActive = ${isActive}`);
+          return isActive;
+        });
         console.log('📱 Fallback: designers ativos do localStorage:', activeLocalDesigners?.length || 0);
         return activeLocalDesigners;
       } catch (fallbackError) {
@@ -284,10 +375,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   const getServices = async (): Promise<Service[]> => {
     if (!selectedDesigner) return [];
+    console.log('🔍 Buscando serviços para designer:', selectedDesigner.id);
     try {
       // Buscar do Supabase
       const { serviceService } = await import('../utils/supabaseUtils');
       const supabaseServices = await serviceService.getByDesignerId(selectedDesigner.id);
+      console.log('📡 Serviços do Supabase:', supabaseServices?.length || 0);
       
       // Mapear campos do Supabase para o formato esperado (inclui category)
       const mappedServices = supabaseServices.map(service => ({
@@ -300,29 +393,45 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       }));
       
       if (mappedServices.length > 0) {
+        console.log('✅ Serviços mapeados do Supabase:', mappedServices.length);
         return mappedServices;
       }
       
       // Fallback para localStorage se não houver dados no Supabase
+      console.log('💾 Buscando serviços do localStorage...');
       const saved = localStorage.getItem('nail_services');
       const allServices = saved ? JSON.parse(saved) : [];
-      return allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+      console.log('📱 Serviços do localStorage:', allServices?.length || 0);
+      const filteredServices = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+      console.log('🎯 Serviços filtrados para designer:', filteredServices.length);
+      return filteredServices;
     } catch (error) {
-      console.error('Erro ao buscar serviços:', error);
+      console.error('❌ Erro ao buscar serviços:', error);
       // Fallback para localStorage em caso de erro
-      const saved = localStorage.getItem('nail_services');
-      const allServices = saved ? JSON.parse(saved) : [];
-      return allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+      try {
+        console.log('🔄 Fallback para localStorage...');
+        const saved = localStorage.getItem('nail_services');
+        const allServices = saved ? JSON.parse(saved) : [];
+        console.log('📱 Serviços do localStorage (fallback):', allServices?.length || 0);
+        const filteredServices = allServices.filter((service: Service) => service.designerId === selectedDesigner.id);
+        console.log('🎯 Serviços filtrados (fallback):', filteredServices.length);
+        return filteredServices;
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback de serviços:', fallbackError);
+        return [];
+      }
     }
   };
 
   const getAppointments = useCallback(async (): Promise<Appointment[]> => {
     if (!selectedDesigner) return [];
+    console.log('🔍 Buscando agendamentos para designer:', selectedDesigner.id);
     
     try {
       // Buscar do Supabase primeiro
       const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
       const supabaseAppointments = await getSupabaseAppointments();
+      console.log('📡 Agendamentos do Supabase:', supabaseAppointments?.length || 0);
       
       // Garantir que supabaseAppointments é um array válido
       if (!Array.isArray(supabaseAppointments)) {
@@ -351,18 +460,21 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
               price: apt.price || 0
           }));
         
+        console.log('✅ Agendamentos filtrados do Supabase:', designerAppointments.length);
         if (designerAppointments.length > 0) {
           return designerAppointments;
         }
       }
     } catch (error) {
-      console.error('Erro ao buscar agendamentos do Supabase:', error);
+      console.error('❌ Erro ao buscar agendamentos do Supabase:', error);
     }
     
     // Fallback para localStorage se Supabase falhar ou não tiver dados
     try {
+      console.log('💾 Buscando agendamentos do localStorage...');
       const saved = localStorage.getItem('nail_appointments');
       const allAppointments = saved ? JSON.parse(saved) : [];
+      console.log('📱 Agendamentos do localStorage:', allAppointments?.length || 0);
       
       // Garantir que allAppointments é um array válido
       if (!Array.isArray(allAppointments)) {
@@ -370,83 +482,168 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         return [];
       }
       
-      return allAppointments.filter((apt: Appointment) => 
+      const filteredAppointments = allAppointments.filter((apt: Appointment) => 
         apt && apt.designerId === selectedDesigner.id
       );
+      console.log('🎯 Agendamentos filtrados do localStorage:', filteredAppointments.length);
+      return filteredAppointments;
     } catch (error) {
-      console.error('Erro ao buscar agendamentos do localStorage:', error);
+      console.error('❌ Erro ao buscar agendamentos do localStorage:', error);
       return [];
     }
   }, [selectedDesigner]);
 
   // Get designer's availability settings - agora retorna dias BLOQUEADOS
-  const getDesignerAvailability = async () => {
-    if (!selectedDesigner) return [];
+  const getDesignerAvailability = useCallback(async () => {
+    if (!selectedDesigner) {
+      console.log('🔍 getDesignerAvailability: Nenhum designer selecionado');
+      return [];
+    }
+    console.log('🔍 Buscando disponibilidade para designer:', selectedDesigner.id);
+    
     try {
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(selectedDesigner.id);
+      console.log('📡 Disponibilidade do Supabase:', supabaseAvailability?.length || 0);
+      console.log('📋 Dados brutos de disponibilidade:', JSON.stringify(supabaseAvailability, null, 2));
       
-      if (!Array.isArray(supabaseAvailability)) {
-        console.warn('⚠️ getDesignerAvailability: supabaseAvailability is not an array:', supabaseAvailability);
-        throw new Error('Invalid availability data from Supabase');
-      }
-      
-      // Mapear como bloqueios (isActive = dia bloqueado)
+      // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
       const mappedAvailability = supabaseAvailability
-        .filter(avail => avail && avail.specific_date)
-        .map(avail => ({
-          id: avail.id,
-          designerId: avail.designer_id,
-          dayOfWeek: avail.day_of_week,
-          startTime: avail.start_time,
-          endTime: avail.end_time,
-          isActive: !avail.is_available, // bloqueado quando is_available = false
-          specificDate: avail.specific_date
-        }));
+        .filter(avail => {
+          const isValid = avail && avail.specific_date;
+          console.log(`🔍 Filtrando availability - válido: ${isValid}`, avail);
+          return isValid;
+        })
+        .map((avail, index) => {
+          const mapped = {
+            id: avail.id,
+            designerId: avail.designer_id,
+            dayOfWeek: avail.day_of_week,
+            startTime: avail.start_time,
+            endTime: avail.end_time,
+            isActive: !avail.is_available, // isActive = bloqueio ativo (quando is_available = false)
+            specificDate: avail.specific_date
+          };
+          console.log(`🔍 Mapeando availability ${index}:`, { original: avail, mapped });
+          
+          // Verificar se os dados mapeados são válidos
+          if (!mapped.specificDate || !mapped.startTime || !mapped.endTime) {
+            console.warn('⚠️ Dados de availability mapeados incompletos:', mapped);
+          }
+          
+          // Verificar o formato da data
+          try {
+            const dateObj = new Date(mapped.specificDate);
+            console.log(`📅 Data mapeada ${index}:`, {
+              original: mapped.specificDate,
+              parsed: dateObj,
+              formatted: dateObj.toLocaleDateString('pt-BR'),
+              iso: dateObj.toISOString()
+            });
+          } catch (dateError) {
+            console.error(`❌ Erro ao processar data ${index}:`, {
+              date: mapped.specificDate,
+              error: dateError
+            });
+          }
+          
+          return mapped;
+        });
       
-      // Apenas dias bloqueados
-      const blockedDates = mappedAvailability.filter(avail => avail.isActive);
-      if (blockedDates.length > 0) {
-        return blockedDates;
-      }
+      console.log('✅ Disponibilidade mapeada:', mappedAvailability.length);
+      console.log('📋 Dados mapeados de disponibilidade (final):', JSON.stringify(mappedAvailability, null, 2));
       
-      // Fallback para localStorage: interpretar isActive como bloqueio
-      const saved = localStorage.getItem('nail_availability');
-      const allAvailability = saved ? JSON.parse(saved) : [];
-      if (!Array.isArray(allAvailability)) {
-        console.warn('⚠️ getDesignerAvailability: localStorage availability is not an array');
-        return [];
-      }
-      return allAvailability.filter((avail: any) => 
-        avail && avail.designerId === selectedDesigner.id && avail.isActive // isActive = bloqueado
-      );
+      // Verificar se há bloqueios ativos
+      const activeBlocks = mappedAvailability.filter(avail => avail.isActive);
+      console.log('🔒 Bloqueios ativos encontrados:', activeBlocks.length);
+      activeBlocks.forEach((block, index) => {
+        console.log(`🔒 Bloqueio ativo ${index}:`, {
+          date: block.specificDate,
+          start: block.startTime,
+          end: block.endTime,
+          formatted: new Date(block.specificDate + 'T00:00:00').toLocaleDateString('pt-BR')
+        });
+      });
+      
+      // Sempre retornar os dados do Supabase, nunca usar localStorage como fallback
+      return mappedAvailability;
     } catch (error) {
       console.error('❌ Erro ao buscar disponibilidade:', error);
-      try {
-        const saved = localStorage.getItem('nail_availability');
-        const allAvailability = saved ? JSON.parse(saved) : [];
-        return allAvailability.filter((avail: any) => 
-          avail && avail.designerId === selectedDesigner.id && avail.isActive
-        );
-      } catch (fallbackError) {
-        console.error('❌ Erro no fallback de disponibilidade:', fallbackError);
-        return [];
-      }
+      return [];
     }
-  };
+  }, [selectedDesigner]);
 
-  // Check if a specific date is available - disponível se NÃO estiver bloqueada
-  const isDateAvailable = async (date: string) => {
-    const blocked = await getDesignerAvailability();
-    if (blocked.length === 0) return true; // sem bloqueios, calendário livre
+  // Get blocked dates for display to client
+  const getBlockedDatesPreview = useCallback(async () => {
+    if (!selectedDesigner) {
+      console.log('🔍 getBlockedDatesPreview: Nenhum designer selecionado');
+      return [];
+    }
+    console.log('🔍 Buscando prévia de datas bloqueadas para designer:', selectedDesigner.id);
     
-    const normalizedDate = date.split('T')[0];
-    const isBlocked = blocked.some((avail: any) => {
-      if (!avail || !avail.specificDate) return false;
-      const normalizedAvailDate = avail.specificDate.split('T')[0];
-      return normalizedAvailDate === normalizedDate;
+    try {
+      const blocked = await getDesignerAvailability();
+      console.log('📡 Datas bloqueadas encontradas:', blocked?.length || 0);
+      console.log('📋 Dados de bloqueio para prévia (completo):', JSON.stringify(blocked, null, 2));
+      
+      const filteredBlocked = blocked.filter(avail => {
+        const isValid = avail.isActive;
+        console.log(`🔍 Filtrando bloqueio - válido: ${isValid}`, avail);
+        return isValid;
+      });
+      
+      console.log('📋 Bloqueios ativos filtrados:', filteredBlocked.length);
+      
+      const blockedDates = filteredBlocked.map((avail, index) => {
+        const mapped = {
+          date: avail.specificDate,
+          isFullDay: avail.startTime === '00:00' && avail.endTime === '23:59',
+          startTime: avail.startTime,
+          endTime: avail.endTime
+        };
+        console.log(`🔍 Mapeando bloqueio ${index}:`, { original: avail, mapped });
+        return mapped;
+      });
+      
+      console.log('✅ Datas bloqueadas filtradas:', blockedDates.length);
+      console.log('📋 Dados filtrados para prévia (final):', JSON.stringify(blockedDates, null, 2));
+      return blockedDates;
+    } catch (error) {
+      console.error('❌ Erro ao buscar datas bloqueadas:', error);
+      return [];
+    }
+  }, [selectedDesigner, getDesignerAvailability]);
+
+  // Check if a specific date and time slot is available - disponível se NÃO estiver bloqueada
+  const isDateAvailable = async (date: string, checkStartTime: string, checkEndTime: string) => {
+    const blocked = await getDesignerAvailability();
+    
+    // Verificar se há algum bloqueio ativo que se sobreponha ao horário solicitado
+    const isBlocked = blocked.some(avail => {
+      if (!avail.isActive) return false; // Ignorar bloqueios inativos
+
+      // Se for um bloqueio de dia inteiro (00:00-23:59)
+      if (avail.specificDate === date && avail.startTime === '00:00' && avail.endTime === '23:59') {
+        return true;
+      }
+
+      // Se for um bloqueio de horário específico
+      if (avail.specificDate === date) {
+        // Converter horários para um formato comparável (ex: minutos desde a meia-noite)
+        const blockedStart = parseInt(avail.startTime.split(':')[0]) * 60 + parseInt(avail.startTime.split(':')[1]);
+        const blockedEnd = parseInt(avail.endTime.split(':')[0]) * 60 + parseInt(avail.endTime.split(':')[1]);
+        const requestedStart = parseInt(checkStartTime.split(':')[0]) * 60 + parseInt(checkStartTime.split(':')[1]);
+        const requestedEnd = parseInt(checkEndTime.split(':')[0]) * 60 + parseInt(checkEndTime.split(':')[1]);
+
+        // Verificar sobreposição - corrigido para verificar corretamente a sobreposição
+        return (
+          (requestedStart < blockedEnd && requestedEnd > blockedStart)
+        );
+      }
+      return false;
     });
-    return !isBlocked;
+
+    return !isBlocked; // Retorna true se não houver bloqueio, false se houver
   };
 
   const saveAppointment = async (appointment: Appointment) => {
@@ -471,6 +668,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const savedAppointment = await createAppointment(supabaseAppointment);
       
       if (savedAppointment) {
+        console.log("Agendamento salvo com sucesso:", savedAppointment);
         // Sucesso no Supabase - também salvar no localStorage para cache
         const saved = localStorage.getItem('nail_appointments');
         const allAppointments = saved ? JSON.parse(saved) : [];
@@ -483,23 +681,23 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         }));
       
         // 🆕 NOVO: Enviar notificação imediata e agendar lembretes
-        await sendAppointmentNotifications(savedAppointment);
+        const webhookSent = await sendToN8nWebhook(savedAppointment);
+        if (webhookSent) {
+          console.log("Dados do agendamento enviados para o n8n com sucesso.");
+        } else {
+          console.error("Falha ao enviar dados do agendamento para o n8n.");
+        }
       
         console.log('✅ Agendamento salvo no Supabase e sincronizado');
         return savedAppointment;
       } else {
         // Horário já ocupado - retornar null silenciosamente (sem aviso de conflito)
-        console.log('ℹ️ Horário não disponível - agendamento não foi salvo');
-        return null;
+        console.log('Horário não disponível - agendamento não foi salvo');
+        return null; // Return null if not saved
       }
     } catch (error) {
-      // Erro de conexão - usar localStorage apenas como fallback temporário
-      console.log('⚠️ Erro de conexão - usando localStorage como fallback temporário');
-      const saved = localStorage.getItem('nail_appointments');
-      const allAppointments = saved ? JSON.parse(saved) : [];
-      allAppointments.push(appointment);
-      localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
-      return appointment;
+      console.error("Erro ao salvar agendamento:", error);
+      return null; // Adicionei um return null aqui para garantir que a função sempre retorne algo em caso de erro.
     }
   };
 
@@ -574,6 +772,7 @@ Você tem um novo agendamento:
   return true; // sem designer: não é um erro crítico neste contexto
 };
 
+
 // 🆕 NOVA FUNÇÃO: Agendar lembretes
 const scheduleReminders = async (appointment: any): Promise<boolean> => {
   const ok24 = await sendToN8nWebhook({
@@ -632,73 +831,37 @@ const calculateReminderTime = (date: string, time: string, hoursBefore: number):
   }
 };
 
-// 🆕 NOVA FUNÇÃO: Enviar dados para webhook do n8n
 const sendToN8nWebhook = async (data: any): Promise<boolean> => {
+  const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+
+  if (!webhookUrl) {
+    console.error("VITE_N8N_WEBHOOK_URL is not defined. Webhook call skipped.");
+    return false;
+  }
+
   try {
-    // URL do webhook do n8n (você precisará configurar isso)
-    // 🆕 NOVO: Usar variável de ambiente ou URL padrão
-    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
-    
-    // Para desenvolvimento local, usar o proxy do Vite
-    // Se for uma URL completa, usar diretamente; caso contrário, usar o proxy
-    const url = webhookUrl.startsWith('http') ? webhookUrl : `/webhook${webhookUrl.split('/webhook')[1] || ''}`;
-    
-    // Configuração de autenticação básica para n8n
-    const username = import.meta.env.VITE_N8N_USERNAME || 'seu_usuario_aqui';
-    const password = import.meta.env.VITE_N8N_PASSWORD || 'sua_senha_aqui';
-    const credentials = btoa(`${username}:${password}`);
-    
-    const response = await fetch(url, {
-      method: 'POST',
+    console.log("Sending data to n8n webhook:", data);
+    const response = await fetch(webhookUrl, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${credentials}`
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
-    // 🆕 Diagnóstico: capturar corpo de erro para entender o 500
-    if (!response.ok) {
-      let errorBody: any = '';
-      try {
-        // tenta JSON
-        errorBody = await response.json();
-      } catch {
-        try {
-          // tenta texto
-          errorBody = await response.text();
-        } catch {
-          errorBody = '<sem corpo>';
-        }
-      }
-      console.error('❌ n8n respondeu com erro', {
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        body: errorBody
-      });
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (response.ok) {
+      console.log("Webhook call successful!");
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error(`Webhook call failed: ${response.status} - ${errorText}`);
+      return false;
     }
-
-    // 🆕 Sucesso: tentar JSON, se não der, tentar texto
-    let result: any = null;
-    try {
-      result = await response.json();
-    } catch {
-      try {
-        result = await response.text();
-      } catch {
-        result = null;
-      }
-    }
-    console.log('✅ Dados enviados para n8n:', result ?? '<sem corpo>');
-    return true;
   } catch (error) {
-    console.error('❌ Erro ao enviar para n8n:', error);
-    // Em caso de erro, salvar em uma fila para reprocessamento
-    await saveToRetryQueue(data);
-    return false; // ← Indicar falha
+    console.error("Error sending data to n8n webhook:", error);
+    return false;
   }
+
 };
 
 // 🆕 NOVA FUNÇÃO: Salvar em fila para reprocessamento
@@ -724,31 +887,56 @@ const defaultTimeSlots = [
 ];
 
 const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
+  const cacheBreaker = Date.now().toString(); // Define cacheBreaker aqui
+  console.log(`🔄 [${cacheBreaker}] Iniciando getAvailableTimeSlots`, { 
+    selectedDate, 
+    selectedDesignerId: selectedDesigner?.id,
+    selectedDesignerName: selectedDesigner?.name
+  });
+  
   if (!selectedDate || !selectedDesigner) {
+    console.log(`🔄 [${cacheBreaker}] Sem data ou designer selecionado, retornando horários padrão`);
     return defaultTimeSlots;
   }
 
-  // Checar bloqueio antes de buscar agendamentos
+  // Verificar o formato da data selecionada
+  console.log(`📅 [${cacheBreaker}] Formato da data selecionada:`, {
+    rawDate: selectedDate,
+    type: typeof selectedDate,
+    isString: typeof selectedDate === 'string',
+    length: typeof selectedDate === 'string' ? selectedDate.length : 'N/A'
+  });
+
+  // Checar bloqueios específicos de horário antes de buscar agendamentos
   try {
+    console.log(`🔄 [${cacheBreaker}] Buscando disponibilidade do designer`);
     const blocked = await getDesignerAvailability();
-    const normalizedSelectedDate = selectedDate;
-    const isBlocked = Array.isArray(blocked) && blocked.some((avail: any) => {
-      if (!avail || !avail.specificDate) return false;
-      const normalizedAvailDate = String(avail.specificDate).split('T')[0];
-      return normalizedAvailDate === normalizedSelectedDate;
+    console.log(`🔄 [${cacheBreaker}] Disponibilidade carregada:`, blocked?.length || 0);
+    
+    // Normalizar a data selecionada para garantir o formato correto
+    const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
+    console.log(`📅 [${cacheBreaker}] Data selecionada normalizada:`, normalizedSelectedDate);
+
+    // Check for a full-day block first
+    const dayBlockedCompletely = blocked.some(avail => {
+      const isFullDayBlock = avail.specificDate === normalizedSelectedDate && 
+                            avail.startTime === '00:00' && 
+                            avail.endTime === '23:59' && 
+                            avail.isActive;
+      console.log(`🔍 [${cacheBreaker}] Verificando bloqueio de dia inteiro:`, {
+        dateMatch: avail.specificDate === normalizedSelectedDate,
+        timeMatch: avail.startTime === '00:00' && avail.endTime === '23:59',
+        isActive: avail.isActive,
+        isFullDayBlock
+      });
+      return isFullDayBlock;
     });
-    if (isBlocked) {
-      console.log('🚫 Dia bloqueado pela designer; sem horários disponíveis:', normalizedSelectedDate);
+
+    if (dayBlockedCompletely) {
+      // If the entire day is blocked, no slots are available
+      console.log(`🚫 [${cacheBreaker}] Dia inteiro bloqueado`);
       return [];
     }
-  } catch (err) {
-    // Silencioso: em erro, segue para lógica padrão
-  }
-
-  try {
-    // Cache breaker para forçar nova busca
-    const cacheBreaker = Date.now() + Math.random();
-    console.log(`🔄 [${cacheBreaker}] Buscando horários disponíveis para ${selectedDate} - Designer: ${selectedDesigner.name}`);
 
     let appointments: any[] = [];
     let retryCount = 0;
@@ -788,6 +976,7 @@ const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
     console.log(`🚫 [${cacheBreaker}] Agendamentos cancelados:`, appointments.length - activeAppointments.length);
     
     // Log detalhado dos agendamentos
+
     activeAppointments.forEach(apt => {
       console.log(`   ✓ Ativo: ${apt.time} - Status: ${apt.status}`);
     });
@@ -826,16 +1015,152 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status}`);
     });
 
-    // Extrair e normalizar horários ocupados (remover segundos se existirem)
+    // Extrair e normalizar horários ocupados por agendamentos (remover segundos se existirem)
     const bookedTimes = activeAppointments.map(apt => {
       // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
       return apt.time.length > 5 ? apt.time.substring(0, 5) : apt.time;
     });
-    console.log(`⏰ [${cacheBreaker}] Horários ocupados (normalizados):`, bookedTimes);
+    console.log(`⏰ [${cacheBreaker}] Horários ocupados por agendamentos (normalizados):`, bookedTimes);
+
+    // Verificar bloqueios de disponibilidade para a data selecionada
+    const blockedTimes: string[] = [];
+    
+    // Verificar cada bloqueio ativo para a data selecionada
+    blocked.forEach((avail: any) => {
+      if (!avail || !avail.specificDate || !avail.isActive) {
+        console.log(`🔍 [${cacheBreaker}] Bloqueio inválido ou inativo, pulando:`, avail);
+        return;
+      }
+      
+      try {
+        // Normalizar as datas para comparação (remover informações de hora se existirem)
+        const normalizedAvailDate = new Date(avail.specificDate).toISOString().split('T')[0];
+        const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
+        
+        // Adicionar log detalhado das datas sendo comparadas
+        console.log(`🔍 [${cacheBreaker}] Comparando datas:`, {
+          bloqueioDate: avail.specificDate,
+          bloqueioDateNormalizado: normalizedAvailDate,
+          selecionadaDate: selectedDate,
+          selecionadaDateNormalizado: normalizedSelectedDate,
+          saoIguais: normalizedAvailDate === normalizedSelectedDate
+        });
+        
+        if (normalizedAvailDate === normalizedSelectedDate) {
+          console.log(`✅ [${cacheBreaker}] Data corresponde - Verificando bloqueio:`, {
+            startTime: avail.startTime,
+            endTime: avail.endTime,
+            isFullDay: avail.startTime === '00:00' && avail.endTime === '23:59'
+          });
+          // Se for um bloqueio de dia inteiro
+          if (avail.startTime === '00:00' && avail.endTime === '23:59') {
+            // Adicionar todos os horários padrão como bloqueados
+            blockedTimes.push(...defaultTimeSlots);
+            console.log(`🔒 [${cacheBreaker}] Dia inteiro bloqueado - todos os horários bloqueados`);
+          } else {
+            // Verificar sobreposição com horários padrão
+            console.log(`🔍 [${cacheBreaker}] Verificando bloqueios parciais para:`, {
+              startTime: avail.startTime,
+              endTime: avail.endTime
+            });
+            
+            defaultTimeSlots.forEach(time => {
+              try {
+                // Converter horários para minutos desde a meia-noite para comparação
+                const timeParts = time.split(':').map(Number);
+                const timeMinutes = timeParts[0] * 60 + timeParts[1];
+                
+                const startParts = avail.startTime.split(':').map(Number);
+                const startMinutes = startParts[0] * 60 + startParts[1];
+                
+                const endParts = avail.endTime.split(':').map(Number);
+                const endMinutes = endParts[0] * 60 + endParts[1];
+                
+                console.log(`🔍 [${cacheBreaker}] Verificando sobreposição:`, {
+                  horarioPadrao: time,
+                  horarioPadraoMinutos: timeMinutes,
+                  bloqueioInicio: avail.startTime,
+                  bloqueioInicioMinutos: startMinutes,
+                  bloqueioFim: avail.endTime,
+                  bloqueioFimMinutos: endMinutes,
+                  condicao1: timeMinutes >= startMinutes,
+                  condicao2: timeMinutes < endMinutes,
+                  estaBloqueado: timeMinutes >= startMinutes && timeMinutes < endMinutes
+                });
+                
+                // Verificar se o horário padrão se sobrepõe com o bloqueio
+                // Corrigido: verificar se o horário está dentro do intervalo bloqueado
+                if (timeMinutes >= startMinutes && timeMinutes < endMinutes) {
+                  blockedTimes.push(time);
+                  console.log(`🔒 [${cacheBreaker}] Horário ${time} bloqueado (entre ${avail.startTime} e ${avail.endTime})`);
+                }
+              } catch (timeError) {
+                console.error(`❌ [${cacheBreaker}] Erro ao processar horário:`, {
+                  time: time,
+                  startTime: avail.startTime,
+                  endTime: avail.endTime,
+                  error: timeError
+                });
+              }
+            });
+          }
+        }
+      } catch (dateError) {
+        console.error(`❌ [${cacheBreaker}] Erro ao processar datas:`, {
+          specificDate: avail.specificDate,
+          selectedDate: selectedDate,
+          error: dateError
+        });
+      }
+    });
+    
+    console.log(`🚫 [${cacheBreaker}] Horários bloqueados para a data selecionada:`, blockedTimes);
 
     // Filtrar horários disponíveis
-    const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
-    console.log(`✨ [${cacheBreaker}] Horários disponíveis:`, availableSlots);
+    const availableTimes = defaultTimeSlots.filter(time => {
+      return !blockedTimes.includes(time) && !bookedTimes.includes(time);
+    });
+    console.log(`🚫 [${cacheBreaker}] Horários bloqueados por disponibilidade:`, blockedTimes);
+    
+    // Combinar horários ocupados por agendamentos e bloqueios de disponibilidade
+    // Remover duplicatas dos horários bloqueados
+    const uniqueBlockedTimes = [...new Set([...bookedTimes, ...blockedTimes])];
+    
+    console.log(`📋 [${cacheBreaker}] Horários ocupados:`, bookedTimes);
+    console.log(`📋 [${cacheBreaker}] Horários bloqueados:`, blockedTimes);
+    console.log(`📋 [${cacheBreaker}] Horários bloqueados únicos:`, uniqueBlockedTimes);
+    
+    // Filtrar horários disponíveis
+    const availableSlots = defaultTimeSlots.filter(time => {
+      const isBlocked = uniqueBlockedTimes.includes(time);
+      console.log(`🔍 [${cacheBreaker}] Verificando disponibilidade do horário ${time}:`, {
+        isBlocked,
+        booked: bookedTimes.includes(time),
+        blocked: blockedTimes.includes(time),
+        uniqueBlocked: uniqueBlockedTimes.includes(time)
+      });
+      return !isBlocked;
+    });
+    console.log(`✨ [${cacheBreaker}] Horários disponíveis FINAIS:`, availableSlots);
+    
+    // Verificação adicional - garantir que os horários bloqueados não estão nos disponíveis
+    const verification = defaultTimeSlots.filter(time => {
+      const shouldBeAvailable = !uniqueBlockedTimes.includes(time);
+      const isActuallyAvailable = availableSlots.includes(time);
+      if (shouldBeAvailable !== isActuallyAvailable) {
+        console.warn(`⚠️ [${cacheBreaker}] Inconsistência na disponibilidade do horário ${time}:`, {
+          shouldBeAvailable,
+          isActuallyAvailable
+        });
+      }
+      return shouldBeAvailable;
+    });
+    
+    if (JSON.stringify(verification.sort()) !== JSON.stringify(availableSlots.sort())) {
+      console.warn(`⚠️ [${cacheBreaker}] Inconsistência detectada nos horários disponíveis`);
+      console.log(`📋 [${cacheBreaker}] Verificação:`, verification);
+      return verification;
+    }
     
     // Log dos horários liberados (cancelados)
     const freedTimes = defaultTimeSlots.filter(time => {
@@ -856,11 +1181,20 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
 
   // Load available time slots when date is selected
   useEffect(() => {
+    console.log('🔄 useEffect de carregamento de horários chamado:', {
+      isInitialized,
+      selectedDate,
+      step,
+      forceReload
+    });
+    
     if (!isInitialized) {
+      console.log('🔄 useEffect: Aplicação ainda não inicializada');
       return;
     }
     
     if (selectedDate && step === 4) {
+      console.log('🔄 useEffect: Data selecionada e no passo 4, carregando horários');
       const loadTimeSlots = async () => {
         setLoadingTimeSlots(true);
         
@@ -868,7 +1202,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
           // Forçar nova consulta sem cache
           const slots = await getAvailableTimeSlots();
           
-          const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+          const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
           
           // Garantir que sempre temos um array válido
           const finalSlots = Array.isArray(slots) && slots.length >= 0 ? slots : defaultTimeSlots;
@@ -877,7 +1211,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
           setAvailableTimeSlots(finalSlots);
         } catch (error) {
           console.error('Erro ao carregar horários:', error);
-          const defaultTimeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'];
+          const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
           setAvailableTimeSlots(defaultTimeSlots);
         } finally {
           setLoadingTimeSlots(false);
@@ -886,6 +1220,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       
       loadTimeSlots();
     } else {
+      console.log('🔄 useEffect: Resetando horários');
       // Reset time slots when not on step 4 or no date selected
       setAvailableTimeSlots([]);
       setLoadingTimeSlots(false);
@@ -938,7 +1273,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       
       const existingClient = appointments.find(apt => apt && apt.clientName === name);
       if (existingClient) {
-        setClientPhone(existingClient.clientPhone || '');
+        setClientPhone(formatPhoneNumber(existingClient.clientPhone || '')); // Aplica a formatação aqui
         setClientEmail(existingClient.clientEmail || '');
       }
     } catch (error) {
@@ -1016,6 +1351,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   };
 
   const resetForm = () => {
+    console.log('🔄 Resetando formulário');
     setIsResetting(true); // Marca que estamos resetando
     setShowConfirmation(false);
     
@@ -1032,7 +1368,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       // Se há uma cliente logada, preencher automaticamente os campos
       if (loggedClient) {
         setClientName(loggedClient.name);
-        setClientPhone(loggedClient.phone);
+        setClientPhone(formatPhoneNumber(loggedClient.phone)); // Aplica a formatação aqui
         setClientEmail(loggedClient.email || '');
       } else {
         setClientName('');
@@ -1044,6 +1380,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       
       // Remove a flag de reset
       setIsResetting(false);
+      console.log('✅ Formulário resetado');
     }, 50);
   };
 
@@ -1282,11 +1619,13 @@ Aguardo confirmação!`;
 
   // Show loading spinner during initialization
   if (!isInitialized) {
+    console.log('⏳ Componente ainda não inicializado');
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/70 mx-auto mb-4"></div>
           <p className="text-white/70">Carregando...</p>
+          <p className="text-xs text-white/50 mt-2">Debug: isInitialized = {String(isInitialized)}</p>
         </div>
       </div>
     );
@@ -1334,18 +1673,14 @@ Aguardo confirmação!`;
                     <h3 className="text-lg font-semibold text-white">1. Escolha sua Nail Designer</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(() => {
-        console.log('🎨 Renderizando step 1 - designersLoaded:', designersLoaded, 'designers.length:', designers.length);
-        return null;
-      })()}
-      {!designersLoaded ? (
-        <div className="col-span-full text-center text-white py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-          Carregando designers...
-          <p className="text-xs text-white/50 mt-2">Debug: designersLoaded = {String(designersLoaded)}</p>
-          <p className="text-xs text-white/50">Designers: {designers.length}</p>
-        </div>
-      ) : designers.length === 0 ? (
+                    {designersLoaded === false ? (
+                      <div className="col-span-full text-center text-white py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                        <p>Carregando designers...</p>
+                        <p className="text-xs text-white/50 mt-2">Debug: designersLoaded = {String(designersLoaded)}</p>
+                        <p className="text-xs text-white/50">Designers: {designers.length}</p>
+                      </div>
+                    ) : designers.length === 0 ? (
                       <div className="col-span-full text-center text-white py-8">
                         <p>Nenhuma nail designer encontrada.</p>
                         <p className="text-sm text-white/70 mt-2">Verifique se há designers cadastradas no sistema.</p>
@@ -1549,46 +1884,71 @@ Aguardo confirmação!`;
                       value={selectedDate}
                       onChange={(e) => {
                         const selectedDateValue = e.target.value;
-                        // Se houver bloqueios, impedir avanço em dia bloqueado
-                        if (selectedDateValue && Array.isArray(availability) && availability.length > 0) {
-                          const normalizedSelectedDate = selectedDateValue;
-                          const isBlocked = availability.some((avail: any) => {
-                            if (!avail || !avail.specificDate) return false;
-                            const normalizedAvailDate = String(avail.specificDate).split('T')[0];
-                            return normalizedAvailDate === normalizedSelectedDate;
-                          });
-                          if (isBlocked) {
-                            alert('Este dia está bloqueado pela designer e não pode ser agendado.');
-                            return;
+                        // Verificar bloqueios usando a função getDesignerAvailability
+                        const checkDateBlocked = async () => {
+                          if (selectedDateValue && selectedDesigner) {
+                            const blocked = await getDesignerAvailability();
+                            const normalizedSelectedDate = selectedDateValue.split('T')[0];
+                            
+                            // Verificar se há algum bloqueio ativo para a data selecionada
+                            const isBlocked = blocked.some((avail: any) => {
+                              if (!avail || !avail.specificDate || !avail.isActive) return false;
+                              const normalizedAvailDate = String(avail.specificDate).split('T')[0];
+                              
+                              // Se for um bloqueio de dia inteiro (00:00-23:59)
+                              if (normalizedAvailDate === normalizedSelectedDate && 
+                                  avail.startTime === '00:00' && 
+                                  avail.endTime === '23:59') {
+                                return true;
+                              }
+                              
+                              // Se for um bloqueio parcial, ainda permitir avançar para o step 4
+                              // onde serão filtrados os horários específicos
+                              return false;
+                            });
+                            
+                            if (isBlocked) {
+                              alert('Este dia está completamente bloqueado pela designer e não pode ser agendado.');
+                              return;
+                            }
                           }
-                        }
-                        setSelectedDate(selectedDateValue);
-                        if (selectedDateValue) setStep(4);
+                          setSelectedDate(selectedDateValue);
+                          if (selectedDateValue) setStep(4);
+                        };
+                        
+                        checkDateBlocked();
                       }}
                       min={new Date().toISOString().split('T')[0]}
                       className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                     />
-                    {loadingAvailability ? (
+                  {loadingAvailability ? (
                       <div className="mt-3 p-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
                         <div className="flex items-center justify-center py-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white/70 mr-2"></div>
                           <p className="text-white/70 text-sm">Carregando disponibilidade...</p>
                         </div>
                       </div>
-                    ) : Array.isArray(availability) && availability.length > 0 ? (
-                      <div className="mt-3 p-3 bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl">
-                        <p className="text-red-100 text-sm font-medium mb-2">🚫 Dias indisponíveis (bloqueados):</p>
-                        <div className="flex flex-wrap gap-2">
-                          {availability.filter(avail => avail && avail.specificDate).map((avail: any) => (
-                            <span key={avail.id} className="bg-red-400/30 text-red-100 px-2 py-1 rounded-lg text-xs">
-                              {new Date(String(avail.specificDate) + 'T00:00:00').toLocaleDateString('pt-BR')}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
                     ) : (
-                      <div className="mt-3 p-3 bg-green-500/20 backdrop-blur-sm border border-green-400/30 rounded-xl">
-                        <p className="text-green-100 text-sm">✅ Calendário liberado. Nenhum dia bloqueado pela designer.</p>
+                      <div className="mt-3 p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm border border-purple-400/30 rounded-xl">
+                        <p className="text-purple-100 text-sm font-medium mb-2">📆 Calendário atualizado</p>
+                        <p className="text-purple-200 text-xs mb-3">Os dias e horários bloqueados pela designer já estão refletidos no calendário abaixo.</p>
+                        
+                        {/* Preview de dias bloqueados */}
+                        {blockedDatesPreview.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-purple-400/20">
+                            <p className="text-purple-100 text-xs font-medium mb-2">Dias bloqueados pela designer:</p>
+                            <div className="max-h-20 overflow-y-auto">
+                              {blockedDatesPreview.map((blocked, index) => (
+                                <div key={index} className="text-purple-200 text-xs mb-1">
+                                  {blocked.isFullDay 
+                                    ? `📅 ${new Date(blocked.date + 'T00:00:00').toLocaleDateString('pt-BR')} (dia inteiro bloqueado)`
+                                    : `⏰ ${new Date(blocked.date + 'T00:00:00').toLocaleDateString('pt-BR')} das ${blocked.startTime} às ${blocked.endTime}`
+                                  }
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1638,6 +1998,7 @@ Aguardo confirmação!`;
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                      {console.log('🔍 Renderizando horários disponíveis:', availableTimeSlots)}
                       {Array.isArray(availableTimeSlots) && availableTimeSlots.length > 0 ? (
                         availableTimeSlots.map((time) => (
                           <button
@@ -1714,7 +2075,7 @@ Aguardo confirmação!`;
                       <input
                         type="tel"
                         value={clientPhone}
-                        onChange={(e) => setClientPhone(e.target.value)}
+                        onChange={(e) => setClientPhone(formatPhoneNumber(e.target.value))} // Aplica a formatação aqui
                         placeholder="(11) 99999-9999"
                         className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                         required

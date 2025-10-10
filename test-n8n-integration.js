@@ -4,9 +4,13 @@
 // Substitua pela URL real do seu webhook n8n (Production URL)
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5679/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
 
-// 🆕 Adicione credenciais Basic Auth (mesmos valores definidos nas credenciais do Webhook)
-const N8N_USERNAME = process.env.N8N_USERNAME || 'seu_usuario_aqui';
-const N8N_PASSWORD = process.env.N8N_PASSWORD || 'sua_senha_aqui';
+// 🔽 **ALTERAÇÃO AQUI** 🔽
+// Use as mesmas variáveis do docker-compose.yml
+const N8N_USERNAME = process.env.N8N_BASIC_AUTH_USER;
+const N8N_PASSWORD = process.env.N8N_BASIC_AUTH_PASSWORD;
+// 🔼 **FIM DA ALTERAÇÃO** 🔼
+
+// O resto do código continua igual para gerar o token
 const BASIC_TOKEN = Buffer.from(`${N8N_USERNAME}:${N8N_PASSWORD}`).toString('base64');
 
 // 🆕 Payload de teste compatível com o workflow

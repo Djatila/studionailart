@@ -71,7 +71,8 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   
   console.log('🔍 [DEBUG] Estado inicial do componente AdminDashboard:', { 
-    designerId: designer.id,
+    // Removido designerId pois não existe na interface Client
+    // designerId: designer.id,
     clientType, 
     clientsCount: clients.length,
     servicesCount: services.length,
@@ -185,14 +186,13 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
           name: client.name,
           email: client.email || '',
           phone: client.phone || '',
-          designerId: designer.id, // Associar ao designer atual
-          createdAt: client.created_at || client.createdAt || new Date().toISOString(),
-          lastAppointment: client.lastAppointment || null
+          password: client.password || '',
+          isActive: client.is_active || client.isActive || true,
+          createdAt: client.created_at || client.createdAt || new Date().toISOString()
         };
         console.log('🔍 Cliente convertido:', convertedClient);
         return convertedClient;
       });
-      
       console.log('📊 Todos os clientes convertidos:', convertedClients);
       setClients(convertedClients);
     } catch (err) {
@@ -223,7 +223,8 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         phone: client.phone,
         password: 'default123', // Senha padrão para clientes criados manualmente
         is_active: true,
-        designer_id: client.designerId
+        // Removido designer_id pois não existe na interface Client
+        // designer_id: client.designerId
       };
       
       // Usar a função createClientRecord para salvar no Supabase
@@ -289,7 +290,8 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
 
   const findClientByPhone = (phone: string): Client | null => {
     const clients = getClients();
-    return clients.find(c => c.phone === phone && c.designerId === designer.id) || null;
+    // Verificar se o cliente tem o campo designerId ou se precisamos filtrar de outra forma
+    return clients.find(c => c.phone === phone) || null;
   };
 
   const findClientsByName = (name: string): Client[] => {
@@ -367,9 +369,9 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         name: newClientData.name,
         phone: newClientData.phone,
         email: newClientData.email,
-        designerId: designer.id,
-        createdAt: existingClient?.createdAt || new Date().toISOString(),
-        lastAppointment: new Date().toISOString()
+        password: 'default123',
+        isActive: true,
+        createdAt: existingClient?.createdAt || new Date().toISOString()
       };
       
       await saveClient(client);
@@ -385,7 +387,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         date: newClientData.date,
         time: newClientData.time,
         price: parseFloat(newClientData.price),
-        status: 'confirmed', // Definir como confirmado por padrão em agendamento manual
+        status: 'confirmed' as const, // Definir como confirmado por padrão em agendamento manual
         created_at: new Date().toISOString()
       };
 
@@ -665,13 +667,15 @@ Nos vemos em breve! 💖`;
   const todayAppointments = appointments.filter(apt => apt.date === selectedDate);
   const upcomingAppointments = appointments.filter(apt => apt.date > selectedDate);
   
-  // Get next 7 days appointments
+  // Get next 7 days appointments - filtrar apenas agendamentos confirmados
   const nextWeekAppointments = appointments.filter(apt => {
+    // Verificar se o agendamento está confirmado antes de incluir na lista
+    const isConfirmed = apt.status === 'confirmed';
     const aptDate = new Date(apt.date + 'T00:00:00');
     const today = new Date(selectedDate);
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
-    return aptDate > today && aptDate <= nextWeek;
+    return isConfirmed && aptDate > today && aptDate <= nextWeek;
   });
 
   // Monthly clients
@@ -733,18 +737,55 @@ Nos vemos em breve! 💖`;
       
       console.log(`📊 [${cacheBreaker}] Agendamentos ativos (não cancelados):`, activeAppointments.length);
       
-      // Extrair horários ocupados
+      // Extrair horários ocupados por agendamentos
       const bookedTimes = activeAppointments.map(apt => {
         // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
         return apt.time.length > 5 ? apt.time.substring(0, 5) : apt.time;
       });
-      console.log(`⏰ [${cacheBreaker}] Horários ocupados (normalizados):`, bookedTimes);
+      console.log(`⏰ [${cacheBreaker}] Horários ocupados por agendamentos (normalizados):`, bookedTimes);
 
       // Horários padrão
       const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
       
+      // Verificar bloqueios de disponibilidade para a data selecionada
+      const blockedTimes = designerAvailability
+        .filter((avail: any) => {
+          if (!avail || !avail.specificDate || !avail.isActive) return false;
+          const normalizedAvailDate = String(avail.specificDate).split('T')[0];
+          const normalizedSelectedDate = selectedDate.split('T')[0];
+          return normalizedAvailDate === normalizedSelectedDate;
+        })
+        .map((avail: any) => {
+          // Para bloqueios de horários específicos, retornar o horário de início
+          if (avail.startTime !== '00:00' || avail.endTime !== '23:59') {
+            return avail.startTime;
+          }
+          // Para bloqueios de dia inteiro, retornar todos os horários
+          return null;
+        })
+        .filter(time => time !== null);
+      
+      console.log(`🚫 [${cacheBreaker}] Horários bloqueados por disponibilidade:`, blockedTimes);
+      
+      // Se há um bloqueio de dia inteiro, nenhum horário está disponível
+      const hasFullDayBlock = designerAvailability.some((avail: any) => {
+        if (!avail || !avail.specificDate || !avail.isActive) return false;
+        const normalizedAvailDate = String(avail.specificDate).split('T')[0];
+        const normalizedSelectedDate = selectedDate.split('T')[0];
+        return normalizedAvailDate === normalizedSelectedDate && 
+               avail.startTime === '00:00' && avail.endTime === '23:59';
+      });
+      
+      if (hasFullDayBlock) {
+        console.log(`🚫 [${cacheBreaker}] Dia inteiro bloqueado`);
+        return [];
+      }
+      
+      // Combinar horários ocupados por agendamentos e bloqueios de disponibilidade
+      const allBlockedTimes = [...bookedTimes, ...blockedTimes];
+      
       // Filtrar horários disponíveis
-      const availableSlots = defaultTimeSlots.filter(time => !bookedTimes.includes(time));
+      const availableSlots = defaultTimeSlots.filter(time => !allBlockedTimes.includes(time));
       console.log(`✨ [${cacheBreaker}] Horários disponíveis:`, availableSlots);
       
       return availableSlots;
@@ -752,7 +793,7 @@ Nos vemos em breve! 💖`;
       console.error('Erro ao buscar horários disponíveis:', err);
       return [];
     }
-  }, [newClientData.date, designer.id]);
+  }, [newClientData.date, designer.id, designerAvailability]);
 
   // Função para carregar disponibilidade da designer
   const loadDesignerAvailability = async () => {
@@ -760,14 +801,26 @@ Nos vemos em breve! 💖`;
       setLoadingAvailability(true);
       console.log('🔄 Carregando disponibilidade para designer:', designer.id);
       
-      const availability = await getNailDesignerById(designer.id);
-      console.log('✅ Disponibilidade recebida:', availability);
+      // Carregar disponibilidade do Supabase
+      const { availabilityService } = await import('../utils/supabaseUtils');
+      const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
       
-      if (availability) {
-        setDesignerAvailability(availability.availability || []);
-      } else {
-        console.error('❌ Designer não encontrado:', designer.id);
-      }
+      // Mapear campos do Supabase para o formato esperado
+      // IMPORTANTE: is_available = true significa DISPONÍVEL, então isActive = !is_available significa BLOQUEADO
+      const mappedAvailability = supabaseAvailability
+        .filter((avail: any) => avail && avail.specific_date)
+        .map((avail: any) => ({
+          id: avail.id,
+          designerId: avail.designer_id,
+          dayOfWeek: avail.day_of_week,
+          startTime: avail.start_time,
+          endTime: avail.end_time,
+          isActive: !avail.is_available, // isActive = bloqueio ativo (quando is_available = false)
+          specificDate: avail.specific_date
+        }));
+      
+      console.log('📊 Disponibilidade carregada:', mappedAvailability);
+      setDesignerAvailability(mappedAvailability);
     } catch (err) {
       console.error('Erro ao carregar disponibilidade:', err);
       setError('Erro ao carregar disponibilidade');
@@ -1020,15 +1073,43 @@ Você tem um novo agendamento:
   };
   */
 
-  // Função para verificar se uma data específica está disponível
-  const isDateAvailable = (date: string): boolean => {
-    if (designerAvailability.length === 0) return true; // Sem bloqueios, calendário livre
-    
+  // Função para verificar se uma data e horário específicos estão disponíveis
+  const isDateAvailable = (date: string, startTime: string, endTime: string): boolean => {
+    if (!designerAvailability || designerAvailability.length === 0) return true; // Sem bloqueios, calendário livre
+
     const normalizedDate = date.split('T')[0];
+
+    // Converter horários para minutos para fácil comparação
+    const timeToMinutes = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const slotStartMinutes = timeToMinutes(startTime);
+    const slotEndMinutes = timeToMinutes(endTime);
+
     return !designerAvailability.some((avail: any) => {
       if (!avail || !avail.specificDate) return false;
       const normalizedAvailDate = String(avail.specificDate).split('T')[0];
-      return normalizedAvailDate === normalizedDate;
+
+      if (normalizedAvailDate === normalizedDate) {
+        // Se for um bloqueio de dia inteiro (00:00-23:59), o dia inteiro está bloqueado
+        if (avail.startTime === '00:00' && avail.endTime === '23:59') {
+          return true; // Dia inteiro bloqueado
+        }
+
+        const blockedStartMinutes = timeToMinutes(avail.startTime);
+        const blockedEndMinutes = timeToMinutes(avail.endTime);
+
+        // Verifica se há sobreposição com um bloqueio de horário específico
+        if (
+          (slotStartMinutes < blockedEndMinutes && slotEndMinutes > blockedStartMinutes) &&
+          avail.isActive // Considera apenas bloqueios ativos
+        ) {
+          return true; // Slot bloqueado
+        }
+      }
+      return false; // Não bloqueado
     });
   };
 
@@ -1160,8 +1241,8 @@ Você tem um novo agendamento:
                                     Último agendamento:
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {client.lastAppointment ? 
-                                      new Date(client.lastAppointment).toLocaleDateString('pt-BR') : 
+                                    {client.createdAt ? 
+                                      new Date(client.createdAt).toLocaleDateString('pt-BR') : 
                                       'Nunca'
                                     }
                                   </p>
@@ -1297,7 +1378,7 @@ Você tem um novo agendamento:
                     onChange={(e) => {
                       const selectedDateValue = e.target.value;
                       // Bloqueado = indisponível para agendamento
-                      if (selectedDateValue && !isDateAvailable(selectedDateValue)) {
+                      if (selectedDateValue && !isDateAvailable(selectedDateValue, '00:00', '23:59')) {
                         alert('Este dia está bloqueado pela designer e não pode ser agendado.');
                         return;
                       }
@@ -1311,12 +1392,12 @@ Você tem um novo agendamento:
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-500 mr-2"></div>
                       Carregando disponibilidade...
                     </div>
-                  ) : designerAvailability.length > 0 ? (
+                  ) : designerAvailability.filter(avail => avail && avail.isActive).length > 0 ? (
                     <div className="mt-2">
                       <p className="text-xs text-gray-500 mb-1">🚫 Dias indisponíveis (bloqueados):</p>
                       <div className="flex flex-wrap gap-1">
                         {designerAvailability
-                          .filter(avail => avail && avail.specificDate)
+                          .filter(avail => avail && avail.specificDate && avail.isActive)
                           .slice(0, 5) // Mostrar apenas as primeiras 5 datas
                           .map((avail: any) => (
                             <span 
@@ -1324,11 +1405,12 @@ Você tem um novo agendamento:
                               className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded"
                             >
                               {new Date(String(avail.specificDate) + 'T00:00:00').toLocaleDateString('pt-BR')}
+                              {avail.startTime === '00:00' && avail.endTime === '23:59' ? '' : ' (horários específicos)'}
                             </span>
                           ))}
-                        {designerAvailability.filter(avail => avail && avail.specificDate).length > 5 && (
+                        {designerAvailability.filter(avail => avail && avail.specificDate && avail.isActive).length > 5 && (
                           <span className="text-xs text-gray-500">
-                            +{designerAvailability.filter(avail => avail && avail.specificDate).length - 5} mais
+                            +{designerAvailability.filter(avail => avail && avail.specificDate && avail.isActive).length - 5} mais
                           </span>
                         )}
                       </div>

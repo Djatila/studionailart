@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dyadComponentTagger from '@dyad-sh/react-vite-component-tagger';
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig({
   plugins: [dyadComponentTagger(), react()],
   optimizeDeps: {
@@ -17,6 +17,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/webhook/, '/webhook')
       }
     },
-    cors: true
+    cors: true,
+    port: 5179 // Adicione esta linha para definir a porta explicitamente
   }
 });

@@ -23,9 +23,21 @@ Configure as variáveis de ambiente diretamente no serviço de hospedagem (Verce
 - `VITE_UAZAPI_TOKEN` = `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.u1JuQWRc5op8p2JTUYYmoCWsfPFXsEKDUmoiUytc3rxVp1K6Fd`
 
 ### n8n
-- `VITE_N8N_WEBHOOK_URL` = `http://localhost:5679/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p` (para produção, use o endereço público do seu n8n)
+- `VITE_N8N_WEBHOOK_URL` = `https://seu-dominio-n8n.com/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p` (**ATUALIZE PARA O ENDEREÇO REAL DO SEU N8N**)
 - `VITE_N8N_USERNAME` = `djatila.azevedo@gmail.com`
 - `VITE_N8N_PASSWORD` = `76yST!aMd@vRQB7`
+
+## Configuração do n8n
+
+### Se estiver usando n8n localmente:
+1. Use um serviço como **ngrok** para tornar seu n8n local acessível publicamente
+2. Instale o ngrok: `npm install -g ngrok`
+3. Inicie o ngrok: `ngrok http 5679`
+4. Use a URL https fornecida pelo ngrok na variável `VITE_N8N_WEBHOOK_URL`
+
+### Se estiver usando n8n hospedado:
+1. Obtenha o endereço público do seu n8n
+2. Use esse endereço na variável `VITE_N8N_WEBHOOK_URL`
 
 ## Configuração no Vercel
 
@@ -34,28 +46,21 @@ Configure as variáveis de ambiente diretamente no serviço de hospedagem (Verce
 2. Vá para Settings → Environment Variables
 3. Clique no botão "Import"
 4. Selecione o arquivo `.env` ou `.env.production` do seu computador
-5. A Vercel irá automaticamente importar todas as variáveis
+5. **ATENÇÃO**: Atualize a variável `VITE_N8N_WEBHOOK_URL` com o endereço real do seu n8n
+6. A Vercel irá automaticamente importar todas as variáveis
 
 ### Opção 2: Adicionar manualmente
 1. Acesse o dashboard do Vercel
 2. Vá para Settings → Environment Variables
 3. Adicione cada uma das variáveis acima manualmente
+4. **ATENÇÃO**: Use o endereço real do seu n8n na variável `VITE_N8N_WEBHOOK_URL`
 
 ## Configuração no Netlify
 
 1. Acesse o dashboard do Netlify
 2. Vá para Site settings → Build & deploy → Environment
 3. Adicione cada uma das variáveis acima
-
-## Para Ambiente de Produção
-
-### Atualizar a URL do Webhook n8n
-
-Para ambiente de produção, atualize a variável `VITE_N8N_WEBHOOK_URL` para apontar para o endereço público do seu n8n:
-
-```
-VITE_N8N_WEBHOOK_URL=https://seu-dominio-n8n.com/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p
-```
+4. **ATENÇÃO**: Use o endereço real do seu n8n na variável `VITE_N8N_WEBHOOK_URL`
 
 ## Verificação
 

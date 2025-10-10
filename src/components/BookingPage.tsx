@@ -846,7 +846,29 @@ const sendToN8nWebhook = async (data: any): Promise<boolean> => {
     console.log("📤 Enviando dados para o webhook do n8n:", data);
     
     // Determinar a URL correta (relativa ou absoluta)
-    const url = webhookUrl.startsWith('http') ? webhookUrl : `${window.location.origin}${webhookUrl}`;
+    let url: string;
+    if (webhookUrl.startsWith('http')) {
+      // Para URLs absolutas, usar proxy do Vite em desenvolvimento ou URL direta em produção
+      url = webhookUrl;
+    } else {
+      // Para URLs relativas, usar o proxy do Vite
+      url = webhookUrl;
+    }
+    
+    // 🆕 Adicionar tratamento para ambiente de produção
+    if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
+      // Em produção, usar URL direta (não precisa de proxy)
+      url = webhookUrl;
+    } else if (import.meta.env.DEV && webhookUrl.startsWith('http')) {
+      // Em desenvolvimento, tentar usar proxy se for localhost
+      if (webhookUrl.includes('localhost')) {
+        url = webhookUrl; // O Vite já faz proxy automático para localhost
+      } else {
+        // Para URLs externas em desenvolvimento, pode haver problemas de CORS
+        console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
+        url = webhookUrl;
+      }
+    }
     
     const response = await fetch(url, {
       method: "POST",
@@ -868,6 +890,7 @@ const sendToN8nWebhook = async (data: any): Promise<boolean> => {
     console.error("❌ Erro ao enviar dados para o webhook do n8n:", error);
     // 🆕 Adicionar mensagem de ajuda para configuração
     console.error("💡 Dica: Verifique se a variável de ambiente VITE_N8N_WEBHOOK_URL está configurada corretamente no seu serviço de hospedagem.");
+    console.error("💡 Dica adicional: Se estiver usando n8n local, certifique-se de que ele está acessível publicamente (use ngrok ou similar).");
     return false;
   }
 };

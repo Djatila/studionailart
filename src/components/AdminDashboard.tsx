@@ -944,7 +944,29 @@ Você tem um novo agendamento:
       }
       
       // Determinar a URL correta (relativa ou absoluta)
-      const url = webhookUrl.startsWith('http') ? webhookUrl : `${window.location.origin}${webhookUrl}`;
+      let url: string;
+      if (webhookUrl.startsWith('http')) {
+        // Para URLs absolutas, usar proxy do Vite em desenvolvimento ou URL direta em produção
+        url = webhookUrl;
+      } else {
+        // Para URLs relativas, usar o proxy do Vite
+        url = webhookUrl;
+      }
+      
+      // 🆕 Adicionar tratamento para ambiente de produção
+      if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
+        // Em produção, usar URL direta (não precisa de proxy)
+        url = webhookUrl;
+      } else if (import.meta.env.DEV && webhookUrl.startsWith('http')) {
+        // Em desenvolvimento, tentar usar proxy se for localhost
+        if (webhookUrl.includes('localhost')) {
+          url = webhookUrl; // O Vite já faz proxy automático para localhost
+        } else {
+          // Para URLs externas em desenvolvimento, pode haver problemas de CORS
+          console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
+          url = webhookUrl;
+        }
+      }
       
       // Ajuste: só enviar Authorization se ambos estiverem definidos no .env
       const username = import.meta.env.VITE_N8N_USERNAME || '';
@@ -999,6 +1021,7 @@ Você tem um novo agendamento:
       console.error('❌ Erro ao enviar para n8n:', error);
       // 🆕 Adicionar mensagem de ajuda para configuração
       console.error("💡 Dica: Verifique se as variáveis de ambiente VITE_N8N_WEBHOOK_URL, VITE_N8N_USERNAME e VITE_N8N_PASSWORD estão configuradas corretamente no seu serviço de hospedagem.");
+      console.error("💡 Dica adicional: Se estiver usando n8n local, certifique-se de que ele está acessível publicamente (use ngrok ou similar).");
       await saveToRetryQueue(data);
       return false;
     }

@@ -664,7 +664,7 @@ Nos vemos em breve! 💖`;
     return date.toLocaleDateString('pt-BR');
   };
   const pendingAppointments = appointments.filter(apt => (apt as any).status === 'pending');
-  const todayAppointments = appointments.filter(apt => apt.date === selectedDate);
+  const todayAppointments = appointments.filter(apt => apt.date === selectedDate && apt.status !== 'cancelled' && apt.status !== 'canceled');
   const upcomingAppointments = appointments.filter(apt => apt.date > selectedDate);
   
   // Get next 7 days appointments - filtrar apenas agendamentos confirmados

@@ -1867,18 +1867,18 @@ Aguardo confirmação!`;
                                     // Remover serviço se já estiver selecionado
                                     setSelectedExtraServices(prev => prev.filter(s => s.id !== service.id));
                                   } else {
-                                    // Adicionar serviço se tiver menos de 2 selecionados
-                                    if (selectedExtraServices.length < 2) {
+                                    // Adicionar serviço se tiver menos de 3 selecionados
+                                    if (selectedExtraServices.length < 3) {
                                       setSelectedExtraServices(prev => [...prev, service]);
                                     } else {
-                                      alert('Você pode selecionar no máximo 2 serviços extras.');
+                                      alert('Você pode selecionar no máximo 3 serviços extras.');
                                     }
                                   }
                                 }}
                                 className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
                                   isSelected ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
                                 }`}
-                                disabled={!isSelected && selectedExtraServices.length >= 2}
+                                disabled={!isSelected && selectedExtraServices.length >= 3}
                               >
                                 <h5 className="font-semibold text-white mb-1">{service.name}</h5>
                                 <p className="text-white/70 text-sm mb-1">{service.duration} minutos</p>
@@ -1888,9 +1888,9 @@ Aguardo confirmação!`;
                                     ✓ Selecionado
                                   </div>
                                 )}
-                                {!isSelected && selectedExtraServices.length >= 2 && (
+                                {!isSelected && selectedExtraServices.length >= 3 && (
                                   <div className="mt-2 text-xs text-yellow-300">
-                                    Limite atingido (2)
+                                    Limite atingido (3)
                                   </div>
                                 )}
                               </button>

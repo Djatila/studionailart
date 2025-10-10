@@ -933,9 +933,19 @@ Você tem um novo agendamento:
   // 🆕 NOVA FUNÇÃO: Enviar dados para webhook do n8n
   const sendToN8nWebhook = async (data: any): Promise<boolean> => {
     try {
+      // 🆕 Melhor tratamento de variáveis de ambiente
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
-      const url = webhookUrl.startsWith('http') ? webhookUrl : `/webhook${webhookUrl.split('/webhook')[1] || ''}`;
-
+      
+      // Se nem a variável de ambiente nem a URL padrão estiverem disponíveis, logar erro detalhado
+      if (!webhookUrl) {
+        console.error("❌ VITE_N8N_WEBHOOK_URL não está definida e nenhuma URL padrão foi fornecida.");
+        console.error("💡 Solução: Configure a variável de ambiente VITE_N8N_WEBHOOK_URL no seu serviço de hospedagem.");
+        return false;
+      }
+      
+      // Determinar a URL correta (relativa ou absoluta)
+      const url = webhookUrl.startsWith('http') ? webhookUrl : `${window.location.origin}${webhookUrl}`;
+      
       // Ajuste: só enviar Authorization se ambos estiverem definidos no .env
       const username = import.meta.env.VITE_N8N_USERNAME || '';
       const password = import.meta.env.VITE_N8N_PASSWORD || '';
@@ -987,6 +997,8 @@ Você tem um novo agendamento:
       return true;
     } catch (error) {
       console.error('❌ Erro ao enviar para n8n:', error);
+      // 🆕 Adicionar mensagem de ajuda para configuração
+      console.error("💡 Dica: Verifique se as variáveis de ambiente VITE_N8N_WEBHOOK_URL, VITE_N8N_USERNAME e VITE_N8N_PASSWORD estão configuradas corretamente no seu serviço de hospedagem.");
       await saveToRetryQueue(data);
       return false;
     }

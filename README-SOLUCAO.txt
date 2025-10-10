@@ -42,3 +42,25 @@ VERIFICAÇÃO DA SOLUÇÃO:
 
 RESULTADO ESPERADO:
 Agora, quando um designer criar um bloqueio em um navegador, ele aparecerá imediatamente em todos os outros navegadores, pois os dados estão sendo armazenados no banco de dados Supabase e não apenas localmente.
+
+CONFIGURAÇÃO DE VARIÁVEIS DE AMBIENTE:
+========================================================
+
+IMPORTANTE: O arquivo .env contém variáveis de ambiente sensíveis que não são enviadas para o repositório Git por razões de segurança.
+
+Para implantação em ambiente de produção, configure as seguintes variáveis de ambiente no seu serviço de hospedagem (Vercel, Netlify, etc.):
+
+Supabase:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_ANON_KEY
+
+UAZAPI:
+- VITE_UAZAPI_INSTANCE_ID
+- VITE_UAZAPI_TOKEN
+
+n8n:
+- VITE_N8N_WEBHOOK_URL (para produção, use o endereço público do seu n8n)
+- VITE_N8N_USERNAME
+- VITE_N8N_PASSWORD
+
+Veja o arquivo DEPLOYMENT_ENV_VARS_GUIDE.md para instruções detalhadas de configuração.

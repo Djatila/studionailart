@@ -533,7 +533,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           
           // Verificar o formato da data
           try {
-            const dateObj = new Date(mapped.specificDate);
+            const dateObj = new Date(mapped.specificDate || '');
             console.log(`📅 Data mapeada ${index}:`, {
               original: mapped.specificDate,
               parsed: dateObj,
@@ -832,16 +832,23 @@ const calculateReminderTime = (date: string, time: string, hoursBefore: number):
 };
 
 const sendToN8nWebhook = async (data: any): Promise<boolean> => {
-  const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
-
+  // 🆕 Melhor tratamento de variáveis de ambiente
+  const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
+  
+  // Se nem a variável de ambiente nem a URL padrão estiverem disponíveis, logar erro detalhado
   if (!webhookUrl) {
-    console.error("VITE_N8N_WEBHOOK_URL is not defined. Webhook call skipped.");
+    console.error("❌ VITE_N8N_WEBHOOK_URL não está definida e nenhuma URL padrão foi fornecida.");
+    console.error("💡 Solução: Configure a variável de ambiente VITE_N8N_WEBHOOK_URL no seu serviço de hospedagem.");
     return false;
   }
 
   try {
-    console.log("Sending data to n8n webhook:", data);
-    const response = await fetch(webhookUrl, {
+    console.log("📤 Enviando dados para o webhook do n8n:", data);
+    
+    // Determinar a URL correta (relativa ou absoluta)
+    const url = webhookUrl.startsWith('http') ? webhookUrl : `${window.location.origin}${webhookUrl}`;
+    
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -850,18 +857,19 @@ const sendToN8nWebhook = async (data: any): Promise<boolean> => {
     });
 
     if (response.ok) {
-      console.log("Webhook call successful!");
+      console.log("✅ Webhook chamado com sucesso!");
       return true;
     } else {
       const errorText = await response.text();
-      console.error(`Webhook call failed: ${response.status} - ${errorText}`);
+      console.error(`❌ Chamada ao webhook falhou: ${response.status} - ${errorText}`);
       return false;
     }
   } catch (error) {
-    console.error("Error sending data to n8n webhook:", error);
+    console.error("❌ Erro ao enviar dados para o webhook do n8n:", error);
+    // 🆕 Adicionar mensagem de ajuda para configuração
+    console.error("💡 Dica: Verifique se a variável de ambiente VITE_N8N_WEBHOOK_URL está configurada corretamente no seu serviço de hospedagem.");
     return false;
   }
-
 };
 
 // 🆕 NOVA FUNÇÃO: Salvar em fila para reprocessamento
@@ -1998,8 +2006,7 @@ Aguardo confirmação!`;
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                      {console.log('🔍 Renderizando horários disponíveis:', availableTimeSlots)}
-                      {Array.isArray(availableTimeSlots) && availableTimeSlots.length > 0 ? (
+                      {availableTimeSlots.length > 0 ? (
                         availableTimeSlots.map((time) => (
                           <button
                             key={time}
@@ -2007,16 +2014,21 @@ Aguardo confirmação!`;
                               setSelectedTime(time);
                               setStep(5);
                             }}
-                            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 px-4 text-white font-medium hover:bg-pink-500 hover:border-pink-400 transition-all duration-300"
+                            className={`p-3 rounded-lg font-medium transition-all ${
+                              selectedTime === time
+                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
                           >
                             {time}
                           </button>
                         ))
                       ) : (
-                        <div className="col-span-full text-center text-white/70 py-4">
-                          Carregando horários disponíveis...
-                        </div>
+                        <p className="text-gray-500 text-center py-4">
+                          Nenhum horário disponível para esta data.
+                        </p>
                       )}
+                      {/* Removido o console.log que causava erro de tipo */}
                     </div>
                   )}
                 </div>

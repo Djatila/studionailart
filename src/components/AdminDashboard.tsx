@@ -961,8 +961,11 @@ Você tem um novo agendamento:
         // Em desenvolvimento, tentar usar proxy se for localhost
         if (webhookUrl.includes('localhost')) {
           url = webhookUrl; // O Vite já faz proxy automático para localhost
+        } else if (webhookUrl.includes('railway.app')) {
+          // Para URLs da Railway em desenvolvimento, usar URL direta (sem aviso de CORS)
+          url = webhookUrl;
         } else {
-          // Para URLs externas em desenvolvimento, pode haver problemas de CORS
+          // Para outras URLs externas em desenvolvimento, pode haver problemas de CORS
           console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
           url = webhookUrl;
         }

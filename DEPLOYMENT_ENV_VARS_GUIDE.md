@@ -25,7 +25,7 @@ Configure as variáveis de ambiente diretamente no serviço de hospedagem (Verce
 ### n8n
 - `VITE_N8N_WEBHOOK_URL` = `https://seu-dominio-n8n.com/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p` (**ATUALIZE PARA O ENDEREÇO REAL DO SEU N8N**)
 - `VITE_N8N_USERNAME` = `djatila.azevedo@gmail.com`
-- `VITE_N8N_PASSWORD` = `76yST!aMd@vRQB7`
+- `VITE_N8N_PASSWORD` = `yLKy9Q4K8CYveL2`
 
 ## Configuração do n8n
 

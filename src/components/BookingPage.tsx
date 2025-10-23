@@ -41,6 +41,7 @@ interface BookingPageProps {
   onBack: () => void;
   loggedClient?: Client; // Cliente logada no sistema (corrigido o tipo)
   onNavigateToClientDashboard?: () => void; // Função para navegar ao dashboard da cliente
+  isOnline?: boolean; // Status de conexão
 }
 
 const loadingReducer = (state: boolean, action: { type: 'START' | 'FINISH' }) => {
@@ -54,10 +55,11 @@ const loadingReducer = (state: boolean, action: { type: 'START' | 'FINISH' }) =>
   }
 };
 
-const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard }) => {
-  console.log('🔧 BookingPage montado. Props recebidas:', { initialDesigner, loggedClient });
+const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard, isOnline = true }) => {
+  console.log('🔧 BookingPage montado. Props recebidas:', { initialDesigner, loggedClient, isOnline });
   
-  const [step, setStep] = useState(1);
+  // 🆕 NOVO: Se designer já está selecionada (link personalizado), começa no Step 2
+  const [step, setStep] = useState(initialDesigner ? 2 : 1);
   const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(initialDesigner || null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -1325,6 +1327,12 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   const handleConfirmBooking = async () => {
     if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime) return;
     
+    // 🆕 Verificar conexão antes de confirmar
+    if (!isOnline) {
+      alert('⚠️ Sem conexão com a internet. Por favor, verifique sua conexão e tente novamente.');
+      return;
+    }
+    
     // Logs para verificar o ID da designer selecionada
     console.log('🔍 Verificando designer selecionada:', {
       designerId: selectedDesigner.id,
@@ -1806,17 +1814,44 @@ Aguardo confirmação!`;
               {/* Step 2: Service Selection */}
               {step === 2 && selectedDesigner && (
                 <div>
+                  {/* 🆕 NOVO: Card com foto e bio da designer (quando vier de link personalizado) */}
+                  {initialDesigner && (selectedDesigner.photoUrl || selectedDesigner.bio) && (
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
+                      <div className="flex items-start gap-4">
+                        {selectedDesigner.photoUrl && (
+                          <img 
+                            src={selectedDesigner.photoUrl} 
+                            alt={selectedDesigner.name}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h2 className="text-xl font-bold text-white mb-2">
+                            {selectedDesigner.name}
+                          </h2>
+                          {selectedDesigner.bio && (
+                            <p className="text-white/80 text-sm leading-relaxed">
+                              {selectedDesigner.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-white">
-                      2. Escolha um Serviço
+                      {initialDesigner ? '1. Escolha um Serviço' : '2. Escolha um Serviço'}
                     </h3>
                     <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => setStep(1)}
-                        className="text-white/70 hover:text-white transition-colors"
-                      >
-                        ← Voltar
-                      </button>
+                      {!initialDesigner && (
+                        <button
+                          onClick={() => setStep(1)}
+                          className="text-white/70 hover:text-white transition-colors"
+                        >
+                          ← Voltar
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1951,6 +1986,31 @@ Aguardo confirmação!`;
               {/* Step 3: Date Selection */}
               {step === 3 && (
                 <div>
+                  {/* 🆕 NOVO: Card com foto e bio da designer */}
+                  {initialDesigner && selectedDesigner && (selectedDesigner.photoUrl || selectedDesigner.bio) && (
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
+                      <div className="flex items-start gap-4">
+                        {selectedDesigner.photoUrl && (
+                          <img 
+                            src={selectedDesigner.photoUrl} 
+                            alt={selectedDesigner.name}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h2 className="text-xl font-bold text-white mb-2">
+                            {selectedDesigner.name}
+                          </h2>
+                          {selectedDesigner.bio && (
+                            <p className="text-white/80 text-sm leading-relaxed">
+                              {selectedDesigner.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-white">
                       3. Selecione a Data
@@ -2044,6 +2104,31 @@ Aguardo confirmação!`;
               {/* Step 4: Time Selection */}
               {step === 4 && (
                 <div>
+                  {/* 🆕 NOVO: Card com foto e bio da designer */}
+                  {initialDesigner && selectedDesigner && (selectedDesigner.photoUrl || selectedDesigner.bio) && (
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
+                      <div className="flex items-start gap-4">
+                        {selectedDesigner.photoUrl && (
+                          <img 
+                            src={selectedDesigner.photoUrl} 
+                            alt={selectedDesigner.name}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h2 className="text-xl font-bold text-white mb-2">
+                            {selectedDesigner.name}
+                          </h2>
+                          {selectedDesigner.bio && (
+                            <p className="text-white/80 text-sm leading-relaxed">
+                              {selectedDesigner.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-white">
                       4. Escolha o Horário
@@ -2115,6 +2200,31 @@ Aguardo confirmação!`;
               {/* Step 5: Client Information */}
               {step === 5 && (
                 <div>
+                  {/* 🆕 NOVO: Card com foto e bio da designer */}
+                  {initialDesigner && selectedDesigner && (selectedDesigner.photoUrl || selectedDesigner.bio) && (
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
+                      <div className="flex items-start gap-4">
+                        {selectedDesigner.photoUrl && (
+                          <img 
+                            src={selectedDesigner.photoUrl} 
+                            alt={selectedDesigner.name}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h2 className="text-xl font-bold text-white mb-2">
+                            {selectedDesigner.name}
+                          </h2>
+                          {selectedDesigner.bio && (
+                            <p className="text-white/80 text-sm leading-relaxed">
+                              {selectedDesigner.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold text-white">
                       5. Suas Informações

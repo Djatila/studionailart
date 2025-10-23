@@ -10,9 +10,12 @@ import DesignerSettings from './components/DesignerSettings';
 // Remove unused import
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import ClientDashboard from './components/ClientDashboard';
+import ConnectionStatus from './components/ConnectionStatus';
 
 import { cleanOldAppointments } from './utils/appointmentUtils';
 import { notificationService } from './services/notificationService';
+import { extractSlugFromPath, generateSlug } from './utils/slugUtils';
+import { designerService } from './utils/supabaseUtils';
 
 export interface NailDesigner {
   id: string;
@@ -27,6 +30,10 @@ export interface NailDesigner {
   updated_at?: string; // Campo do Supabase (snake_case)
   pixKey?: string;
   pix_key?: string; // Campo do Supabase (snake_case)
+  slug?: string; // Link personalizado (ex: klivia-azevedo)
+  bio?: string; // Biografia da designer
+  photoUrl?: string; // URL da foto de perfil
+  photo_url?: string; // Campo do Supabase (snake_case)
 }
 
 export interface Service {
@@ -66,17 +73,16 @@ export interface Client {
   name: string;
   phone: string;
   email: string;
-  password: string;
   isActive: boolean;
   createdAt: string;
 }
 
 function App() {
-  const [currentView, setCurrentView] = useState<'login' | 'booking' | 'admin' | 'services' | 'stats' | 'availability' | 'settings' | 'superadmin' | 'client'>('login');
-  const [currentDesigner, setCurrentDesigner] = useState<NailDesigner | null>(null);
+  const [currentView, setCurrentView] = useState<'login' | 'superadmin' | 'client' | 'booking'>('login');
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
+  const [currentDesigner, setCurrentDesigner] = useState<NailDesigner | null>(null);
+  const [isOnline, setIsOnline] = useState(true); // Estado global de conexão
   const [isClient, setIsClient] = useState(false);
-// Removed unused state variable isSuperAdmin
   const [designerSlug, setDesignerSlug] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -99,28 +105,96 @@ function App() {
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('designerUpdated', handleDesignerUpdate as EventListener);
     
-    // Check if accessing via designer's personal link
-    const path = window.location.pathname;
-    const match = path.match(/^\/([^\/]+)-nail$/);
-    if (match) {
-      const slug = match[1];
-      setDesignerSlug(slug);
+    // 🆕 NOVO: Check if accessing via designer's personal link
+    const checkPersonalLink = async () => {
+      const slug = extractSlugFromPath(window.location.pathname);
+      console.log('🔍 Verificando URL:', window.location.pathname, '| Slug extraído:', slug);
       
-      // Find designer by slug
-      const designers = getDesigners();
-      const designer = designers.find(d => 
-        d.name.toLowerCase().replace(/\s+/g, '-') === slug && d.isActive
-      );
+      // Verificar se tem slug salvo no localStorage
+      const savedSlug = localStorage.getItem('designerSlug');
+      const activeSlug = slug || savedSlug;
       
-      if (designer) {
-        setCurrentDesigner(designer);
-        setIsClient(true);
-        setCurrentView('booking');
+      if (activeSlug) {
+        console.log('🔗 Link personalizado detectado:', activeSlug, slug ? '(da URL)' : '(do localStorage)');
+        setDesignerSlug(activeSlug);
+        
+        // Salvar no localStorage para persistir após navegação
+        if (slug) {
+          localStorage.setItem('designerSlug', slug);
+        }
+        
+        try {
+          // Buscar designer pelo slug no Supabase
+          const designers = await designerService.getAll();
+          console.log('📋 Designers encontradas:', designers.map(d => ({
+            name: d.name,
+            slug: d.slug || generateSlug(d.name),
+            active: d.is_active
+          })));
+          
+          const designer = designers.find(d => {
+            const designerSlug = d.slug || generateSlug(d.name);
+            console.log(`🔎 Comparando: "${designerSlug}" === "${slug}"?`, designerSlug === slug);
+            return designerSlug === slug && d.is_active;
+          });
+          
+          if (designer) {
+            console.log('✅ Designer encontrada:', designer.name);
+            // Converter campos do Supabase para formato do App
+            const mappedDesigner: NailDesigner = {
+              id: designer.id,
+              name: designer.name,
+              email: designer.email,
+              phone: designer.phone,
+              password: designer.password,
+              isActive: designer.is_active,
+              is_active: designer.is_active,
+              createdAt: designer.created_at,
+              created_at: designer.created_at,
+              updated_at: designer.updated_at,
+              pixKey: designer.pix_key || undefined,
+              pix_key: designer.pix_key || undefined,
+              slug: designer.slug || generateSlug(designer.name),
+              bio: designer.bio || undefined,
+              photoUrl: designer.photo_url || undefined,
+              photo_url: designer.photo_url || undefined,
+            };
+            
+            // Salvar designer mas NÃO fazer login automático
+            // Cliente precisa fazer login normalmente primeiro
+            setCurrentDesigner(mappedDesigner);
+            // Salvar no localStorage para persistir após login
+            localStorage.setItem('preSelectedDesigner', JSON.stringify(mappedDesigner));
+            console.log('✅ Designer salva para uso após login da cliente');
+          } else {
+            console.warn('❌ Designer não encontrada ou inativa para slug:', activeSlug);
+            // Limpar localStorage se designer não for encontrada
+            localStorage.removeItem('designerSlug');
+            localStorage.removeItem('preSelectedDesigner');
+            setCurrentView('login');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar designer:', error);
+          setCurrentView('login');
+        }
       } else {
-        // Designer not found or inactive
-        setCurrentView('login');
+        // Se não tem slug na URL, verificar se tem designer salva no localStorage
+        const savedDesignerStr = localStorage.getItem('preSelectedDesigner');
+        if (savedDesignerStr) {
+          try {
+            const savedDesigner = JSON.parse(savedDesignerStr);
+            setCurrentDesigner(savedDesigner);
+            setDesignerSlug(savedDesigner.slug);
+            console.log('✅ Designer recuperada do localStorage:', savedDesigner.name);
+          } catch (e) {
+            console.error('❌ Erro ao recuperar designer do localStorage:', e);
+            localStorage.removeItem('preSelectedDesigner');
+          }
+        }
       }
-    }
+    };
+    
+    checkPersonalLink();
 
     // Clean old appointments on app load
     cleanOldAppointments();
@@ -196,6 +270,9 @@ function App() {
     setIsClient(false);
     setDesignerSlug(null);
     setCurrentView('login');
+    // Limpar localStorage ao fazer logout
+    localStorage.removeItem('designerSlug');
+    localStorage.removeItem('preSelectedDesigner');
     // Reset URL if accessed via personal link
     if (window.location.pathname !== '/') {
       window.history.pushState({}, '', '/');
@@ -224,37 +301,99 @@ function App() {
   }
 
   if (currentView === 'login') {
-    return <LoginPage onLogin={handleLogin} onSuperAdminLogin={handleSuperAdminLogin} />;
+    return (
+      <>
+        <ConnectionStatus onConnectionChange={setIsOnline} />
+        <LoginPage onLogin={handleLogin} onSuperAdminLogin={handleSuperAdminLogin} isOnline={isOnline} />
+      </>
+    );
   }
 
   if (currentView === 'superadmin') {
-    return <SuperAdminDashboard onBack={handleLogout} />;
+    return (
+      <>
+        <ConnectionStatus />
+        <SuperAdminDashboard onBack={handleLogout} />
+      </>
+    );
   }
 
   if (currentView === 'client') {
     return (
-      <ClientDashboard 
-        client={currentClient!} 
-        onBack={handleLogout}
-        onBookService={() => {
-          setCurrentView('booking');
-        }}
-      />
+      <>
+        <ConnectionStatus />
+        <ClientDashboard 
+          client={currentClient!} 
+          onBack={handleLogout}
+          onBookService={() => {
+            // Antes de abrir booking, recuperar designer do localStorage se necessário
+            const savedSlug = localStorage.getItem('designerSlug');
+            const savedDesignerStr = localStorage.getItem('preSelectedDesigner');
+            
+            if (savedSlug && savedDesignerStr && !currentDesigner) {
+              try {
+                const savedDesigner = JSON.parse(savedDesignerStr);
+                setCurrentDesigner(savedDesigner);
+                setDesignerSlug(savedSlug);
+                console.log('🔄 Recuperando designer do localStorage antes de abrir booking:', savedDesigner.name);
+              } catch (e) {
+                console.error('❌ Erro ao recuperar designer:', e);
+              }
+            }
+            
+            setCurrentView('booking');
+          }}
+        />
+      </>
     );
   }
 
-  if (isClient) {
+  // 🆕 NOVO: Se for cliente e estiver na view de booking
+  if (isClient && currentView === 'booking') {
+    // Sempre verificar localStorage primeiro (mais confiável que estado)
+    const savedSlug = localStorage.getItem('designerSlug');
+    const savedDesignerStr = localStorage.getItem('preSelectedDesigner');
+    
+    let initialDesigner: NailDesigner | undefined = currentDesigner || undefined;
+    
+    // Se tem no localStorage mas não no estado, usar do localStorage
+    if (savedSlug && savedDesignerStr && !currentDesigner) {
+      try {
+        const parsed = JSON.parse(savedDesignerStr) as NailDesigner;
+        initialDesigner = parsed;
+        console.log('🔄 Usando designer do localStorage:', initialDesigner?.name);
+      } catch (e) {
+        console.error('❌ Erro ao parsear designer do localStorage:', e);
+        initialDesigner = undefined;
+      }
+    }
+    
+    console.log('🎯 Abrindo BookingPage:', {
+      temSlug: !!(designerSlug || savedSlug),
+      temDesigner: !!initialDesigner,
+      passandoDesigner: !!initialDesigner,
+      nomeDesigner: initialDesigner?.name,
+      fonte: currentDesigner ? 'estado' : 'localStorage'
+    });
+    
     return (
-      <BookingPage 
-        designer={undefined} // Não passa designer para começar sempre no step 1
-        onBack={handleLogout}
-        loggedClient={isClient ? currentClient : undefined}
-      />
+      <>
+        <ConnectionStatus onConnectionChange={setIsOnline} />
+        <BookingPage 
+          designer={initialDesigner}
+          onBack={handleLogout}
+          loggedClient={currentClient || undefined}
+          isOnline={isOnline}
+        />
+      </>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600">
+      {/* Connection Status Monitor */}
+      <ConnectionStatus />
+      
       {/* Navigation */}
       <nav className="bg-white/10 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-lg mx-auto px-4 py-3">
@@ -323,7 +462,7 @@ function App() {
                 handleLogout();
               }
             }}
-            loggedClient={isClient ? currentClient : undefined}
+            loggedClient={isClient ? (currentClient || undefined) : undefined}
             onNavigateToClientDashboard={() => setCurrentView('client')}
           />
         )}

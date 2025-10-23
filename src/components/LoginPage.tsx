@@ -20,9 +20,10 @@ import {
 interface LoginPageProps {
   onLogin: (designer: NailDesigner, asClient?: boolean) => void;
   onSuperAdminLogin?: () => void;
+  isOnline?: boolean;
 }
 
-export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps) {
+export default function LoginPage({ onLogin, onSuperAdminLogin, isOnline = true }: LoginPageProps) {
   const [showRegister, setShowRegister] = useState(false);
   const [showDesignerLogin, setShowDesignerLogin] = useState(false);
   const [showClientLogin, setShowClientLogin] = useState(false);
@@ -30,6 +31,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
   const [selectedDesigner, setSelectedDesigner] = useState<string>('');
   const [password, setPassword] = useState('');
+  const [designerPhone, setDesignerPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showClientPassword, setShowClientPassword] = useState(false);
   const [showClientRegisterPassword, setShowClientRegisterPassword] = useState(false);
@@ -172,23 +174,33 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     setLoading(true);
     setLoginError('');
     
+    // Verificar conexão antes de tentar login
+    if (!isOnline) {
+      setLoginError('Sem conexão com a internet. Verifique sua conexão e tente novamente.');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      // Primeiro, obter o designer selecionado para pegar o email
-      const designer = await getNailDesignerById(selectedDesigner);
+      // Buscar designer pelo telefone
+      const designer = await getNailDesignerByPhone(designerPhone);
       
       if (!designer) {
-        setLoginError('Designer não encontrado!');
+        setLoginError('Telefone não encontrado!');
+        setLoading(false);
         return;
       }
       
       if (!designer.isActive) {
         setLoginError('Esta conta foi desativada.');
+        setLoading(false);
         return;
       }
       
       // Verificar senha diretamente com os dados da designer
       if (designer.password !== password) {
         setLoginError('Senha incorreta!');
+        setLoading(false);
         return;
       }
       
@@ -300,6 +312,13 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
     e.preventDefault();
     setLoading(true);
     setClientLoginError('');
+    
+    // Verificar conexão antes de tentar login
+    if (!isOnline) {
+      setClientLoginError('Sem conexão com a internet. Verifique sua conexão e tente novamente.');
+      setLoading(false);
+      return;
+    }
     
     try {
       // ✅ SEMPRE consultar Supabase primeiro (não localStorage)
@@ -911,28 +930,19 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
             <form onSubmit={handleDesignerLogin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-purple-100 mb-2">
-                  Selecione seu perfil
+                  Número do WhatsApp
                 </label>
-                <select
-                  value={selectedDesigner}
+                <input
+                  type="tel"
+                  value={designerPhone}
                   onChange={(e) => {
-                    setSelectedDesigner(e.target.value);
+                    setDesignerPhone(e.target.value);
                     setLoginError('');
                   }}
-                  className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-purple-800/80 backdrop-blur-sm text-white placeholder-purple-200"
-                  style={{
-                    backgroundColor: 'rgba(107, 33, 168, 0.8)',
-                    color: 'white'
-                  }}
+                  className="w-full p-3 border border-white/30 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/10 backdrop-blur-sm text-white placeholder-purple-200"
+                  placeholder="(11) 99999-9999"
                   required
-                >
-                  <option value="" style={{ backgroundColor: '#6b21a8', color: 'white' }}>Escolha...</option>
-                  {designers.map((designer) => (
-                    <option key={designer.id} value={designer.id} style={{ backgroundColor: '#6b21a8', color: 'white' }}>
-                      {designer.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
@@ -969,7 +979,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                   type="button"
                   onClick={() => {
                     setShowDesignerLogin(false);
-                    setSelectedDesigner('');
+                    setDesignerPhone('');
                     setPassword('');
                     setLoginError('');
                   }}
@@ -979,7 +989,7 @@ export default function LoginPage({ onLogin, onSuperAdminLogin }: LoginPageProps
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedDesigner || !password || loading}
+                  disabled={!designerPhone || !password || loading}
                   className="flex-1 p-3 bg-gradient-to-r from-gold-400 to-yellow-400 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all"
                 >
                   {loading ? 'Entrando...' : 'Entrar'}

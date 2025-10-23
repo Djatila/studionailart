@@ -86,24 +86,29 @@ export const designerService = {
   async update(id: string, updates: Database['public']['Tables']['nail_designers']['Update']): Promise<NailDesigner | null> {
     console.log('🔍 DEBUG - Tentando atualizar designer:', { id, updates });
     
-    const { data, error } = await supabase
+    // Primeiro, tentar atualizar sem select para evitar problemas de RLS
+    const { error: updateError } = await supabase
       .from('nail_designers')
       .update(updates)
       .eq('id', id)
-      .select()
+    
+    if (updateError) {
+      console.error('❌ Erro ao atualizar designer:', updateError);
+      return null
+    }
+    
+    // Depois, buscar o registro atualizado
+    const { data, error: selectError } = await supabase
+      .from('nail_designers')
+      .select('*')
+      .eq('id', id)
       .single()
     
-    if (error) {
-      console.error('❌ Erro detalhado ao atualizar designer:', {
-        error,
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        id,
-        updates
-      });
-      return null
+    if (selectError || !data) {
+      console.error('❌ Erro ao buscar designer atualizado:', selectError);
+      // Mesmo com erro no select, a atualização pode ter funcionado
+      // Retornar um objeto com os dados atualizados
+      return { id, ...updates } as NailDesigner
     }
     
     console.log('✅ Designer atualizado com sucesso:', data);
@@ -611,6 +616,8 @@ export const createNailDesigner = async (designer: any) => {
   return designerService.create(supabaseDesigner);
 };
 export const updateNailDesigner = async (id: string, updates: any) => {
+  console.log('📝 updateNailDesigner - Dados recebidos:', updates);
+  
   // Converter de camelCase (App) para snake_case (Supabase)
   const supabaseUpdates: Database['public']['Tables']['nail_designers']['Update'] = {};
   
@@ -621,7 +628,19 @@ export const updateNailDesigner = async (id: string, updates: any) => {
   if (updates.pixKey !== undefined) supabaseUpdates.pix_key = updates.pixKey;
   if (updates.isActive !== undefined) supabaseUpdates.is_active = updates.isActive;
   
-  return designerService.update(id, supabaseUpdates);
+  // 🆕 NOVO: Adicionar campos de perfil público
+  if (updates.bio !== undefined) supabaseUpdates.bio = updates.bio;
+  if (updates.photo_url !== undefined) supabaseUpdates.photo_url = updates.photo_url;
+  if (updates.photoUrl !== undefined) supabaseUpdates.photo_url = updates.photoUrl;
+  if (updates.slug !== undefined) supabaseUpdates.slug = updates.slug;
+  
+  console.log('📤 updateNailDesigner - Enviando para Supabase:', supabaseUpdates);
+  
+  const result = await designerService.update(id, supabaseUpdates);
+  
+  console.log('✅ updateNailDesigner - Resultado:', result);
+  
+  return result;
 };
 export const deleteNailDesigner = (id: string) => designerService.delete(id);
 export const getNailDesignerByPhone = async (phone: string) => {

@@ -107,9 +107,32 @@ export class NotificationService {
       // 🆕 NOVO: Usar variável de ambiente ou URL padrão
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
       // 🆕 Garante que usamos o proxy do Vite para desenvolvimento local, ou a URL completa se fornecida
-      const url = webhookUrl.startsWith('http')
-        ? webhookUrl
-        : `/webhook${webhookUrl.split('/webhook')[1] || ''}`;
+      let url: string;
+      if (webhookUrl.startsWith('http')) {
+        // Para URLs absolutas, usar proxy do Vite em desenvolvimento ou URL direta em produção
+        url = webhookUrl;
+      } else {
+        // Para URLs relativas, usar o proxy do Vite
+        url = `/webhook${webhookUrl.split('/webhook')[1] || ''}`;
+      }
+      
+      // 🆕 Adicionar tratamento para ambiente de produção
+      if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
+        // Em produção, usar URL direta (não precisa de proxy)
+        url = webhookUrl;
+      } else if (import.meta.env.DEV && webhookUrl.startsWith('http')) {
+        // Em desenvolvimento, tentar usar proxy se for localhost
+        if (webhookUrl.includes('localhost')) {
+          url = webhookUrl; // O Vite já faz proxy automático para localhost
+        } else if (webhookUrl.includes('railway.app')) {
+          // Para URLs da Railway em desenvolvimento, usar URL direta (sem aviso de CORS)
+          url = webhookUrl;
+        } else {
+          // Para outras URLs externas em desenvolvimento, pode haver problemas de CORS
+          console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
+          url = webhookUrl;
+        }
+      }
 
       // 🆕 Basic Auth (se o n8n estiver protegido)
       const username = import.meta.env.VITE_N8N_USERNAME || '';

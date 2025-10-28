@@ -44,8 +44,13 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
           description: service.description
         }));
       
+      const cancelledCount = designerAppointments.filter(apt => apt.status === 'cancelled').length;
+      const activeCount = designerAppointments.filter(apt => apt.status !== 'cancelled').length;
+      
       console.log('📊 Estatísticas - Serviços carregados:', designerServices.length);
       console.log('📊 Estatísticas - Agendamentos carregados:', designerAppointments.length);
+      console.log('📊 Estatísticas - Agendamentos ativos:', activeCount);
+      console.log('📊 Estatísticas - Agendamentos cancelados (excluídos):', cancelledCount);
       
       setAppointments(designerAppointments);
       setServices(designerServices);
@@ -61,6 +66,11 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
     now.setHours(0, 0, 0, 0); // Zerar horas para comparação correta
     
     return appointments.filter(apt => {
+      // ❌ Excluir agendamentos cancelados
+      if (apt.status === 'cancelled') {
+        return false;
+      }
+      
       const aptDate = new Date(apt.date + 'T00:00:00');
       aptDate.setHours(0, 0, 0, 0);
       

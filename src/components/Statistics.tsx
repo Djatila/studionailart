@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, Calendar, DollarSign, Award, BarChart } from 'lucide-react';
 import { NailDesigner, Appointment, Service } from '../App';
 import { getAppointments, getServices } from '../utils/supabaseUtils';
@@ -30,9 +30,22 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
       const designerAppointments = allAppointments.filter(
         (apt: Appointment) => apt.designerId === designer.id
       );
-      const designerServices = allServices.filter(
-        (service: Service) => service.designerId === designer.id
-      );
+      
+      // Converter serviços do Supabase (snake_case) para o formato do App (camelCase)
+      const designerServices = allServices
+        .filter((service: any) => service.designer_id === designer.id)
+        .map((service: any) => ({
+          id: service.id,
+          designerId: service.designer_id,
+          name: service.name,
+          duration: service.duration,
+          price: service.price,
+          category: service.category,
+          description: service.description
+        }));
+      
+      console.log('📊 Estatísticas - Serviços carregados:', designerServices.length);
+      console.log('📊 Estatísticas - Agendamentos carregados:', designerAppointments.length);
       
       setAppointments(designerAppointments);
       setServices(designerServices);
@@ -262,14 +275,19 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
           <h3 className="font-semibold text-gray-800">Performance dos Serviços</h3>
         </div>
         
-        {serviceStats.length === 0 ? (
+        {services.length === 0 ? (
           <p className="text-gray-600 text-center py-4">
             Nenhum serviço cadastrado ainda.
           </p>
         ) : serviceStats.every(s => s.count === 0) ? (
-          <p className="text-gray-600 text-center py-4">
-            Nenhum agendamento para o período selecionado.
-          </p>
+          <div className="text-center py-4">
+            <p className="text-gray-600 mb-3">
+              Nenhum agendamento para o período selecionado.
+            </p>
+            <p className="text-sm text-gray-500">
+              Você tem {services.length} serviço{services.length > 1 ? 's' : ''} cadastrado{services.length > 1 ? 's' : ''}, mas sem agendamentos em {getPeriodLabel().toLowerCase()}.
+            </p>
+          </div>
         ) : (
           <div className="space-y-4">
             {serviceStats.filter(s => s.count > 0).map((service, index) => (

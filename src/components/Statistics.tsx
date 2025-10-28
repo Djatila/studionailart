@@ -142,7 +142,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
   console.log('📊 Ticket Médio - Referência (últimos 30 dias):', referenceTicket.toFixed(2));
   console.log('📊 Comparação:', averageTicket > referenceTicket ? 'ACIMA ↑' : 'ABAIXO ↓');
   
-  // Service popularity
+  // Service popularity (mover para antes dos insights)
   const serviceStats = services.map(service => {
     const serviceAppointments = filteredAppointments.filter(apt => apt.service === service.name);
     return {
@@ -151,6 +151,101 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
       revenue: serviceAppointments.reduce((sum, apt) => sum + apt.price, 0)
     };
   }).sort((a, b) => b.count - a.count);
+  
+  // 📊 NOVO: Cálculo dos 5 insights adicionais
+  
+  // 1. Taxa de Ocupação
+  const calculateOccupationRate = () => {
+    // Estimar horários disponíveis (8h/dia, atendimentos de 1h em média)
+    const avgServiceDuration = services.length > 0 
+      ? services.reduce((sum, s) => sum + s.duration, 0) / services.length 
+      : 60;
+    const workingHoursPerDay = 8;
+    const daysInPeriod = selectedPeriod === 'week' ? 7 : selectedPeriod === 'month' ? 30 : 365;
+    const slotsPerDay = (workingHoursPerDay * 60) / avgServiceDuration;
+    const totalAvailableSlots = slotsPerDay * daysInPeriod;
+    const occupationRate = (totalAppointments / totalAvailableSlots) * 100;
+    return Math.min(occupationRate, 100); // Limitar a 100%
+  };
+  
+  // 2. Serviço Mais Lucrativo
+  const mostProfitableService = [...serviceStats].sort((a, b) => b.revenue - a.revenue)[0];
+  
+  // 3. Taxa de Retorno de Clientes
+  const calculateReturnRate = () => {
+    const clientAppointments = new Map<string, number>();
+    filteredAppointments.forEach(apt => {
+      const count = clientAppointments.get(apt.clientPhone) || 0;
+      clientAppointments.set(apt.clientPhone, count + 1);
+    });
+    
+    const returningClients = Array.from(clientAppointments.values()).filter(count => count > 1).length;
+    const totalUniqueClients = clientAppointments.size;
+    
+    return totalUniqueClients > 0 ? (returningClients / totalUniqueClients) * 100 : 0;
+  };
+  
+  // 4. Dia da Semana Mais Movimentado
+  const calculateBusiestDay = () => {
+    const dayStats = new Map<string, number>();
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    
+    filteredAppointments.forEach(apt => {
+      const date = new Date(apt.date + 'T00:00:00');
+      const dayName = dayNames[date.getDay()];
+      dayStats.set(dayName, (dayStats.get(dayName) || 0) + 1);
+    });
+    
+    let busiestDay = '';
+    let maxCount = 0;
+    dayStats.forEach((count, day) => {
+      if (count > maxCount) {
+        maxCount = count;
+        busiestDay = day;
+      }
+    });
+    
+    return { day: busiestDay, count: maxCount };
+  };
+  
+  // 5. Taxa de Cancelamento
+  const calculateCancellationRate = () => {
+    const allAppointmentsInPeriod = appointments.filter(apt => {
+      const aptDate = new Date(apt.date + 'T00:00:00');
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      switch (selectedPeriod) {
+        case 'week': {
+          const weekAhead = new Date(now);
+          weekAhead.setDate(now.getDate() + 7);
+          return aptDate >= now && aptDate <= weekAhead;
+        }
+        case 'month': {
+          const monthAhead = new Date(now);
+          monthAhead.setDate(now.getDate() + 30);
+          return aptDate >= now && aptDate <= monthAhead;
+        }
+        case 'year': {
+          const yearAhead = new Date(now);
+          yearAhead.setFullYear(now.getFullYear() + 1);
+          return aptDate >= now && aptDate <= yearAhead;
+        }
+        default:
+          return true;
+      }
+    });
+    
+    const cancelledCount = allAppointmentsInPeriod.filter(apt => apt.status === 'cancelled').length;
+    const total = allAppointmentsInPeriod.length;
+    
+    return total > 0 ? (cancelledCount / total) * 100 : 0;
+  };
+  
+  const occupationRate = calculateOccupationRate();
+  const returnRate = calculateReturnRate();
+  const busiestDay = calculateBusiestDay();
+  const cancellationRate = calculateCancellationRate();
 
   // Daily revenue for next 30 days
   const dailyRevenue = Array.from({ length: 30 }, (_, i) => {
@@ -379,6 +474,48 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
           )}
           {totalRevenue > 0 && (
             <p>• Faturamento previsto de R$ {totalRevenue.toFixed(2)} para {getPeriodLabel().toLowerCase()}.</p>
+          )}
+          
+          {/* 📊 NOVOS INSIGHTS */}
+          
+          {/* 1. Taxa de Ocupação */}
+          {totalAppointments > 0 && (
+            <p>• Sua taxa de ocupação é de {occupationRate.toFixed(0)}% - {
+              occupationRate >= 70 ? 'você está com ótima demanda! 📈' :
+              occupationRate >= 50 ? 'boa demanda, continue assim! 👍' :
+              occupationRate >= 30 ? 'considere divulgar mais seus serviços. 📢' :
+              'aumente sua divulgação para mais agendamentos. 💡'
+            }</p>
+          )}
+          
+          {/* 2. Serviço Mais Lucrativo */}
+          {mostProfitableService && mostProfitableService.revenue > 0 && (
+            <p>• Seu serviço mais lucrativo é "{mostProfitableService.name}" com R$ {mostProfitableService.revenue.toFixed(2)} em faturamento. 💎</p>
+          )}
+          
+          {/* 3. Taxa de Retorno de Clientes */}
+          {totalAppointments > 0 && (
+            <p>• {returnRate.toFixed(0)}% dos seus clientes são recorrentes - {
+              returnRate >= 60 ? 'excelente fidelização! 🎉' :
+              returnRate >= 40 ? 'boa retenção de clientes! 👏' :
+              returnRate >= 20 ? 'trabalhe no relacionamento pós-atendimento. 💌' :
+              'foque em fidelizar seus clientes. 🤝'
+            }</p>
+          )}
+          
+          {/* 4. Dia da Semana Mais Movimentado */}
+          {busiestDay.count > 0 && (
+            <p>• Seu dia mais movimentado é {busiestDay.day} com {busiestDay.count} agendamento{busiestDay.count > 1 ? 's' : ''}. 📆</p>
+          )}
+          
+          {/* 5. Taxa de Cancelamento */}
+          {totalAppointments > 0 && (
+            <p>• Sua taxa de cancelamento é de {cancellationRate.toFixed(0)}% - {
+              cancellationRate <= 5 ? 'excelente! 🌟' :
+              cancellationRate <= 10 ? 'dentro do normal. ✅' :
+              cancellationRate <= 20 ? 'considere política de confirmação. 📞' :
+              'revise sua política de agendamentos. ⚠️'
+            }</p>
           )}
         </div>
       </div>

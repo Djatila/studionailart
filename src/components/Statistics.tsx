@@ -108,6 +108,40 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
   const totalAppointments = filteredAppointments.length;
   const averageTicket = totalAppointments > 0 ? totalRevenue / totalAppointments : 0;
   
+  // 📊 Calcular ticket médio de referência baseado nos últimos 30 dias
+  const getLast30DaysAverageTicket = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    
+    const last30DaysAppointments = appointments.filter(apt => {
+      // Excluir cancelados
+      if (apt.status === 'cancelled') return false;
+      
+      const aptDate = new Date(apt.date + 'T00:00:00');
+      aptDate.setHours(0, 0, 0, 0);
+      
+      return aptDate >= thirtyDaysAgo && aptDate <= now;
+    });
+    
+    if (last30DaysAppointments.length === 0) {
+      // Se não houver histórico, usar média dos preços dos serviços
+      return services.length > 0
+        ? services.reduce((sum, s) => sum + s.price, 0) / services.length
+        : 50; // Fallback para R$ 50 se não houver serviços
+    }
+    
+    const totalLast30Days = last30DaysAppointments.reduce((sum, apt) => sum + apt.price, 0);
+    return totalLast30Days / last30DaysAppointments.length;
+  };
+  
+  const referenceTicket = getLast30DaysAverageTicket();
+  
+  console.log('📊 Ticket Médio - Período atual:', averageTicket.toFixed(2));
+  console.log('📊 Ticket Médio - Referência (últimos 30 dias):', referenceTicket.toFixed(2));
+  console.log('📊 Comparação:', averageTicket > referenceTicket ? 'ACIMA ↑' : 'ABAIXO ↓');
+  
   // Service popularity
   const serviceStats = services.map(service => {
     const serviceAppointments = filteredAppointments.filter(apt => apt.service === service.name);
@@ -338,7 +372,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
             <p>• Seu serviço mais popular é "{serviceStats[0].name}" com {serviceStats[0].count} agendamentos.</p>
           )}
           {averageTicket > 0 && (
-            <p>• Seu ticket médio de R$ {averageTicket.toFixed(2)} está {averageTicket > 50 ? 'acima' : 'abaixo'} de R$ 50,00.</p>
+            <p>• Seu ticket médio de R$ {averageTicket.toFixed(2)} está {averageTicket > referenceTicket ? 'acima' : 'abaixo'} da média dos últimos 30 dias (R$ {referenceTicket.toFixed(2)}).</p>
           )}
           {services.length < 3 && (
             <p>• Considere adicionar mais serviços para diversificar suas opções.</p>

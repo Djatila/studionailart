@@ -60,6 +60,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   
   // 🆕 NOVO: Se designer já está selecionada (link personalizado), começa no Step 2
   const [step, setStep] = useState(initialDesigner ? 2 : 1);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [selectedDesigner, setSelectedDesigner] = useState<NailDesigner | null>(initialDesigner || null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -172,6 +173,16 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       window.removeEventListener('appointmentCancelled', handleAppointmentCancelled as EventListener);
     };
   }, [step, selectedDate]); // 🆕 Adicionar dependências
+  // Abrir calendário automaticamente quando chegar no step 3
+  useEffect(() => {
+    if (step === 3 && dateInputRef.current) {
+      // Pequeno delay para garantir que o DOM está pronto
+      setTimeout(() => {
+        dateInputRef.current?.showPicker?.();
+      }, 100);
+    }
+  }, [step]);
+
 
   // Listener para sincronização em tempo real
   useEffect(() => {
@@ -2029,6 +2040,7 @@ Aguardo confirmação!`;
                   </div>
                   <div>
                     <input
+                      ref={dateInputRef}
                       type="date"
                       value={selectedDate}
                       onChange={(e) => {

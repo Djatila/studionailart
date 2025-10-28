@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, Calendar, DollarSign, Award, BarChart } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, TrendingUp, Calendar, DollarSign, Users, Award, BarChart } from 'lucide-react';
 import { NailDesigner, Appointment, Service } from '../App';
-import { getAppointments, getServices } from '../utils/supabaseUtils';
 
 interface StatisticsProps {
   designer: NailDesigner;
@@ -10,68 +9,38 @@ interface StatisticsProps {
 
 export default function Statistics({ designer, onBack }: StatisticsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [designer.id]);
+  const getAppointments = (): Appointment[] => {
+    const saved = localStorage.getItem('nail_appointments');
+    const allAppointments = saved ? JSON.parse(saved) : [];
+    return allAppointments.filter((apt: Appointment) => apt.designerId === designer.id);
+  };
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // Buscar do Supabase
-      const allAppointments = await getAppointments();
-      const allServices = await getServices();
-      
-      // Filtrar apenas desta designer
-      const designerAppointments = allAppointments.filter(
-        (apt: Appointment) => apt.designerId === designer.id
-      );
-      const designerServices = allServices.filter(
-        (service: Service) => service.designerId === designer.id
-      );
-      
-      setAppointments(designerAppointments);
-      setServices(designerServices);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    } finally {
-      setLoading(false);
-    }
+  const getServices = (): Service[] => {
+    const saved = localStorage.getItem('nail_services');
+    const allServices = saved ? JSON.parse(saved) : [];
+    return allServices.filter((service: Service) => service.designerId === designer.id);
   };
 
   const getFilteredAppointments = () => {
+    const appointments = getAppointments();
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // Zerar horas para comparação correta
     
     return appointments.filter(apt => {
       const aptDate = new Date(apt.date + 'T00:00:00');
-      aptDate.setHours(0, 0, 0, 0);
       
       switch (selectedPeriod) {
-        case 'week': {
-          // Próximos 7 dias (incluindo hoje)
-          const weekAhead = new Date(now);
-          weekAhead.setDate(now.getDate() + 7);
-          return aptDate >= now && aptDate <= weekAhead;
-        }
+        case 'week':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(now.getDate() - 7);
+          return aptDate >= weekAgo && aptDate <= now;
         
-        case 'month': {
-          // Próximos 30 dias (incluindo hoje)
-          const monthAhead = new Date(now);
-          monthAhead.setDate(now.getDate() + 30);
-          return aptDate >= now && aptDate <= monthAhead;
-        }
+        case 'month':
+          return aptDate.getMonth() === now.getMonth() && 
+                 aptDate.getFullYear() === now.getFullYear();
         
-        case 'year': {
-          // Próximos 365 dias (incluindo hoje)
-          const yearAhead = new Date(now);
-          yearAhead.setFullYear(now.getFullYear() + 1);
-          return aptDate >= now && aptDate <= yearAhead;
-        }
+        case 'year':
+          return aptDate.getFullYear() === now.getFullYear();
         
         default:
           return true;
@@ -79,15 +48,16 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
     });
   };
 
-  const filteredAppointments = getFilteredAppointments();
+  const appointments = getFilteredAppointments();
+  const services = getServices();
   
-  const totalRevenue = filteredAppointments.reduce((sum, apt) => sum + apt.price, 0);
-  const totalAppointments = filteredAppointments.length;
+  const totalRevenue = appointments.reduce((sum, apt) => sum + apt.price, 0);
+  const totalAppointments = appointments.length;
   const averageTicket = totalAppointments > 0 ? totalRevenue / totalAppointments : 0;
   
   // Service popularity
   const serviceStats = services.map(service => {
-    const serviceAppointments = filteredAppointments.filter(apt => apt.service === service.name);
+    const serviceAppointments = appointments.filter(apt => apt.service === service.name);
     return {
       name: service.name,
       count: serviceAppointments.length,
@@ -95,46 +65,32 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
     };
   }).sort((a, b) => b.count - a.count);
 
-  // Daily revenue for next 30 days
+  // Daily revenue for current month
   const dailyRevenue = Array.from({ length: 30 }, (_, i) => {
     const date = new Date();
-    date.setDate(date.getDate() + i); // Próximos dias
+    date.setDate(date.getDate() - (29 - i));
     const dateStr = date.toISOString().split('T')[0];
     
-    const dayRevenue = filteredAppointments
+    const dayRevenue = appointments
       .filter(apt => apt.date === dateStr)
       .reduce((sum, apt) => sum + apt.price, 0);
     
-    const dayCount = filteredAppointments.filter(apt => apt.date === dateStr).length;
-    
     return {
-      date: `${date.getDate()}/${date.getMonth() + 1}`,
-      revenue: dayRevenue,
-      count: dayCount
+      date: date.getDate(),
+      revenue: dayRevenue
     };
   });
 
-  const maxDailyRevenue = Math.max(...dailyRevenue.map(d => d.revenue), 1);
+  const maxDailyRevenue = Math.max(...dailyRevenue.map(d => d.revenue));
 
   const getPeriodLabel = () => {
     switch (selectedPeriod) {
-      case 'week': return 'Próximos 7 Dias';
-      case 'month': return 'Próximos 30 Dias';
-      case 'year': return 'Próximo Ano';
+      case 'week': return 'Última Semana';
+      case 'month': return 'Este Mês';
+      case 'year': return 'Este Ano';
       default: return 'Período';
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando estatísticas...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -162,9 +118,9 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
                   : 'text-gray-600 hover:bg-pink-50'
               }`}
             >
-              {period === 'week' && '7 Dias'}
-              {period === 'month' && '30 Dias'}
-              {period === 'year' && '1 Ano'}
+              {period === 'week' && 'Semana'}
+              {period === 'month' && 'Mês'}
+              {period === 'year' && 'Ano'}
             </button>
           ))}
         </div>
@@ -191,7 +147,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-sm opacity-90">Agendamentos</p>
+              <p className="text-sm opacity-90">Atendimentos</p>
               <p className="text-lg font-bold">{totalAppointments}</p>
               <p className="text-xs opacity-75">{getPeriodLabel()}</p>
             </div>
@@ -229,13 +185,13 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
       <div className="bg-white rounded-xl p-6 shadow-sm border border-pink-100">
         <div className="flex items-center gap-2 mb-4">
           <BarChart className="w-5 h-5 text-pink-600" />
-          <h3 className="font-semibold text-gray-800">Agendamentos dos Próximos 30 Dias</h3>
+          <h3 className="font-semibold text-gray-800">Faturamento dos Últimos 30 Dias</h3>
         </div>
         
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className="space-y-2">
           {dailyRevenue.map((day, index) => (
             <div key={index} className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 w-12">{day.date}</span>
+              <span className="text-xs text-gray-500 w-6">{day.date}</span>
               <div className="flex-1 bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-gradient-to-r from-pink-400 to-rose-400 h-2 rounded-full transition-all duration-500"
@@ -244,10 +200,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
                   }}
                 />
               </div>
-              <span className="text-xs text-gray-600 w-20 text-right">
-                {day.count > 0 ? `${day.count} agend.` : '-'}
-              </span>
-              <span className="text-xs font-medium text-gray-700 w-20 text-right">
+              <span className="text-xs text-gray-600 w-16 text-right">
                 R$ {day.revenue.toFixed(0)}
               </span>
             </div>
@@ -264,15 +217,11 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
         
         {serviceStats.length === 0 ? (
           <p className="text-gray-600 text-center py-4">
-            Nenhum serviço cadastrado ainda.
-          </p>
-        ) : serviceStats.every(s => s.count === 0) ? (
-          <p className="text-gray-600 text-center py-4">
-            Nenhum agendamento para o período selecionado.
+            Nenhum dado de serviço disponível para o período selecionado.
           </p>
         ) : (
           <div className="space-y-4">
-            {serviceStats.filter(s => s.count > 0).map((service, index) => (
+            {serviceStats.map((service, index) => (
               <div key={service.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
@@ -301,10 +250,7 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
         <h3 className="font-semibold text-gray-800 mb-3">💡 Insights Rápidos</h3>
         <div className="space-y-2 text-sm text-gray-700">
           {totalAppointments === 0 && (
-            <p>• Ainda não há agendamentos futuros para este período.</p>
-          )}
-          {totalAppointments > 0 && (
-            <p>• Você tem {totalAppointments} agendamento{totalAppointments > 1 ? 's' : ''} confirmado{totalAppointments > 1 ? 's' : ''} para {getPeriodLabel().toLowerCase()}.</p>
+            <p>• Ainda não há agendamentos para analisar neste período.</p>
           )}
           {serviceStats.length > 0 && serviceStats[0].count > 0 && (
             <p>• Seu serviço mais popular é "{serviceStats[0].name}" com {serviceStats[0].count} agendamentos.</p>
@@ -314,9 +260,6 @@ export default function Statistics({ designer, onBack }: StatisticsProps) {
           )}
           {services.length < 3 && (
             <p>• Considere adicionar mais serviços para diversificar suas opções.</p>
-          )}
-          {totalRevenue > 0 && (
-            <p>• Faturamento previsto de R$ {totalRevenue.toFixed(2)} para {getPeriodLabel().toLowerCase()}.</p>
           )}
         </div>
       </div>

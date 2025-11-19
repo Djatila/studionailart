@@ -1,0 +1,3 @@
+git add index.html
+git commit -m "Atualizado CSP para permitir webhook do easypanel"
+git push

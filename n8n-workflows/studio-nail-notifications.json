@@ -1,0 +1,285 @@
+{
+  "name": "Agend Nail",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        -96
+      ],
+      "id": "256abcc5-08da-4bca-8201-1c759b46f6c8"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "type",
+              "value": "={{ $json[\"type\"] }}"
+            },
+            {
+              "name": "appointment.client_phone",
+              "value": "={{ $json.appointment.client_phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        -96
+      ],
+      "id": "d9ea9832-28cf-42ec-858a-55ec39b57f16"
+    },
+    {
+      "parameters": {},
+      "name": "IF - Novo Agendamento",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        -96
+      ],
+      "id": "7b7d932d-4269-4b46-8d16-e37768f36b73"
+    },
+    {
+      "parameters": {},
+      "name": "IF - Agendar Lembrete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        128
+      ],
+      "id": "d5b6371e-59bc-4b19-87a9-60af30e3a871"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://studionailartspace.uazapi.com/send/text",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"number\": \"{{ $json.appointment.client_phone }}\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "headerParametersJson": "={\n  \"token\": \"9bf14467-a262-40cf-a314-f042d4fd9105\"\n}"
+      },
+      "name": "UAZAPI - Enviar para Cliente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        -192
+      ],
+      "id": "c11d8ad1-976e-4c97-84cc-c3185381d37e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "swW8nBCKX2jy7Yru",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://studionailartspace.uazapi.com/v1/messages",
+        "options": {},
+        "bodyParametersJson": "={\n  \"number\": \"{{ $json.appointment.client_phone }}\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "headerParametersJson": "={\n  \"token\": \"9bf14467-a262-40cf-a314-f042d4fd9105\"\n}"
+      },
+      "name": "UAZAPI - Enviar para Designer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        32
+      ],
+      "id": "8b1e598e-7717-4636-a08d-420335f45225",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "swW8nBCKX2jy7Yru",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "name": "Cron - Verificar Lembretes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        336
+      ],
+      "id": "cee883ac-368a-4bbe-8e86-bb0962a77747"
+    },
+    {
+      "parameters": {
+        "functionCode": "const reminders = [];\n\n// Aqui você pode consultar um banco de dados ou API para obter lembretes agendados\n// Por enquanto, vamos simular com dados de exemplo\n\nconst now = new Date();\nconst in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);\nconst in6Hours = new Date(now.getTime() + 6 * 60 * 60 * 1000);\n\n// Simular lembretes\nreminders.push({\n  type: 'reminder_24h',\n  appointment: {\n    id: '123',\n    client_name: 'Maria Silva',\n    client_phone: '+5511999999999',\n    service: 'Manicure Completa',\n    date: '2023-12-20',\n    time: '14:00',\n    price: 80.00\n  }\n});\n\nreminders.push({\n  type: 'reminder_6h',\n  appointment: {\n    id: '456',\n    client_name: 'Ana Costa',\n    client_phone: '+5511988888888',\n    service: 'Pedicure',\n    date: '2023-12-20',\n    time: '16:00',\n    price: 60.00\n  }\n});\n\nreturn reminders.map(reminder => ({ json: reminder }));"
+      },
+      "name": "Function - Obter Lembretes",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        336
+      ],
+      "id": "d94adf21-e6c5-4ed7-99c5-350c7b2a9bc9"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://studionailartspace.uazapi.com/send/text",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"to\": \"{{ $json.appointment.client_phone }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Olá {{ $json.appointment.client_name }}, seu agendamento de {{ $json.appointment.service }} está confirmado para {{ $json.appointment.date }} às {{ $json.appointment.time }}. Studio Nail Art.\"\n  }\n}",
+        "headerParametersJson": "={\n  \"token\": \"9bf14467-a262-40cf-a314-f042d4fd9105\"\n}"
+      },
+      "name": "UAZAPI - Enviar Lembrete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        336
+      ],
+      "id": "f9409615-e7cb-4ec3-bad2-dfa51929ca26",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "swW8nBCKX2jy7Yru",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        -96
+      ],
+      "webhookId": "3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p",
+      "id": "f0271f12-2a69-4709-9e06-ffdb8eb1edc9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "IF - Novo Agendamento",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Agendar Lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Novo Agendamento": {
+      "main": [
+        [
+          {
+            "node": "UAZAPI - Enviar para Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "UAZAPI - Enviar para Designer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Agendar Lembrete": {
+      "main": [
+        [
+          {
+            "node": "Function - Obter Lembretes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron - Verificar Lembretes": {
+      "main": [
+        [
+          {
+            "node": "Function - Obter Lembretes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Obter Lembretes": {
+      "main": [
+        [
+          {
+            "node": "UAZAPI - Enviar Lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "916ff0a4-529d-418d-a8b9-ef6fcaa2f3a3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ae31e6c1c047cf9418176ea1393c67c2e6a0de223d1e63d50c5743d0fdf609d"
+  },
+  "id": "Gra5og5k35hjT5dy",
+  "tags": []
+}

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Final de Sincronização - Sistema de Agendamento</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f9f9f9;
+        }
+        .test-section h2 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .result.warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .log-container {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .log-entry.info {
+            color: #63b3ed;
+        }
+        .log-entry.success {
+            color: #68d391;
+        }
+        .log-entry.error {
+            color: #fc8181;
+        }
+        .log-entry.warning {
+            color: #f6e05e;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        .status-offline {
+            background: #dc3545;
+        }
+        .status-warning {
+            background: #ffc107;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .sync-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .device-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Teste Final de Sincronização</h1>
+        
+        <div class="device-info">
+            <strong>Dispositivo:</strong> <span id="device-info"></span><br>
+            <strong>Navegador:</strong> <span id="browser-info"></span><br>
+            <strong>Timestamp:</strong> <span id="timestamp"></span>
+        </div>
+
+        <div class="sync-status">
+            <div>
+                <span class="status-indicator status-offline" id="supabase-status"></span>
+                <strong>Status Supabase:</strong> <span id="supabase-text">Verificando...</span>
+            </div>
+            <div>
+                <span class="status-indicator status-offline" id="localStorage-status"></span>
+                <strong>LocalStorage:</strong> <span id="localStorage-text">Verificando...</span>
+            </div>
+        </div>
+
+        <!-- Teste de Conexão -->
+        <div class="test-section">
+            <h2>🔌 Teste de Conexão</h2>
+            <div class="button-group">
+                <button class="btn-primary" onclick="testSupabaseConnection()">Testar Supabase</button>
+                <button class="btn-secondary" onclick="testLocalStorage()">Testar LocalStorage</button>
+                <button class="btn-success" onclick="testBothConnections()">Testar Ambos</button>
+            </div>
+            <div id="connection-result" class="result"></div>
+        </div>
+
+        <!-- Teste de Disponibilidade -->
+        <div class="test-section">
+            <h2>📅 Teste de Disponibilidade</h2>
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadAvailabilityFromSupabase()">Carregar do Supabase</button>
+                <button class="btn-secondary" onclick="loadAvailabilityFromLocalStorage()">Carregar do LocalStorage</button>
+                <button class="btn-success" onclick="compareAvailabilityData()">Comparar Dados</button>
+                <button class="btn-warning" onclick="createTestAvailability()">Criar Teste</button>
+            </div>
+            <div id="availability-result" class="result"></div>
+        </div>
+
+        <!-- Teste de Agendamentos -->
+        <div class="test-section">
+            <h2>📋 Teste de Agendamentos</h2>
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadAppointmentsFromSupabase()">Carregar do Supabase</button>
+                <button class="btn-secondary" onclick="loadAppointmentsFromLocalStorage()">Carregar do LocalStorage</button>
+                <button class="btn-success" onclick="compareAppointmentData()">Comparar Dados</button>
+                <button class="btn-warning" onclick="createTestAppointment()">Criar Teste</button>
+            </div>
+            <div id="appointments-result" class="result"></div>
+        </div>
+
+        <!-- Teste de Sincronização Completa -->
+        <div class="test-section">
+            <h2>🔄 Teste de Sincronização Completa</h2>
+            <div class="button-group">
+                <button class="btn-success" onclick="runFullSyncTest()">Executar Teste Completo</button>
+                <button class="btn-danger" onclick="clearAllData()">Limpar Todos os Dados</button>
+                <button class="btn-warning" onclick="resetToDefaults()">Restaurar Padrões</button>
+            </div>
+            <div id="sync-result" class="result"></div>
+        </div>
+
+        <!-- Log de Atividades -->
+        <div class="test-section">
+            <h2>📝 Log de Atividades</h2>
+            <button class="btn-secondary" onclick="clearLog()">Limpar Log</button>
+            <div id="log-container" class="log-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU'
+        const { createClient } = supabase;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        // Variáveis globais
+        let testResults = {
+            supabase: null,
+            localStorage: null,
+            availability: null,
+            appointments: null,
+            sync: null
+        };
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDeviceInfo();
+            checkInitialStatus();
+        });
+
+        function initializeDeviceInfo() {
+            const deviceInfo = `${navigator.platform} - ${screen.width}x${screen.height}`;
+            const browserInfo = `${navigator.userAgent.split(' ').slice(-2).join(' ')}`;
+            const timestamp = new Date().toLocaleString('pt-BR');
+            
+            document.getElementById('device-info').textContent = deviceInfo;
+            document.getElementById('browser-info').textContent = browserInfo;
+            document.getElementById('timestamp').textContent = timestamp;
+            
+            log('info', `Dispositivo inicializado: ${deviceInfo}`);
+        }
+
+        function log(type, message) {
+            const logContainer = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log-container').innerHTML = '';
+            log('info', 'Log limpo');
+        }
+
+        function updateStatus(elementId, textId, status, text) {
+            const indicator = document.getElementById(elementId);
+            const textElement = document.getElementById(textId);
+            
+            indicator.className = `status-indicator status-${status}`;
+            textElement.textContent = text;
+        }
+
+        async function checkInitialStatus() {
+            log('info', 'Verificando status inicial...');
+            await testSupabaseConnection();
+            testLocalStorage();
+        }
+
+        // Testes de Conexão
+        async function testSupabaseConnection() {
+            try {
+                log('info', 'Testando conexão com Supabase...');
+                const { data, error } = await supabaseClient.from('designers').select('count').limit(1);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                updateStatus('supabase-status', 'supabase-text', 'online', 'Conectado');
+                document.getElementById('connection-result').innerHTML = 
+                    '<div class="result success">✅ Supabase conectado com sucesso!</div>';
+                testResults.supabase = true;
+                log('success', 'Supabase conectado com sucesso');
+                
+            } catch (error) {
+                updateStatus('supabase-status', 'supabase-text', 'offline', 'Erro de conexão');
+                document.getElementById('connection-result').innerHTML = 
+                    `<div class="result error">❌ Erro no Supabase: ${error.message}</div>`;
+                testResults.supabase = false;
+                log('error', `Erro no Supabase: ${error.message}`);
+            }
+        }
+
+        function testLocalStorage() {
+            try {
+                log('info', 'Testando LocalStorage...');
+                const testKey = 'test_' + Date.now();
+                const testValue = 'test_value';
+                
+                localStorage.setItem(testKey, testValue);
+                const retrieved = localStorage.getItem(testKey);
+                localStorage.removeItem(testKey);
+                
+                if (retrieved === testValue) {
+                    updateStatus('localStorage-status', 'localStorage-text', 'online', 'Funcionando');
+                    document.getElementById('connection-result').innerHTML += 
+                        '<div class="result success">✅ LocalStorage funcionando!</div>';
+                    testResults.localStorage = true;
+                    log('success', 'LocalStorage funcionando corretamente');
+                } else {
+                    throw new Error('Falha na verificação do LocalStorage');
+                }
+                
+            } catch (error) {
+                updateStatus('localStorage-status', 'localStorage-text', 'offline', 'Erro');
+                document.getElementById('connection-result').innerHTML += 
+                    `<div class="result error">❌ Erro no LocalStorage: ${error.message}</div>`;
+                testResults.localStorage = false;
+                log('error', `Erro no LocalStorage: ${error.message}`);
+            }
+        }
+
+        async function testBothConnections() {
+            log('info', 'Testando ambas as conexões...');
+            await testSupabaseConnection();
+            testLocalStorage();
+            
+            const bothWorking = testResults.supabase && testResults.localStorage;
+            document.getElementById('connection-result').innerHTML += 
+                `<div class="result ${bothWorking ? 'success' : 'warning'}">` +
+                `${bothWorking ? '✅' : '⚠️'} Status geral: ${bothWorking ? 'Tudo funcionando' : 'Problemas detectados'}</div>`;
+        }
+
+        // Testes de Disponibilidade
+        async function loadAvailabilityFromSupabase() {
+            try {
+                log('info', 'Carregando disponibilidade do Supabase...');
+                const { data, error } = await supabaseClient
+                     .from('availability')
+                     .select('*')
+                     .order('date', { ascending: true });
+                
+                if (error) throw error;
+                
+                document.getElementById('availability-result').innerHTML = 
+                    `<div class="result success">✅ Carregados ${data.length} registros de disponibilidade do Supabase</div>` +
+                    `<div class="result info">Dados: ${JSON.stringify(data.slice(0, 3), null, 2)}${data.length > 3 ? '\n... e mais ' + (data.length - 3) + ' registros' : ''}</div>`;
+                
+                testResults.availability = { supabase: data };
+                log('success', `${data.length} registros carregados do Supabase`);
+                
+            } catch (error) {
+                document.getElementById('availability-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao carregar do Supabase: ${error.message}</div>`;
+                log('error', `Erro ao carregar disponibilidade: ${error.message}`);
+            }
+        }
+
+        function loadAvailabilityFromLocalStorage() {
+            try {
+                log('info', 'Carregando disponibilidade do LocalStorage...');
+                const data = JSON.parse(localStorage.getItem('availability') || '[]');
+                
+                document.getElementById('availability-result').innerHTML += 
+                    `<div class="result success">✅ Carregados ${data.length} registros de disponibilidade do LocalStorage</div>` +
+                    `<div class="result info">Dados: ${JSON.stringify(data.slice(0, 3), null, 2)}${data.length > 3 ? '\n... e mais ' + (data.length - 3) + ' registros' : ''}</div>`;
+                
+                if (!testResults.availability) testResults.availability = {};
+                testResults.availability.localStorage = data;
+                log('success', `${data.length} registros carregados do LocalStorage`);
+                
+            } catch (error) {
+                document.getElementById('availability-result').innerHTML += 
+                    `<div class="result error">❌ Erro ao carregar do LocalStorage: ${error.message}</div>`;
+                log('error', `Erro ao carregar do LocalStorage: ${error.message}`);
+            }
+        }
+
+        function compareAvailabilityData() {
+            if (!testResults.availability || !testResults.availability.supabase || !testResults.availability.localStorage) {
+                document.getElementById('availability-result').innerHTML = 
+                    '<div class="result warning">⚠️ Carregue dados de ambas as fontes primeiro</div>';
+                return;
+            }
+            
+            log('info', 'Comparando dados de disponibilidade...');
+            const supabaseData = testResults.availability.supabase;
+            const localData = testResults.availability.localStorage;
+            
+            const comparison = {
+                supabaseCount: supabaseData.length,
+                localCount: localData.length,
+                matches: 0,
+                differences: []
+            };
+            
+            // Comparar registros
+            supabaseData.forEach(supabaseItem => {
+                const localMatch = localData.find(localItem => 
+                    localItem.designer_id === supabaseItem.designer_id && 
+                    localItem.date === supabaseItem.date
+                );
+                
+                if (localMatch) {
+                    comparison.matches++;
+                    // Verificar se os dados são idênticos
+                    if (JSON.stringify(localMatch) !== JSON.stringify(supabaseItem)) {
+                        comparison.differences.push({
+                            type: 'data_mismatch',
+                            supabase: supabaseItem,
+                            local: localMatch
+                        });
+                    }
+                } else {
+                    comparison.differences.push({
+                        type: 'missing_in_local',
+                        data: supabaseItem
+                    });
+                }
+            });
+            
+            // Verificar itens que existem apenas no localStorage
+            localData.forEach(localItem => {
+                const supabaseMatch = supabaseData.find(supabaseItem => 
+                    supabaseItem.designer_id === localItem.designer_id && 
+                    supabaseItem.date === localItem.date
+                );
+                
+                if (!supabaseMatch) {
+                    comparison.differences.push({
+                        type: 'missing_in_supabase',
+                        data: localItem
+                    });
+                }
+            });
+            
+            const isSync = comparison.differences.length === 0 && comparison.supabaseCount === comparison.localCount;
+            
+            document.getElementById('availability-result').innerHTML = 
+                `<div class="result ${isSync ? 'success' : 'warning'}">` +
+                `${isSync ? '✅' : '⚠️'} Comparação: ${comparison.matches} correspondências, ${comparison.differences.length} diferenças</div>` +
+                `<div class="result info">Supabase: ${comparison.supabaseCount} | LocalStorage: ${comparison.localCount}</div>` +
+                (comparison.differences.length > 0 ? 
+                    `<div class="result warning">Diferenças: ${JSON.stringify(comparison.differences.slice(0, 3), null, 2)}</div>` : '');
+            
+            log(isSync ? 'success' : 'warning', `Comparação concluída: ${isSync ? 'Dados sincronizados' : comparison.differences.length + ' diferenças encontradas'}`);
+        }
+
+        async function createTestAvailability() {
+            try {
+                log('info', 'Criando disponibilidade de teste...');
+                const testDate = new Date();
+                testDate.setDate(testDate.getDate() + 1); // Amanhã
+                const dateStr = testDate.toISOString().split('T')[0];
+                
+                const testAvailability = {
+                    designer_id: 'test-designer-' + Date.now(),
+                    date: dateStr,
+                    available_times: ['09:00', '10:00', '11:00', '14:00', '15:00'],
+                    created_at: new Date().toISOString()
+                };
+                
+                // Salvar no Supabase
+                 const { data, error } = await supabaseClient
+                     .from('availability')
+                     .insert([testAvailability])
+                     .select();
+                
+                if (error) throw error;
+                
+                // Salvar no LocalStorage
+                const localData = JSON.parse(localStorage.getItem('availability') || '[]');
+                localData.push(testAvailability);
+                localStorage.setItem('availability', JSON.stringify(localData));
+                
+                document.getElementById('availability-result').innerHTML = 
+                    '<div class="result success">✅ Disponibilidade de teste criada em ambas as fontes</div>' +
+                    `<div class="result info">Dados: ${JSON.stringify(testAvailability, null, 2)}</div>`;
+                
+                log('success', 'Disponibilidade de teste criada com sucesso');
+                
+            } catch (error) {
+                document.getElementById('availability-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao criar teste: ${error.message}</div>`;
+                log('error', `Erro ao criar disponibilidade de teste: ${error.message}`);
+            }
+        }
+
+        // Testes de Agendamentos
+        async function loadAppointmentsFromSupabase() {
+            try {
+                log('info', 'Carregando agendamentos do Supabase...');
+                const { data, error } = await supabaseClient
+                     .from('appointments')
+                     .select('*')
+                     .order('date', { ascending: true });
+                
+                if (error) throw error;
+                
+                document.getElementById('appointments-result').innerHTML = 
+                    `<div class="result success">✅ Carregados ${data.length} agendamentos do Supabase</div>` +
+                    `<div class="result info">Dados: ${JSON.stringify(data.slice(0, 3), null, 2)}${data.length > 3 ? '\n... e mais ' + (data.length - 3) + ' registros' : ''}</div>`;
+                
+                testResults.appointments = { supabase: data };
+                log('success', `${data.length} agendamentos carregados do Supabase`);
+                
+            } catch (error) {
+                document.getElementById('appointments-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao carregar do Supabase: ${error.message}</div>`;
+                log('error', `Erro ao carregar agendamentos: ${error.message}`);
+            }
+        }
+
+        function loadAppointmentsFromLocalStorage() {
+            try {
+                log('info', 'Carregando agendamentos do LocalStorage...');
+                const data = JSON.parse(localStorage.getItem('appointments') || '[]');
+                
+                document.getElementById('appointments-result').innerHTML += 
+                    `<div class="result success">✅ Carregados ${data.length} agendamentos do LocalStorage</div>` +
+                    `<div class="result info">Dados: ${JSON.stringify(data.slice(0, 3), null, 2)}${data.length > 3 ? '\n... e mais ' + (data.length - 3) + ' registros' : ''}</div>`;
+                
+                if (!testResults.appointments) testResults.appointments = {};
+                testResults.appointments.localStorage = data;
+                log('success', `${data.length} agendamentos carregados do LocalStorage`);
+                
+            } catch (error) {
+                document.getElementById('appointments-result').innerHTML += 
+                    `<div class="result error">❌ Erro ao carregar do LocalStorage: ${error.message}</div>`;
+                log('error', `Erro ao carregar do LocalStorage: ${error.message}`);
+            }
+        }
+
+        function compareAppointmentData() {
+            if (!testResults.appointments || !testResults.appointments.supabase || !testResults.appointments.localStorage) {
+                document.getElementById('appointments-result').innerHTML = 
+                    '<div class="result warning">⚠️ Carregue dados de ambas as fontes primeiro</div>';
+                return;
+            }
+            
+            log('info', 'Comparando dados de agendamentos...');
+            const supabaseData = testResults.appointments.supabase;
+            const localData = testResults.appointments.localStorage;
+            
+            const comparison = {
+                supabaseCount: supabaseData.length,
+                localCount: localData.length,
+                matches: 0,
+                differences: []
+            };
+            
+            // Comparar registros
+            supabaseData.forEach(supabaseItem => {
+                const localMatch = localData.find(localItem => 
+                    localItem.id === supabaseItem.id
+                );
+                
+                if (localMatch) {
+                    comparison.matches++;
+                    // Verificar se os dados são idênticos
+                    if (JSON.stringify(localMatch) !== JSON.stringify(supabaseItem)) {
+                        comparison.differences.push({
+                            type: 'data_mismatch',
+                            supabase: supabaseItem,
+                            local: localMatch
+                        });
+                    }
+                } else {
+                    comparison.differences.push({
+                        type: 'missing_in_local',
+                        data: supabaseItem
+                    });
+                }
+            });
+            
+            // Verificar itens que existem apenas no localStorage
+            localData.forEach(localItem => {
+                const supabaseMatch = supabaseData.find(supabaseItem => 
+                    supabaseItem.id === localItem.id
+                );
+                
+                if (!supabaseMatch) {
+                    comparison.differences.push({
+                        type: 'missing_in_supabase',
+                        data: localItem
+                    });
+                }
+            });
+            
+            const isSync = comparison.differences.length === 0 && comparison.supabaseCount === comparison.localCount;
+            
+            document.getElementById('appointments-result').innerHTML = 
+                `<div class="result ${isSync ? 'success' : 'warning'}">` +
+                `${isSync ? '✅' : '⚠️'} Comparação: ${comparison.matches} correspondências, ${comparison.differences.length} diferenças</div>` +
+                `<div class="result info">Supabase: ${comparison.supabaseCount} | LocalStorage: ${comparison.localCount}</div>` +
+                (comparison.differences.length > 0 ? 
+                    `<div class="result warning">Diferenças: ${JSON.stringify(comparison.differences.slice(0, 3), null, 2)}</div>` : '');
+            
+            log(isSync ? 'success' : 'warning', `Comparação concluída: ${isSync ? 'Dados sincronizados' : comparison.differences.length + ' diferenças encontradas'}`);
+        }
+
+        async function createTestAppointment() {
+            try {
+                log('info', 'Criando agendamento de teste...');
+                const testDate = new Date();
+                testDate.setDate(testDate.getDate() + 2); // Depois de amanhã
+                const dateStr = testDate.toISOString().split('T')[0];
+                
+                const testAppointment = {
+                    id: 'test-appointment-' + Date.now(),
+                    client_name: 'Cliente Teste',
+                    client_phone: '(11) 99999-9999',
+                    designer_id: 'test-designer',
+                    service: 'Manicure',
+                    date: dateStr,
+                    time: '14:00',
+                    status: 'confirmed',
+                    created_at: new Date().toISOString()
+                };
+                
+                // Salvar no Supabase
+                 const { data, error } = await supabaseClient
+                     .from('appointments')
+                     .insert([testAppointment])
+                     .select();
+                
+                if (error) throw error;
+                
+                // Salvar no LocalStorage
+                const localData = JSON.parse(localStorage.getItem('appointments') || '[]');
+                localData.push(testAppointment);
+                localStorage.setItem('appointments', JSON.stringify(localData));
+                
+                document.getElementById('appointments-result').innerHTML = 
+                    '<div class="result success">✅ Agendamento de teste criado em ambas as fontes</div>' +
+                    `<div class="result info">Dados: ${JSON.stringify(testAppointment, null, 2)}</div>`;
+                
+                log('success', 'Agendamento de teste criado com sucesso');
+                
+            } catch (error) {
+                document.getElementById('appointments-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao criar teste: ${error.message}</div>`;
+                log('error', `Erro ao criar agendamento de teste: ${error.message}`);
+            }
+        }
+
+        // Teste de Sincronização Completa
+        async function runFullSyncTest() {
+            log('info', 'Iniciando teste de sincronização completa...');
+            document.getElementById('sync-result').innerHTML = '<div class="result info">🔄 Executando teste completo...</div>';
+            
+            const results = {
+                connection: false,
+                availability: false,
+                appointments: false,
+                overall: false
+            };
+            
+            try {
+                // Teste 1: Conexões
+                log('info', 'Fase 1: Testando conexões...');
+                await testBothConnections();
+                results.connection = testResults.supabase && testResults.localStorage;
+                
+                // Teste 2: Disponibilidade
+                log('info', 'Fase 2: Testando sincronização de disponibilidade...');
+                await loadAvailabilityFromSupabase();
+                loadAvailabilityFromLocalStorage();
+                compareAvailabilityData();
+                results.availability = testResults.availability && 
+                    testResults.availability.supabase && 
+                    testResults.availability.localStorage;
+                
+                // Teste 3: Agendamentos
+                log('info', 'Fase 3: Testando sincronização de agendamentos...');
+                await loadAppointmentsFromSupabase();
+                loadAppointmentsFromLocalStorage();
+                compareAppointmentData();
+                results.appointments = testResults.appointments && 
+                    testResults.appointments.supabase && 
+                    testResults.appointments.localStorage;
+                
+                // Resultado final
+                results.overall = results.connection && results.availability && results.appointments;
+                
+                const summary = {
+                    timestamp: new Date().toLocaleString('pt-BR'),
+                    device: document.getElementById('device-info').textContent,
+                    browser: document.getElementById('browser-info').textContent,
+                    results: results,
+                    score: Object.values(results).filter(r => r).length + '/' + Object.keys(results).length
+                };
+                
+                document.getElementById('sync-result').innerHTML = 
+                    `<div class="result ${results.overall ? 'success' : 'warning'}">` +
+                    `${results.overall ? '✅' : '⚠️'} Teste Completo: ${summary.score} testes passaram</div>` +
+                    `<div class="result info">Conexão: ${results.connection ? '✅' : '❌'} | ` +
+                    `Disponibilidade: ${results.availability ? '✅' : '❌'} | ` +
+                    `Agendamentos: ${results.appointments ? '✅' : '❌'}</div>` +
+                    `<div class="result info">Resumo: ${JSON.stringify(summary, null, 2)}</div>`;
+                
+                log(results.overall ? 'success' : 'warning', 
+                    `Teste completo finalizado: ${summary.score} - ${results.overall ? 'Sistema sincronizado' : 'Problemas detectados'}`);
+                
+            } catch (error) {
+                document.getElementById('sync-result').innerHTML = 
+                    `<div class="result error">❌ Erro durante o teste completo: ${error.message}</div>`;
+                log('error', `Erro no teste completo: ${error.message}`);
+            }
+        }
+
+        async function clearAllData() {
+            if (!confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            try {
+                log('warning', 'Limpando todos os dados...');
+                
+                // Limpar localStorage
+                localStorage.removeItem('appointments');
+                localStorage.removeItem('availability');
+                localStorage.removeItem('designers');
+                localStorage.removeItem('services');
+                
+                // Limpar dados de teste do Supabase (apenas os criados por este teste)
+                 await supabaseClient.from('appointments').delete().like('id', 'test-appointment-%');
+                 await supabaseClient.from('availability').delete().like('designer_id', 'test-designer-%');
+                
+                document.getElementById('sync-result').innerHTML = 
+                    '<div class="result success">✅ Todos os dados de teste foram limpos</div>';
+                
+                // Resetar resultados
+                testResults = {
+                    supabase: null,
+                    localStorage: null,
+                    availability: null,
+                    appointments: null,
+                    sync: null
+                };
+                
+                log('success', 'Dados limpos com sucesso');
+                
+            } catch (error) {
+                document.getElementById('sync-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao limpar dados: ${error.message}</div>`;
+                log('error', `Erro ao limpar dados: ${error.message}`);
+            }
+        }
+
+        async function resetToDefaults() {
+            try {
+                log('info', 'Restaurando configurações padrão...');
+                
+                // Limpar resultados de teste
+                document.getElementById('connection-result').innerHTML = '';
+                document.getElementById('availability-result').innerHTML = '';
+                document.getElementById('appointments-result').innerHTML = '';
+                document.getElementById('sync-result').innerHTML = '';
+                
+                // Resetar status
+                updateStatus('supabase-status', 'supabase-text', 'offline', 'Verificando...');
+                updateStatus('localStorage-status', 'localStorage-text', 'offline', 'Verificando...');
+                
+                // Resetar resultados
+                testResults = {
+                    supabase: null,
+                    localStorage: null,
+                    availability: null,
+                    appointments: null,
+                    sync: null
+                };
+                
+                // Verificar status novamente
+                await checkInitialStatus();
+                
+                document.getElementById('sync-result').innerHTML = 
+                    '<div class="result success">✅ Configurações restauradas para o padrão</div>';
+                
+                log('success', 'Configurações restauradas com sucesso');
+                
+            } catch (error) {
+                document.getElementById('sync-result').innerHTML = 
+                    `<div class="result error">❌ Erro ao restaurar: ${error.message}</div>`;
+                log('error', `Erro ao restaurar configurações: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

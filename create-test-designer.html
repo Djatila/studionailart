@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Criar Designer de Teste</title>
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        window.createTestDesigner = async function() {
+            console.log('🔄 Criando designer de teste...');
+            
+            const testDesigner = {
+                id: 'test-designer-' + Date.now(),
+                name: 'Maria Silva (Teste)',
+                phone: '11999999999',
+                email: 'maria.teste@nail.com',
+                password: '1234',
+                isActive: true,
+                createdAt: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .insert([testDesigner])
+                    .select();
+                
+                if (error) {
+                    console.error('❌ Erro ao criar designer:', error);
+                    document.getElementById('result').innerHTML = `
+                        <div style="color: red;">
+                            <h3>❌ Erro ao criar designer</h3>
+                            <pre>${JSON.stringify(error, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    console.log('✅ Designer criado com sucesso:', data);
+                    document.getElementById('result').innerHTML = `
+                        <div style="color: green;">
+                            <h3>✅ Designer criado com sucesso!</h3>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('💥 Erro inesperado:', err);
+                document.getElementById('result').innerHTML = `
+                    <div style="color: red;">
+                        <h3>💥 Erro inesperado</h3>
+                        <pre>${err.message}</pre>
+                    </div>
+                `;
+            }
+        };
+        
+        window.listDesigners = async function() {
+            console.log('🔍 Listando designers...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (error) {
+                    console.error('❌ Erro ao listar designers:', error);
+                    document.getElementById('result').innerHTML = `
+                        <div style="color: red;">
+                            <h3>❌ Erro ao listar designers</h3>
+                            <pre>${JSON.stringify(error, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    console.log('✅ Designers encontrados:', data);
+                    const activeDesigners = data.filter(d => d.isActive);
+                    document.getElementById('result').innerHTML = `
+                        <div>
+                            <h3>📋 Designers no banco (${data.length} total, ${activeDesigners.length} ativos)</h3>
+                            <h4>Todos os designers:</h4>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                            <h4>Designers ativos:</h4>
+                            <pre>${JSON.stringify(activeDesigners, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error('💥 Erro inesperado:', err);
+                document.getElementById('result').innerHTML = `
+                    <div style="color: red;">
+                        <h3>💥 Erro inesperado</h3>
+                        <pre>${err.message}</pre>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Criar Designer de Teste</h1>
+    
+    <button onclick="createTestDesigner()" style="padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+        🔄 Criar Designer de Teste
+    </button>
+    
+    <button onclick="listDesigners()" style="padding: 10px 20px; margin: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">
+        📋 Listar Designers
+    </button>
+    
+    <div id="result" style="margin-top: 20px; padding: 20px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9;"></div>
+</body>
+</html>

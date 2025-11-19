@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔄 Teste de Sincronização de Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e0e0e0;
+        }
+        
+        .admin-panel {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+        }
+        
+        .client-panel {
+            border-color: #4ecdc4;
+            background: linear-gradient(135deg, #f0fffe 0%, #e0f7f7 100%);
+        }
+        
+        .panel h3 {
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+            display: inline-block;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .button.approve {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+        
+        .button.reject {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+        }
+        
+        .button.refresh {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+        }
+        
+        .appointment-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .appointment-card.pending {
+            border-left-color: #ff9800;
+            background: #fff8e1;
+        }
+        
+        .appointment-card.confirmed {
+            border-left-color: #4caf50;
+            background: #f1f8e9;
+        }
+        
+        .appointment-card.cancelled {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status-confirmed {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        
+        .log-info {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .log-success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .log-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .log-warning {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e0e0e0;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 1em;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .sync-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+        
+        .sync-ok {
+            background: #4caf50;
+        }
+        
+        .sync-error {
+            background: #f44336;
+        }
+        
+        .sync-warning {
+            background: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Teste de Sincronização de Status</h1>
+        <p class="subtitle">Ferramenta para diagnosticar problemas de sincronização entre painéis da designer e cliente</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAppointments">-</div>
+                <div class="stat-label">Total de Agendamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pendingCount">-</div>
+                <div class="stat-label">Pendentes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="confirmedCount">-</div>
+                <div class="stat-label">Confirmados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="cancelledCount">-</div>
+                <div class="stat-label">Cancelados</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="button" onclick="loadAllAppointments()">🔄 Carregar Agendamentos</button>
+            <button class="button" onclick="createTestAppointment()">➕ Criar Agendamento Teste</button>
+            <button class="button" onclick="simulateStatusSync()">🔄 Simular Sincronização</button>
+            <button class="button" onclick="clearTestData()">🗑️ Limpar Dados de Teste</button>
+        </div>
+        
+        <div class="test-grid">
+            <div class="panel admin-panel">
+                <h3>👩‍💼 Painel da Designer <span class="sync-indicator sync-ok" id="adminSyncStatus"></span></h3>
+                <div id="adminAppointments"></div>
+                <div style="margin-top: 15px;">
+                    <button class="button refresh" onclick="refreshAdminView()">🔄 Atualizar Vista</button>
+                </div>
+            </div>
+            
+            <div class="panel client-panel">
+                <h3>👤 Painel da Cliente <span class="sync-indicator sync-ok" id="clientSyncStatus"></span></h3>
+                <div id="clientAppointments"></div>
+                <div style="margin-top: 15px;">
+                    <button class="button refresh" onclick="refreshClientView()">🔄 Atualizar Vista</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log" id="logContainer">
+            <strong>📋 Log de Atividades:</strong>
+            <div id="logContent"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+        
+        const SUPABASE_URL = 'https://vhvxjiorcggilujjtdbr.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU'
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        
+        let appointments = []
+        let testClientPhone = '+5511999999999'
+        let testDesignerId = 'test-designer-id'
+        
+        function log(message, type = 'info') {
+            const logContent = document.getElementById('logContent')
+            const timestamp = new Date().toLocaleTimeString()
+            const logEntry = document.createElement('div')
+            logEntry.className = `log-entry log-${type}`
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`
+            logContent.appendChild(logEntry)
+            logContent.scrollTop = logContent.scrollHeight
+            console.log(`[${timestamp}] ${message}`)
+        }
+        
+        function updateStats() {
+            const total = appointments.length
+            const pending = appointments.filter(apt => apt.status === 'pending').length
+            const confirmed = appointments.filter(apt => apt.status === 'confirmed').length
+            const cancelled = appointments.filter(apt => apt.status === 'cancelled').length
+            
+            document.getElementById('totalAppointments').textContent = total
+            document.getElementById('pendingCount').textContent = pending
+            document.getElementById('confirmedCount').textContent = confirmed
+            document.getElementById('cancelledCount').textContent = cancelled
+        }
+        
+        function getStatusText(status) {
+            switch (status) {
+                case 'pending': return 'Pendente'
+                case 'confirmed': return 'Confirmado'
+                case 'cancelled': return 'Cancelado'
+                default: return status
+            }
+        }
+        
+        function renderAppointmentCard(appointment, isAdmin = false) {
+            const statusClass = appointment.status || 'pending'
+            const statusText = getStatusText(appointment.status || 'pending')
+            
+            let actions = ''
+            if (isAdmin && appointment.status === 'pending') {
+                actions = `
+                    <div style="margin-top: 10px;">
+                        <button class="button approve" onclick="updateAppointmentStatus('${appointment.id}', 'confirmed')">✅ Aprovar</button>
+                        <button class="button reject" onclick="updateAppointmentStatus('${appointment.id}', 'cancelled')">❌ Rejeitar</button>
+                    </div>
+                `
+            }
+            
+            return `
+                <div class="appointment-card ${statusClass}">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <strong>${appointment.client_name || appointment.clientName}</strong><br>
+                            <small>📞 ${appointment.client_phone || appointment.clientPhone}</small><br>
+                            <small>💅 ${appointment.service || appointment.service_name}</small><br>
+                            <small>📅 ${appointment.date || appointment.appointment_date} às ${appointment.time || appointment.appointment_time}</small><br>
+                            <small>💰 R$ ${(appointment.price || appointment.service_price || 0).toFixed(2)}</small>
+                        </div>
+                        <div>
+                            <span class="status-badge status-${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                    ${actions}
+                </div>
+            `
+        }
+        
+        function renderAdminView() {
+            const adminDiv = document.getElementById('adminAppointments')
+            const adminAppointments = appointments.filter(apt => 
+                (apt.designer_id === testDesignerId || apt.designerId === testDesignerId)
+            )
+            
+            if (adminAppointments.length === 0) {
+                adminDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Nenhum agendamento encontrado para esta designer</p>'
+            } else {
+                adminDiv.innerHTML = adminAppointments
+                    .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
+                    .map(apt => renderAppointmentCard(apt, true))
+                    .join('')
+            }
+            
+            // Update sync status
+            const syncStatus = document.getElementById('adminSyncStatus')
+            syncStatus.className = 'sync-indicator sync-ok'
+        }
+        
+        function renderClientView() {
+            const clientDiv = document.getElementById('clientAppointments')
+            const clientAppointments = appointments.filter(apt => 
+                (apt.client_phone === testClientPhone || apt.clientPhone === testClientPhone)
+            )
+            
+            if (clientAppointments.length === 0) {
+                clientDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Nenhum agendamento encontrado para este telefone</p>'
+            } else {
+                clientDiv.innerHTML = clientAppointments
+                    .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
+                    .map(apt => renderAppointmentCard(apt, false))
+                    .join('')
+            }
+            
+            // Update sync status
+            const syncStatus = document.getElementById('clientSyncStatus')
+            syncStatus.className = 'sync-indicator sync-ok'
+        }
+        
+        async function loadAllAppointments() {
+            try {
+                log('🔍 Carregando agendamentos do Supabase...', 'info')
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                
+                if (error) {
+                    log(`❌ Erro ao carregar agendamentos: ${error.message}`, 'error')
+                    return
+                }
+                
+                appointments = data || []
+                log(`✅ ${appointments.length} agendamentos carregados`, 'success')
+                
+                updateStats()
+                renderAdminView()
+                renderClientView()
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error')
+            }
+        }
+        
+        async function createTestAppointment() {
+            try {
+                log('➕ Criando agendamento de teste...', 'info')
+                
+                const testAppointment = {
+                    designer_id: testDesignerId,
+                    client_name: 'Cliente Teste',
+                    client_phone: testClientPhone,
+                    service: 'Manicure Completa',
+                    date: new Date().toISOString().split('T')[0],
+                    time: '14:00',
+                    price: 50.00,
+                    status: 'pending'
+                }
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert(testAppointment)
+                    .select()
+                    .single()
+                
+                if (error) {
+                    log(`❌ Erro ao criar agendamento: ${error.message}`, 'error')
+                    return
+                }
+                
+                log(`✅ Agendamento de teste criado: ${data.id}`, 'success')
+                await loadAllAppointments()
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error')
+            }
+        }
+        
+        async function updateAppointmentStatus(appointmentId, newStatus) {
+            try {
+                log(`🔄 Atualizando status do agendamento ${appointmentId} para ${newStatus}...`, 'info')
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .update({ status: newStatus })
+                    .eq('id', appointmentId)
+                    .select()
+                    .single()
+                
+                if (error) {
+                    log(`❌ Erro ao atualizar status: ${error.message}`, 'error')
+                    return
+                }
+                
+                log(`✅ Status atualizado para ${newStatus}`, 'success')
+                
+                // Simular delay de sincronização
+                setTimeout(async () => {
+                    log('🔄 Simulando sincronização entre painéis...', 'info')
+                    await loadAllAppointments()
+                    log('✅ Sincronização completa', 'success')
+                }, 1000)
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error')
+            }
+        }
+        
+        async function simulateStatusSync() {
+            log('🔄 Iniciando simulação de sincronização de status...', 'info')
+            
+            // Encontrar um agendamento pendente
+            const pendingAppointment = appointments.find(apt => apt.status === 'pending')
+            
+            if (!pendingAppointment) {
+                log('⚠️ Nenhum agendamento pendente encontrado. Criando um...', 'warning')
+                await createTestAppointment()
+                return
+            }
+            
+            log(`📋 Encontrado agendamento pendente: ${pendingAppointment.id}`, 'info')
+            log('👩‍💼 Simulando aprovação pela designer...', 'info')
+            
+            await updateAppointmentStatus(pendingAppointment.id, 'confirmed')
+            
+            log('👤 Verificando se a cliente vê a mudança...', 'info')
+            
+            setTimeout(() => {
+                const updatedAppointment = appointments.find(apt => apt.id === pendingAppointment.id)
+                if (updatedAppointment && updatedAppointment.status === 'confirmed') {
+                    log('✅ SUCESSO: Cliente vê o status atualizado!', 'success')
+                    document.getElementById('clientSyncStatus').className = 'sync-indicator sync-ok'
+                } else {
+                    log('❌ PROBLEMA: Cliente não vê o status atualizado!', 'error')
+                    document.getElementById('clientSyncStatus').className = 'sync-indicator sync-error'
+                }
+            }, 2000)
+        }
+        
+        async function clearTestData() {
+            try {
+                log('🗑️ Removendo dados de teste...', 'info')
+                
+                const { error } = await supabase
+                    .from('appointments')
+                    .delete()
+                    .eq('client_phone', testClientPhone)
+                
+                if (error) {
+                    log(`❌ Erro ao limpar dados: ${error.message}`, 'error')
+                    return
+                }
+                
+                log('✅ Dados de teste removidos', 'success')
+                await loadAllAppointments()
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error')
+            }
+        }
+        
+        function refreshAdminView() {
+            log('🔄 Atualizando vista da designer...', 'info')
+            renderAdminView()
+        }
+        
+        function refreshClientView() {
+            log('🔄 Atualizando vista da cliente...', 'info')
+            renderClientView()
+        }
+        
+        // Expor funções globalmente
+        window.loadAllAppointments = loadAllAppointments
+        window.createTestAppointment = createTestAppointment
+        window.updateAppointmentStatus = updateAppointmentStatus
+        window.simulateStatusSync = simulateStatusSync
+        window.clearTestData = clearTestData
+        window.refreshAdminView = refreshAdminView
+        window.refreshClientView = refreshClientView
+        
+        // Carregar dados iniciais
+        log('🚀 Ferramenta de teste de sincronização iniciada', 'info')
+        log(`📱 Telefone de teste: ${testClientPhone}`, 'info')
+        log(`👩‍💼 ID da designer de teste: ${testDesignerId}`, 'info')
+        
+        await loadAllAppointments()
+    </script>
+</body>
+</html>

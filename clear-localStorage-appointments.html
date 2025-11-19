@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Agendamentos do localStorage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #c0392b;
+        }
+        .button.secondary {
+            background: #3498db;
+        }
+        .button.secondary:hover {
+            background: #2980b9;
+        }
+        .button.success {
+            background: #27ae60;
+        }
+        .button.success:hover {
+            background: #229954;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .localStorage-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .localStorage-item.appointment {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .json-content {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpar Agendamentos do localStorage</h1>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalKeys">-</div>
+                <div class="stat-label">Total de Chaves no localStorage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="appointmentKeys">-</div>
+                <div class="stat-label">Chaves Relacionadas a Agendamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="testAppointments">-</div>
+                <div class="stat-label">Agendamentos "Manicure Teste"</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button secondary" onclick="inspectLocalStorage()">🔍 Inspecionar localStorage</button>
+            <button class="button secondary" onclick="findAppointmentData()">📋 Buscar Dados de Agendamentos</button>
+            <button class="button" onclick="clearAppointmentData()">🗑️ Limpar Agendamentos</button>
+            <button class="button success" onclick="clearAllLocalStorage()">🧹 Limpar Todo localStorage</button>
+        </div>
+
+        <div class="log" id="log">Clique em "Inspecionar localStorage" para começar...</div>
+        
+        <div id="localStorageContent"></div>
+    </div>
+
+    <script>
+        let localStorageData = {};
+        let appointmentRelatedKeys = [];
+        let testAppointmentCount = 0;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateStats() {
+            document.getElementById('totalKeys').textContent = Object.keys(localStorageData).length;
+            document.getElementById('appointmentKeys').textContent = appointmentRelatedKeys.length;
+            document.getElementById('testAppointments').textContent = testAppointmentCount;
+        }
+        
+        function inspectLocalStorage() {
+            log('🔍 Inspecionando localStorage...');
+            
+            localStorageData = {};
+            appointmentRelatedKeys = [];
+            testAppointmentCount = 0;
+            
+            // Listar todas as chaves do localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                localStorageData[key] = value;
+                
+                log(`📝 Chave encontrada: ${key}`);
+                
+                // Verificar se é relacionado a agendamentos
+                if (key.toLowerCase().includes('appointment') || 
+                    key.toLowerCase().includes('agendamento') ||
+                    key.toLowerCase().includes('booking')) {
+                    appointmentRelatedKeys.push(key);
+                    log(`📅 Chave relacionada a agendamentos: ${key}`);
+                }
+            }
+            
+            log(`\n📊 RESUMO:`);
+            log(`Total de chaves: ${Object.keys(localStorageData).length}`);
+            log(`Chaves relacionadas a agendamentos: ${appointmentRelatedKeys.length}`);
+            
+            updateStats();
+            displayLocalStorageContent();
+        }
+        
+        function displayLocalStorageContent() {
+            const container = document.getElementById('localStorageContent');
+            container.innerHTML = '';
+            
+            if (Object.keys(localStorageData).length === 0) {
+                container.innerHTML = '<p>Nenhum dado encontrado no localStorage.</p>';
+                return;
+            }
+            
+            const title = document.createElement('h3');
+            title.textContent = 'Conteúdo do localStorage:';
+            container.appendChild(title);
+            
+            Object.entries(localStorageData).forEach(([key, value]) => {
+                const div = document.createElement('div');
+                div.className = appointmentRelatedKeys.includes(key) ? 
+                    'localStorage-item appointment' : 'localStorage-item';
+                
+                const keyElement = document.createElement('strong');
+                keyElement.textContent = key;
+                div.appendChild(keyElement);
+                
+                const valueElement = document.createElement('div');
+                valueElement.className = 'json-content';
+                
+                try {
+                    // Tentar formatar como JSON se possível
+                    const parsed = JSON.parse(value);
+                    valueElement.textContent = JSON.stringify(parsed, null, 2);
+                } catch {
+                    // Se não for JSON, mostrar como texto
+                    valueElement.textContent = value;
+                }
+                
+                div.appendChild(valueElement);
+                container.appendChild(div);
+            });
+        }
+        
+        function findAppointmentData() {
+            log('📋 Procurando dados de agendamentos no localStorage...');
+            
+            testAppointmentCount = 0;
+            
+            Object.entries(localStorageData).forEach(([key, value]) => {
+                try {
+                    // Tentar parsear como JSON
+                    const parsed = JSON.parse(value);
+                    
+                    // Verificar se contém dados de agendamentos
+                    if (Array.isArray(parsed)) {
+                        // Array de agendamentos
+                        parsed.forEach((item, index) => {
+                            if (item && typeof item === 'object') {
+                                checkForTestAppointments(item, `${key}[${index}]`);
+                            }
+                        });
+                    } else if (parsed && typeof parsed === 'object') {
+                        // Objeto único
+                        checkForTestAppointments(parsed, key);
+                    }
+                } catch {
+                    // Não é JSON, verificar como string
+                    if (value.toLowerCase().includes('manicure teste')) {
+                        log(`🎯 "Manicure Teste" encontrado em ${key}: ${value}`);
+                        testAppointmentCount++;
+                    }
+                }
+            });
+            
+            log(`\n📊 Total de "Manicure Teste" encontrados: ${testAppointmentCount}`);
+            updateStats();
+        }
+        
+        function checkForTestAppointments(obj, path) {
+            if (!obj || typeof obj !== 'object') return;
+            
+            Object.entries(obj).forEach(([prop, val]) => {
+                if (typeof val === 'string' && val.toLowerCase().includes('manicure teste')) {
+                    log(`🎯 "Manicure Teste" encontrado em ${path}.${prop}: ${val}`);
+                    testAppointmentCount++;
+                } else if (typeof val === 'object' && val !== null) {
+                    checkForTestAppointments(val, `${path}.${prop}`);
+                }
+            });
+        }
+        
+        function clearAppointmentData() {
+            if (appointmentRelatedKeys.length === 0 && testAppointmentCount === 0) {
+                log('⚠️ Nenhum dado de agendamento encontrado para limpar!');
+                return;
+            }
+            
+            const confirmed = confirm(`Tem certeza que deseja limpar ${appointmentRelatedKeys.length} chave(s) relacionada(s) a agendamentos?\n\nEsta ação não pode ser desfeita!`);
+            
+            if (!confirmed) {
+                log('❌ Operação cancelada pelo usuário');
+                return;
+            }
+            
+            log('🗑️ Limpando dados de agendamentos do localStorage...');
+            
+            let removedCount = 0;
+            
+            appointmentRelatedKeys.forEach(key => {
+                try {
+                    localStorage.removeItem(key);
+                    log(`✅ Removido: ${key}`);
+                    removedCount++;
+                } catch (error) {
+                    log(`❌ Erro ao remover ${key}: ${error.message}`);
+                }
+            });
+            
+            // Também remover qualquer chave que contenha "manicure teste"
+            Object.entries(localStorageData).forEach(([key, value]) => {
+                if (value.toLowerCase().includes('manicure teste')) {
+                    try {
+                        localStorage.removeItem(key);
+                        log(`✅ Removido (contém "manicure teste"): ${key}`);
+                        removedCount++;
+                    } catch (error) {
+                        log(`❌ Erro ao remover ${key}: ${error.message}`);
+                    }
+                }
+            });
+            
+            log(`\n📊 RESULTADO: ${removedCount} chave(s) removida(s)`);
+            
+            // Reinspecionar localStorage
+            setTimeout(() => {
+                log('🔄 Reinspecionando localStorage...');
+                inspectLocalStorage();
+            }, 1000);
+        }
+        
+        function clearAllLocalStorage() {
+            const confirmed = confirm('⚠️ ATENÇÃO: Isso irá limpar TODOS os dados do localStorage!\n\nIncluindo login, configurações, etc.\n\nTem certeza?');
+            
+            if (!confirmed) {
+                log('❌ Operação cancelada pelo usuário');
+                return;
+            }
+            
+            log('🧹 Limpando TODO o localStorage...');
+            
+            try {
+                const keysCount = localStorage.length;
+                localStorage.clear();
+                log(`✅ localStorage limpo! ${keysCount} chave(s) removida(s)`);
+                
+                // Reinspecionar localStorage
+                setTimeout(() => {
+                    inspectLocalStorage();
+                }, 1000);
+            } catch (error) {
+                log(`❌ Erro ao limpar localStorage: ${error.message}`);
+            }
+        }
+        
+        // Inspecionar automaticamente ao carregar
+        inspectLocalStorage();
+    </script>
+</body>
+</html>

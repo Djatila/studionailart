@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Designer ID - Agendamentos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .success { background: #28a745; }
+        .error { background: #dc3545; }
+        .warning { background: #ffc107; color: #000; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .designer-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+        .appointment-card {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 5px 0;
+            background: #fff;
+        }
+        .match { background: #d4edda; border-color: #c3e6cb; }
+        .no-match { background: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Designer ID - Problema de Agendamentos</h1>
+    
+    <div class="container">
+        <h2>1. Verificar IDs das Designers</h2>
+        <button class="button" onclick="loadDesigners()">👩‍💼 Carregar Designers</button>
+        <button class="button" onclick="loadAppointments()">📅 Carregar Agendamentos</button>
+        <button class="button" onclick="analyzeMatches()">🔍 Analisar Correspondências</button>
+        <button class="button" onclick="clearLogs()">🗑️ Limpar Logs</button>
+    </div>
+
+    <div class="container">
+        <h3>📋 Logs de Debug</h3>
+        <div id="logs" class="log">Clique em "Carregar Designers" para começar...</div>
+    </div>
+
+    <div class="container">
+        <h3>👩‍💼 Designers Encontradas</h3>
+        <div id="designersList"></div>
+    </div>
+
+    <div class="container">
+        <h3>📅 Agendamentos Encontrados</h3>
+        <div id="appointmentsList"></div>
+    </div>
+
+    <div class="container">
+        <h3>🔍 Análise de Correspondências</h3>
+        <div id="analysisResults"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let designers = [];
+        let appointments = [];
+        
+        function log(message) {
+            const logElement = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').textContent = 'Logs limpos.\n';
+        }
+        
+        window.loadDesigners = async function() {
+            log('🔍 Carregando designers do Supabase...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('name');
+                
+                if (error) {
+                    log(`❌ Erro ao carregar designers: ${error.message}`);
+                    return;
+                }
+                
+                designers = data || [];
+                log(`✅ ${designers.length} designers encontradas no Supabase`);
+                
+                // Mostrar designers
+                const designersDiv = document.getElementById('designersList');
+                designersDiv.innerHTML = '';
+                
+                designers.forEach((designer, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'designer-card';
+                    card.innerHTML = `
+                        <strong>${designer.name}</strong><br>
+                        <small>ID: ${designer.id}</small><br>
+                        <small>Ativa: ${designer.is_active ? 'Sim' : 'Não'}</small><br>
+                        <small>Criada em: ${new Date(designer.created_at).toLocaleString()}</small>
+                    `;
+                    designersDiv.appendChild(card);
+                    
+                    log(`${index + 1}. ${designer.name} (ID: ${designer.id}) - Ativa: ${designer.is_active}`);
+                });
+                
+                // Verificar localStorage também
+                log('\n🔍 Verificando designers no localStorage...');
+                const localDesigners = localStorage.getItem('nail_designers');
+                if (localDesigners) {
+                    const parsed = JSON.parse(localDesigners);
+                    log(`📱 ${parsed.length} designers no localStorage`);
+                    parsed.forEach((designer, index) => {
+                        log(`   ${index + 1}. ${designer.name} (ID: ${designer.id})`);
+                    });
+                } else {
+                    log('📱 Nenhuma designer no localStorage');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.loadAppointments = async function() {
+            log('\n🔍 Carregando agendamentos do Supabase...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('date', { ascending: false })
+                    .order('time', { ascending: false });
+                
+                if (error) {
+                    log(`❌ Erro ao carregar agendamentos: ${error.message}`);
+                    return;
+                }
+                
+                appointments = data || [];
+                log(`✅ ${appointments.length} agendamentos encontrados no Supabase`);
+                
+                // Mostrar agendamentos
+                const appointmentsDiv = document.getElementById('appointmentsList');
+                appointmentsDiv.innerHTML = '';
+                
+                appointments.forEach((apt, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'appointment-card';
+                    card.innerHTML = `
+                        <strong>${apt.client_name}</strong> - ${apt.service}<br>
+                        <small>Designer ID: ${apt.designer_id}</small><br>
+                        <small>Data: ${apt.date} às ${apt.time}</small><br>
+                        <small>Status: ${apt.status}</small><br>
+                        <small>Criado em: ${new Date(apt.created_at).toLocaleString()}</small>
+                    `;
+                    appointmentsDiv.appendChild(card);
+                    
+                    log(`${index + 1}. ${apt.client_name} - Designer ID: ${apt.designer_id} - ${apt.date} ${apt.time}`);
+                });
+                
+                // Verificar localStorage também
+                log('\n🔍 Verificando agendamentos no localStorage...');
+                const localAppointments = localStorage.getItem('nail_appointments');
+                if (localAppointments) {
+                    const parsed = JSON.parse(localAppointments);
+                    log(`📱 ${parsed.length} agendamentos no localStorage`);
+                    parsed.forEach((apt, index) => {
+                        log(`   ${index + 1}. ${apt.clientName} - Designer ID: ${apt.designerId} - ${apt.date} ${apt.time}`);
+                    });
+                } else {
+                    log('📱 Nenhum agendamento no localStorage');
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        window.analyzeMatches = async function() {
+            if (designers.length === 0 || appointments.length === 0) {
+                log('⚠️ Carregue primeiro as designers e agendamentos');
+                return;
+            }
+            
+            log('\n🔍 Analisando correspondências entre designers e agendamentos...');
+            
+            const analysisDiv = document.getElementById('analysisResults');
+            analysisDiv.innerHTML = '';
+            
+            // Criar mapa de designers por ID
+            const designerMap = {};
+            designers.forEach(designer => {
+                designerMap[designer.id] = designer;
+            });
+            
+            // Analisar cada agendamento
+            const results = [];
+            appointments.forEach(apt => {
+                const designer = designerMap[apt.designer_id];
+                const result = {
+                    appointment: apt,
+                    designer: designer,
+                    hasMatch: !!designer
+                };
+                results.push(result);
+                
+                const card = document.createElement('div');
+                card.className = `appointment-card ${result.hasMatch ? 'match' : 'no-match'}`;
+                card.innerHTML = `
+                    <strong>Agendamento:</strong> ${apt.client_name} - ${apt.service}<br>
+                    <strong>Designer ID:</strong> ${apt.designer_id}<br>
+                    <strong>Designer Encontrada:</strong> ${result.hasMatch ? designer.name : 'NÃO ENCONTRADA'}<br>
+                    <strong>Status:</strong> ${result.hasMatch ? '✅ MATCH' : '❌ SEM MATCH'}<br>
+                    <small>Data: ${apt.date} às ${apt.time}</small>
+                `;
+                analysisDiv.appendChild(card);
+            });
+            
+            // Resumo
+            const matchCount = results.filter(r => r.hasMatch).length;
+            const noMatchCount = results.filter(r => !r.hasMatch).length;
+            
+            log(`\n📊 RESUMO DA ANÁLISE:`);
+            log(`✅ Agendamentos com designer encontrada: ${matchCount}`);
+            log(`❌ Agendamentos sem designer encontrada: ${noMatchCount}`);
+            log(`📊 Total de agendamentos: ${appointments.length}`);
+            
+            if (noMatchCount > 0) {
+                log('\n⚠️ AGENDAMENTOS PROBLEMÁTICOS:');
+                results.filter(r => !r.hasMatch).forEach((result, index) => {
+                    log(`${index + 1}. ${result.appointment.client_name} - Designer ID: ${result.appointment.designer_id}`);
+                });
+            }
+            
+            // Verificar se há designers sem agendamentos
+            log('\n👩‍💼 DESIGNERS SEM AGENDAMENTOS:');
+            const designersWithAppointments = new Set(appointments.map(apt => apt.designer_id));
+            const designersWithoutAppointments = designers.filter(designer => !designersWithAppointments.has(designer.id));
+            
+            if (designersWithoutAppointments.length > 0) {
+                designersWithoutAppointments.forEach((designer, index) => {
+                    log(`${index + 1}. ${designer.name} (ID: ${designer.id})`);
+                });
+            } else {
+                log('Todas as designers ativas têm pelo menos um agendamento.');
+            }
+        }
+        
+        // Carregar automaticamente ao abrir a página
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                loadDesigners();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

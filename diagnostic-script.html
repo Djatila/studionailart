@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - Designer Não Encontrada</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico: Designer Não Encontrada</h1>
+        
+        <div class="step">
+            <h3>Passo 1: Verificar Dados</h3>
+            <button class="button" onclick="checkData()">Verificar Designers e Agendamentos</button>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 2: Corrigir Problema</h3>
+            <button class="button" onclick="fixDesignerIds()">Corrigir IDs dos Designers</button>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 3: Testar Solução</h3>
+            <button class="button" onclick="testClientDashboard()">Testar Painel do Cliente</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        window.checkData = async function() {
+            clearResults();
+            addResult('🔍 Verificando dados no Supabase...', 'info');
+            
+            try {
+                // Buscar designers
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('name');
+                
+                if (designersError) {
+                    addResult(`❌ Erro ao buscar designers: ${designersError.message}`, 'error');
+                    return;
+                }
+                
+                addResult(`✅ Encontradas ${designers.length} designers:`, 'success');
+                designers.forEach(designer => {
+                    addResult(`   • ${designer.name} (ID: ${designer.id})`, 'info');
+                });
+                
+                // Buscar agendamentos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('date', { ascending: false });
+                
+                if (appointmentsError) {
+                    addResult(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`, 'error');
+                    return;
+                }
+                
+                addResult(`✅ Encontrados ${appointments.length} agendamentos`, 'success');
+                
+                // Verificar correspondências
+                const designerIds = new Set(designers.map(d => d.id));
+                const appointmentDesignerIds = new Set(appointments.map(a => a.designer_id));
+                
+                addResult('<h4>🔍 Análise de Correspondências:</h4>', 'info');
+                
+                // Agendamentos órfãos (sem designer correspondente)
+                const orphanAppointments = appointments.filter(apt => !designerIds.has(apt.designer_id));
+                if (orphanAppointments.length > 0) {
+                    addResult(`⚠️ ${orphanAppointments.length} agendamentos com designer inexistente:`, 'warning');
+                    orphanAppointments.forEach(apt => {
+                        addResult(`   • ${apt.client_name} - Designer ID: ${apt.designer_id} (${apt.date} ${apt.time})`, 'warning');
+                    });
+                } else {
+                    addResult('✅ Todos os agendamentos têm designers válidos', 'success');
+                }
+                
+                // Verificar localStorage
+                const localDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+                addResult(`📱 Designers no localStorage: ${localDesigners.length}`, 'info');
+                
+                if (localDesigners.length !== designers.length) {
+                    addResult('⚠️ Diferença entre Supabase e localStorage detectada', 'warning');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        };
+        
+        window.fixDesignerIds = async function() {
+            addResult('🔧 Iniciando correção dos IDs...', 'info');
+            
+            try {
+                // 1. Buscar designers do Supabase
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (designersError) {
+                    addResult(`❌ Erro ao buscar designers: ${designersError.message}`, 'error');
+                    return;
+                }
+                
+                // 2. Atualizar localStorage com dados corretos
+                localStorage.setItem('nail_designers', JSON.stringify(designers));
+                addResult('✅ localStorage atualizado com designers do Supabase', 'success');
+                
+                // 3. Buscar agendamentos órfãos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*');
+                
+                if (appointmentsError) {
+                    addResult(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`, 'error');
+                    return;
+                }
+                
+                const designerIds = new Set(designers.map(d => d.id));
+                const orphanAppointments = appointments.filter(apt => !designerIds.has(apt.designer_id));
+                
+                if (orphanAppointments.length > 0) {
+                    addResult(`🔧 Corrigindo ${orphanAppointments.length} agendamentos órfãos...`, 'info');
+                    
+                    // Tentar associar por nome da designer
+                    for (const apt of orphanAppointments) {
+                        // Procurar designer por nome similar (ex: Kika)
+                        const kikaDesigner = designers.find(d => 
+                            d.name.toLowerCase().includes('kika') || 
+                            d.name.toLowerCase().includes('klicia')
+                        );
+                        
+                        if (kikaDesigner) {
+                            const { error: updateError } = await supabase
+                                .from('appointments')
+                                .update({ designer_id: kikaDesigner.id })
+                                .eq('id', apt.id);
+                            
+                            if (updateError) {
+                                addResult(`❌ Erro ao corrigir agendamento ${apt.id}: ${updateError.message}`, 'error');
+                            } else {
+                                addResult(`✅ Agendamento de ${apt.client_name} associado à ${kikaDesigner.name}`, 'success');
+                            }
+                        }
+                    }
+                } else {
+                    addResult('✅ Nenhum agendamento órfão encontrado', 'success');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro durante correção: ${error.message}`, 'error');
+            }
+        };
+        
+        window.testClientDashboard = async function() {
+            addResult('🧪 Testando função getDesignerName...', 'info');
+            
+            try {
+                // Simular a função getDesignerName do ClientDashboard
+                const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+                
+                if (designers.length === 0) {
+                    addResult('❌ Nenhuma designer no localStorage. Execute a correção primeiro.', 'error');
+                    return;
+                }
+                
+                // Buscar agendamentos recentes
+                const { data: appointments, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (error) {
+                    addResult(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                    return;
+                }
+                
+                addResult('🧪 Testando últimos 5 agendamentos:', 'info');
+                
+                appointments.forEach(apt => {
+                    const designer = designers.find(d => d.id === apt.designer_id);
+                    const designerName = designer ? designer.name : 'Designer não encontrada';
+                    
+                    const status = designer ? 'success' : 'error';
+                    addResult(`   • ${apt.client_name}: ${designerName} (ID: ${apt.designer_id})`, status);
+                });
+                
+                const successCount = appointments.filter(apt => 
+                    designers.find(d => d.id === apt.designer_id)
+                ).length;
+                
+                if (successCount === appointments.length) {
+                    addResult('🎉 Todos os agendamentos têm designers válidos! Problema resolvido.', 'success');
+                } else {
+                    addResult(`⚠️ ${appointments.length - successCount} agendamentos ainda têm problemas`, 'warning');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Criação de Agendamentos - Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .appointments-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .appointment-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste de Criação de Agendamentos - Supabase</h1>
+    
+    <div class="container">
+        <h2>📝 Criar Novo Agendamento</h2>
+        <form id="appointmentForm">
+            <div class="form-group">
+                <label for="clientName">Nome do Cliente:</label>
+                <input type="text" id="clientName" value="Cliente Teste" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="clientPhone">Telefone do Cliente:</label>
+                <input type="tel" id="clientPhone" value="11999999999" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="designerId">ID do Designer:</label>
+                <input type="text" id="designerId" value="" placeholder="Será preenchido automaticamente">
+            </div>
+            
+            <div class="form-group">
+                <label for="serviceId">ID do Serviço:</label>
+                <input type="text" id="serviceId" value="" placeholder="Será preenchido automaticamente">
+            </div>
+            
+            <div class="form-group">
+                <label for="appointmentDate">Data:</label>
+                <input type="date" id="appointmentDate" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="appointmentTime">Horário:</label>
+                <input type="time" id="appointmentTime" value="14:00" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="status">Status:</label>
+                <select id="status">
+                    <option value="pending">Pendente</option>
+                    <option value="confirmed">Confirmado</option>
+                    <option value="completed">Concluído</option>
+                    <option value="cancelled">Cancelado</option>
+                </select>
+            </div>
+            
+            <button type="submit">Criar Agendamento</button>
+            <button type="button" onclick="loadDesignersAndServices()">Carregar Designers e Serviços</button>
+        </form>
+        
+        <div id="createResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="container">
+        <h2>👥 Designers Disponíveis</h2>
+        <button onclick="loadDesigners()">Carregar Designers</button>
+        <div id="designersResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="container">
+        <h2>💅 Serviços Disponíveis</h2>
+        <button onclick="loadServices()">Carregar Serviços</button>
+        <div id="servicesResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="container">
+        <h2>📅 Agendamentos no Supabase</h2>
+        <button onclick="loadAppointments()">Carregar Agendamentos</button>
+        <button onclick="clearAllAppointments()">Limpar Todos os Agendamentos</button>
+        <div id="appointmentsResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="container">
+        <h2>🔧 Teste de Conexão</h2>
+        <button onclick="testConnection()">Testar Conexão com Supabase</button>
+        <div id="connectionResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://vhvxjiorcpgllujjtdbr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY3BnbGx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzU2NzQsImV4cCI6MjA1MDU1MTY3NH0.CstZpGTY_js267';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Definir data padrão para hoje
+        document.getElementById('appointmentDate').value = new Date().toISOString().split('T')[0];
+        
+        // Teste de conexão
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testando conexão...';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro na conexão: ${error.message}`;
+                    resultDiv.className = 'result error';
+                } else {
+                    resultDiv.innerHTML = `✅ Conexão bem-sucedida! Total de agendamentos: ${data || 0}`;
+                    resultDiv.className = 'result success';
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro na conexão: ${err.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Carregar designers
+        async function loadDesigners() {
+            const resultDiv = document.getElementById('designersResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Carregando designers...';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('*');
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro ao carregar designers: ${error.message}`;
+                    resultDiv.className = 'result error';
+                } else {
+                    resultDiv.innerHTML = `✅ Designers encontrados: ${data.length}\n\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                    
+                    // Preencher o primeiro designer no formulário
+                    if (data.length > 0) {
+                        document.getElementById('designerId').value = data[0].id;
+                    }
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro ao carregar designers: ${err.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Carregar serviços
+        async function loadServices() {
+            const resultDiv = document.getElementById('servicesResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Carregando serviços...';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('services')
+                    .select('*');
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro ao carregar serviços: ${error.message}`;
+                    resultDiv.className = 'result error';
+                } else {
+                    resultDiv.innerHTML = `✅ Serviços encontrados: ${data.length}\n\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                    
+                    // Preencher o primeiro serviço no formulário
+                    if (data.length > 0) {
+                        document.getElementById('serviceId').value = data[0].id;
+                    }
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro ao carregar serviços: ${err.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Carregar designers e serviços
+        async function loadDesignersAndServices() {
+            await loadDesigners();
+            await loadServices();
+        }
+        
+        // Carregar agendamentos
+        async function loadAppointments() {
+            const resultDiv = document.getElementById('appointmentsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Carregando agendamentos...';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro ao carregar agendamentos: ${error.message}`;
+                    resultDiv.className = 'result error';
+                } else {
+                    let html = `✅ Agendamentos encontrados: ${data.length}\n\n`;
+                    
+                    if (data.length === 0) {
+                        html += 'Nenhum agendamento encontrado.';
+                    } else {
+                        data.forEach((appointment, index) => {
+                            html += `--- Agendamento ${index + 1} ---\n`;
+                            html += `ID: ${appointment.id}\n`;
+                            html += `Cliente: ${appointment.client_name}\n`;
+                            html += `Telefone: ${appointment.client_phone}\n`;
+                            html += `Data: ${appointment.date}\n`;
+                            html += `Horário: ${appointment.time}\n`;
+                            html += `Status: ${appointment.status}\n`;
+                            html += `Designer ID: ${appointment.designer_id}\n`;
+                            html += `Serviço ID: ${appointment.service_id}\n`;
+                            html += `Criado em: ${appointment.created_at}\n\n`;
+                        });
+                    }
+                    
+                    resultDiv.innerHTML = html;
+                    resultDiv.className = 'result success';
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro ao carregar agendamentos: ${err.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Limpar todos os agendamentos
+        async function clearAllAppointments() {
+            if (!confirm('Tem certeza que deseja limpar TODOS os agendamentos? Esta ação não pode ser desfeita!')) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('appointmentsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Limpando agendamentos...';
+            
+            try {
+                const { error } = await supabase
+                    .from('appointments')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro ao limpar agendamentos: ${error.message}`;
+                    resultDiv.className = 'result error';
+                } else {
+                    resultDiv.innerHTML = '✅ Todos os agendamentos foram removidos!';
+                    resultDiv.className = 'result success';
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro ao limpar agendamentos: ${err.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Criar agendamento
+        document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Criando agendamento...';
+            
+            const appointmentData = {
+                client_name: document.getElementById('clientName').value,
+                client_phone: document.getElementById('clientPhone').value,
+                designer_id: document.getElementById('designerId').value,
+                service_id: document.getElementById('serviceId').value,
+                date: document.getElementById('appointmentDate').value,
+                time: document.getElementById('appointmentTime').value,
+                status: document.getElementById('status').value,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                console.log('Dados do agendamento:', appointmentData);
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert([appointmentData])
+                    .select();
+                
+                if (error) {
+                    resultDiv.innerHTML = `❌ Erro ao criar agendamento: ${error.message}\n\nDetalhes: ${JSON.stringify(error, null, 2)}`;
+                    resultDiv.className = 'result error';
+                    console.error('Erro detalhado:', error);
+                } else {
+                    resultDiv.innerHTML = `✅ Agendamento criado com sucesso!\n\nDados criados:\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                    console.log('Agendamento criado:', data);
+                    
+                    // Recarregar a lista de agendamentos
+                    setTimeout(() => {
+                        loadAppointments();
+                    }, 1000);
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `❌ Erro ao criar agendamento: ${err.message}`;
+                resultDiv.className = 'result error';
+                console.error('Erro na criação:', err);
+            }
+        });
+        
+        // Carregar dados iniciais
+        window.addEventListener('load', function() {
+            testConnection();
+            loadDesignersAndServices();
+        });
+    </script>
+</body>
+</html>

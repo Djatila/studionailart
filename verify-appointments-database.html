@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Agendamentos no Supabase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button.success {
+            background: #27ae60;
+        }
+        .button.success:hover {
+            background: #229954;
+        }
+        .button.warning {
+            background: #f39c12;
+        }
+        .button.warning:hover {
+            background: #e67e22;
+        }
+        .button.danger {
+            background: #e74c3c;
+        }
+        .button.danger:hover {
+            background: #c0392b;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .appointment-item {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .appointment-item.recent {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verificar Agendamentos no Supabase</h1>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalAppointments">-</div>
+                <div class="stat-label">Total de Agendamentos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="recentAppointments">-</div>
+                <div class="stat-label">Agendamentos Hoje</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalClients">-</div>
+                <div class="stat-label">Total de Clientes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalDesigners">-</div>
+                <div class="stat-label">Total de Designers</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button" onclick="loadAllData()">📊 Carregar Dados Completos</button>
+            <button class="button success" onclick="testAppointmentCreation()">✅ Testar Criação de Agendamento</button>
+            <button class="button warning" onclick="monitorRealTime()">⏱️ Monitorar em Tempo Real</button>
+            <button class="button danger" onclick="stopMonitoring()">⏹️ Parar Monitoramento</button>
+        </div>
+
+        <!-- Formulário para teste de agendamento -->
+        <div class="form-section" id="testForm" style="display: none;">
+            <h3>🧪 Criar Agendamento de Teste</h3>
+            <div class="form-group">
+                <label>Nome do Cliente:</label>
+                <input type="text" id="clientName" value="Cliente Teste" placeholder="Nome do cliente">
+            </div>
+            <div class="form-group">
+                <label>Telefone:</label>
+                <input type="text" id="clientPhone" value="(11) 99999-9999" placeholder="Telefone">
+            </div>
+            <div class="form-group">
+                <label>Designer:</label>
+                <select id="designerSelect">
+                    <option value="">Selecione uma designer...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Serviço:</label>
+                <input type="text" id="serviceName" value="Manicure Completa" placeholder="Nome do serviço">
+            </div>
+            <div class="form-group">
+                <label>Preço:</label>
+                <input type="number" id="servicePrice" value="50" placeholder="Preço">
+            </div>
+            <div class="form-group">
+                <label>Data:</label>
+                <input type="date" id="appointmentDate">
+            </div>
+            <div class="form-group">
+                <label>Horário:</label>
+                <input type="time" id="appointmentTime" value="14:00">
+            </div>
+            <button class="button success" onclick="createTestAppointment()">✅ Criar Agendamento</button>
+            <button class="button" onclick="toggleTestForm()">❌ Cancelar</button>
+        </div>
+
+        <div class="log" id="log">Clique em "Carregar Dados Completos" para começar...</div>
+        
+        <div id="appointmentsList"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let allAppointments = [];
+        let allClients = [];
+        let allDesigners = [];
+        let monitoringInterval = null;
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function updateStats() {
+            const today = new Date().toISOString().split('T')[0];
+            const recentCount = allAppointments.filter(apt => 
+                apt.appointment_date === today || 
+                apt.created_at?.startsWith(today)
+            ).length;
+            
+            document.getElementById('totalAppointments').textContent = allAppointments.length;
+            document.getElementById('recentAppointments').textContent = recentCount;
+            document.getElementById('totalClients').textContent = allClients.length;
+            document.getElementById('totalDesigners').textContent = allDesigners.length;
+        }
+        
+        async function loadAllData() {
+            try {
+                log('🔄 Carregando todos os dados do Supabase...');
+                
+                // Carregar designers
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (designersError) {
+                    log(`❌ Erro ao carregar designers: ${designersError.message}`);
+                } else {
+                    allDesigners = designers || [];
+                    log(`✅ ${allDesigners.length} designers carregadas`);
+                    populateDesignerSelect();
+                }
+                
+                // Carregar clientes
+                const { data: clients, error: clientsError } = await supabase
+                    .from('clients')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (clientsError) {
+                    log(`❌ Erro ao carregar clientes: ${clientsError.message}`);
+                } else {
+                    allClients = clients || [];
+                    log(`✅ ${allClients.length} clientes carregados`);
+                }
+                
+                // Carregar agendamentos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        nail_designers(id, name),
+                        clients(id, name, phone)
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao carregar agendamentos: ${appointmentsError.message}`);
+                } else {
+                    allAppointments = appointments || [];
+                    log(`✅ ${allAppointments.length} agendamentos carregados`);
+                    displayAppointments();
+                }
+                
+                updateStats();
+                
+                // Verificar integridade dos dados
+                checkDataIntegrity();
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        function checkDataIntegrity() {
+            log('\n🔍 Verificando integridade dos dados...');
+            
+            let issuesFound = 0;
+            
+            allAppointments.forEach((apt, index) => {
+                // Verificar se tem designer associada
+                if (!apt.nail_designers) {
+                    log(`⚠️ Agendamento ${apt.id} sem designer associada`);
+                    issuesFound++;
+                }
+                
+                // Verificar se tem cliente associado
+                if (!apt.clients) {
+                    log(`⚠️ Agendamento ${apt.id} sem cliente associado`);
+                    issuesFound++;
+                }
+                
+                // Verificar campos obrigatórios
+                if (!apt.service_name) {
+                    log(`⚠️ Agendamento ${apt.id} sem nome do serviço`);
+                    issuesFound++;
+                }
+                
+                if (!apt.appointment_date) {
+                    log(`⚠️ Agendamento ${apt.id} sem data`);
+                    issuesFound++;
+                }
+            });
+            
+            if (issuesFound === 0) {
+                log('✅ Todos os agendamentos estão íntegros!');
+            } else {
+                log(`⚠️ Encontrados ${issuesFound} problemas de integridade`);
+            }
+        }
+        
+        function displayAppointments() {
+            const container = document.getElementById('appointmentsList');
+            container.innerHTML = '';
+            
+            if (allAppointments.length === 0) {
+                container.innerHTML = '<p>Nenhum agendamento encontrado.</p>';
+                return;
+            }
+            
+            const title = document.createElement('h3');
+            title.textContent = `📅 Últimos ${Math.min(10, allAppointments.length)} Agendamentos:`;
+            container.appendChild(title);
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            allAppointments.slice(0, 10).forEach(apt => {
+                const div = document.createElement('div');
+                const isRecent = apt.created_at?.startsWith(today) || apt.appointment_date === today;
+                div.className = isRecent ? 'appointment-item recent' : 'appointment-item';
+                
+                div.innerHTML = `
+                    <strong>${isRecent ? '🆕 ' : ''}${apt.service_name || 'Serviço não informado'}</strong><br>
+                    <strong>ID:</strong> ${apt.id}<br>
+                    <strong>Designer:</strong> ${apt.nail_designers?.name || 'Não informada'}<br>
+                    <strong>Cliente:</strong> ${apt.clients?.name || 'Não informado'} ${apt.clients?.phone ? `(${apt.clients.phone})` : ''}<br>
+                    <strong>Data:</strong> ${apt.appointment_date || 'Não informada'}<br>
+                    <strong>Horário:</strong> ${apt.appointment_time || 'Não informado'}<br>
+                    <strong>Preço:</strong> R$ ${apt.service_price || '0,00'}<br>
+                    <strong>Status:</strong> ${apt.status || 'pending'}<br>
+                    <strong>Criado em:</strong> ${apt.created_at ? new Date(apt.created_at).toLocaleString('pt-BR') : 'Não informado'}
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function populateDesignerSelect() {
+            const select = document.getElementById('designerSelect');
+            select.innerHTML = '<option value="">Selecione uma designer...</option>';
+            
+            allDesigners.forEach(designer => {
+                const option = document.createElement('option');
+                option.value = designer.id;
+                option.textContent = designer.name;
+                select.appendChild(option);
+            });
+        }
+        
+        function toggleTestForm() {
+            const form = document.getElementById('testForm');
+            const isVisible = form.style.display !== 'none';
+            form.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                // Definir data padrão para amanhã
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                document.getElementById('appointmentDate').value = tomorrow.toISOString().split('T')[0];
+            }
+        }
+        
+        async function testAppointmentCreation() {
+            toggleTestForm();
+        }
+        
+        async function createTestAppointment() {
+            try {
+                const clientName = document.getElementById('clientName').value;
+                const clientPhone = document.getElementById('clientPhone').value;
+                const designerId = document.getElementById('designerSelect').value;
+                const serviceName = document.getElementById('serviceName').value;
+                const servicePrice = parseFloat(document.getElementById('servicePrice').value);
+                const appointmentDate = document.getElementById('appointmentDate').value;
+                const appointmentTime = document.getElementById('appointmentTime').value;
+                
+                if (!clientName || !designerId || !serviceName || !appointmentDate) {
+                    log('❌ Preencha todos os campos obrigatórios!');
+                    return;
+                }
+                
+                log('🔄 Criando agendamento de teste...');
+                
+                // Primeiro, criar ou encontrar o cliente
+                let clientId;
+                const existingClient = allClients.find(c => c.phone === clientPhone);
+                
+                if (existingClient) {
+                    clientId = existingClient.id;
+                    log(`✅ Cliente existente encontrado: ${existingClient.name}`);
+                } else {
+                    // Criar novo cliente
+                    const { data: newClient, error: clientError } = await supabase
+                        .from('clients')
+                        .insert({
+                            name: clientName,
+                            phone: clientPhone
+                        })
+                        .select()
+                        .single();
+                    
+                    if (clientError) {
+                        log(`❌ Erro ao criar cliente: ${clientError.message}`);
+                        return;
+                    }
+                    
+                    clientId = newClient.id;
+                    log(`✅ Novo cliente criado: ${newClient.name} (ID: ${clientId})`);
+                }
+                
+                // Criar o agendamento
+                const { data: appointment, error: appointmentError } = await supabase
+                    .from('appointments')
+                    .insert({
+                        client_id: clientId,
+                        designer_id: designerId,
+                        service_name: serviceName,
+                        service_price: servicePrice,
+                        appointment_date: appointmentDate,
+                        appointment_time: appointmentTime,
+                        status: 'pending'
+                    })
+                    .select(`
+                        *,
+                        nail_designers(name),
+                        clients(name, phone)
+                    `)
+                    .single();
+                
+                if (appointmentError) {
+                    log(`❌ Erro ao criar agendamento: ${appointmentError.message}`);
+                    return;
+                }
+                
+                log(`✅ Agendamento criado com sucesso!`);
+                log(`📅 ID: ${appointment.id}`);
+                log(`👤 Cliente: ${appointment.clients.name}`);
+                log(`👩‍🎨 Designer: ${appointment.nail_designers.name}`);
+                log(`🛠️ Serviço: ${appointment.service_name}`);
+                log(`📅 Data: ${appointment.appointment_date} às ${appointment.appointment_time}`);
+                
+                // Recarregar dados
+                setTimeout(() => {
+                    loadAllData();
+                    toggleTestForm();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        function monitorRealTime() {
+            if (monitoringInterval) {
+                log('⚠️ Monitoramento já está ativo!');
+                return;
+            }
+            
+            log('⏱️ Iniciando monitoramento em tempo real...');
+            
+            monitoringInterval = setInterval(async () => {
+                const previousCount = allAppointments.length;
+                await loadAllData();
+                
+                if (allAppointments.length > previousCount) {
+                    log(`🆕 ${allAppointments.length - previousCount} novo(s) agendamento(s) detectado(s)!`);
+                }
+            }, 5000); // Verificar a cada 5 segundos
+            
+            log('✅ Monitoramento ativo (verificando a cada 5 segundos)');
+        }
+        
+        function stopMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+                log('⏹️ Monitoramento parado');
+            } else {
+                log('⚠️ Nenhum monitoramento ativo');
+            }
+        }
+        
+        // Disponibilizar funções globalmente
+        window.loadAllData = loadAllData;
+        window.testAppointmentCreation = testAppointmentCreation;
+        window.createTestAppointment = createTestAppointment;
+        window.toggleTestForm = toggleTestForm;
+        window.monitorRealTime = monitorRealTime;
+        window.stopMonitoring = stopMonitoring;
+        
+        // Carregar dados automaticamente
+        loadAllData();
+    </script>
+</body>
+</html>

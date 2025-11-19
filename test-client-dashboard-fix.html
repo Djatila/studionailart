@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Correção do ClientDashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log {
+            background-color: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .appointment-item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste de Correção do ClientDashboard</h1>
+        <p>Esta ferramenta testa se a correção da separação entre clientes e designers resolveu o problema dos agendamentos não aparecerem no painel da cliente.</p>
+        
+        <div class="form-group">
+            <label>Telefone do Cliente (para teste):</label>
+            <input type="text" id="clientPhone" value="(11) 99999-9999" placeholder="Digite o telefone do cliente">
+        </div>
+        
+        <button onclick="runFullTest()">🚀 Executar Teste Completo</button>
+        <button onclick="clearTestData()">🗑️ Limpar Dados de Teste</button>
+        
+        <div id="log" class="log"></div>
+        <div id="result"></div>
+        <div id="appointmentsList"></div>
+    </div>
+
+    <script type="module">
+        // Importar o Supabase client
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js';
+        
+        // Configuração do Supabase (substituir com suas credenciais reais)
+        const supabaseUrl = 'SUA_URL_DO_SUPABASE';
+        const supabaseAnonKey = 'SUA_CHAVE_ANONIMA';
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        
+        // Função para registrar logs
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // Também mostrar no console
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        // Função para mostrar resultado
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+        
+        // Função para normalizar telefones
+        function normalizePhone(phone) {
+            if (!phone) return '';
+            return String(phone).replace(/\D/g, '');
+        }
+        
+        // Função para criar agendamento de teste no Supabase
+        async function createTestAppointment() {
+            const clientPhone = document.getElementById('clientPhone').value;
+            
+            const testAppointment = {
+                id: 'test-' + Date.now(),
+                designer_id: 'test-designer-id',
+                client_name: 'Cliente Teste',
+                client_phone: clientPhone, // Usar o telefone informado
+                client_email: 'cliente@teste.com',
+                service: 'Serviço de Teste',
+                date: '2025-10-10',
+                time: '14:00',
+                price: 50,
+                status: 'pending'
+            };
+            
+            log('✅ Criando agendamento de teste no Supabase...', 'success');
+            log(JSON.stringify(testAppointment, null, 2));
+            
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .insert(testAppointment);
+                
+                if (error) {
+                    log(`❌ Erro ao criar agendamento: ${error.message}`, 'error');
+                    return null;
+                }
+                
+                log('💾 Agendamento criado no Supabase', 'success');
+                return testAppointment;
+            } catch (error) {
+                log(`❌ Erro de conexão: ${error.message}`, 'error');
+                return null;
+            }
+        }
+        
+        // Função para simular a função getSupabaseAppointments (como deveria funcionar agora)
+        async function getSupabaseAppointments() {
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+                
+                if (error) {
+                    log(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                    return [];
+                }
+                
+                // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
+                return data.map(apt => ({
+                    // Campos originais do Supabase (snake_case) - garantir que existam
+                    id: apt.id || '',
+                    designer_id: apt.designer_id || '',
+                    client_name: apt.client_name || '',
+                    client_phone: apt.client_phone || '',
+                    client_email: apt.client_email || null,
+                    service: apt.service || '',
+                    date: apt.date || '',
+                    time: apt.time || '',
+                    price: apt.price || 0,
+                    status: apt.status || 'pending',
+                    created_at: apt.created_at || new Date().toISOString(),
+                    updated_at: apt.updated_at || new Date().toISOString(),
+                    
+                    // Campos mapeados para camelCase (compatibilidade com frontend)
+                    designerId: apt.designer_id || '',
+                    clientName: apt.client_name || '',
+                    clientPhone: apt.client_phone || '',
+                    clientEmail: apt.client_email || null,
+                    createdAt: apt.created_at || new Date().toISOString(),
+                    updatedAt: apt.updated_at || new Date().toISOString()
+                }));
+            } catch (error) {
+                log(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error');
+                return [];
+            }
+        }
+        
+        // Função para simular o filtro de agendamentos (como no ClientDashboard)
+        function filterAppointmentsForClient(appointments, clientPhone) {
+            log(`🔍 Filtrando agendamentos para cliente com telefone: ${clientPhone}`);
+            
+            const normalizedClientPhone = normalizePhone(clientPhone);
+            log(`📱 Telefone normalizado do cliente: ${normalizedClientPhone}`);
+            
+            const filtered = appointments.filter((apt) => {
+                // Verificação mais robusta para o telefone (como no ClientDashboard)
+                const clientPhoneFromDB = apt.client_phone || apt.clientPhone || '';
+                const normalizedDBPhone = normalizePhone(clientPhoneFromDB);
+                
+                const matchesPhone = normalizedDBPhone === normalizedClientPhone;
+                log(`📋 Verificando agendamento ${apt.id}:`, 'info');
+                log(`   Telefone no DB: ${clientPhoneFromDB} (${normalizedDBPhone})`);
+                log(`   Telefone cliente: ${clientPhone} (${normalizedClientPhone})`);
+                log(`   Combina: ${matchesPhone ? '✅ SIM' : '❌ NÃO'}`);
+                
+                return matchesPhone;
+            });
+            
+            log(`📊 Total de agendamentos filtrados: ${filtered.length}`, 'info');
+            return filtered;
+        }
+        
+        // Função para mostrar agendamentos encontrados
+        function displayAppointments(appointments) {
+            const listDiv = document.getElementById('appointmentsList');
+            
+            if (appointments.length === 0) {
+                listDiv.innerHTML = '<div class="result error">❌ Nenhum agendamento encontrado para o cliente</div>';
+                return;
+            }
+            
+            let html = '<h3>📋 Agendamentos Encontrados:</h3>';
+            appointments.forEach(apt => {
+                html += `
+                    <div class="appointment-item">
+                        <strong>ID:</strong> ${apt.id}<br>
+                        <strong>Cliente:</strong> ${apt.client_name || apt.clientName}<br>
+                        <strong>Telefone:</strong> ${apt.client_phone || apt.clientPhone || 'N/A'}<br>
+                        <strong>Serviço:</strong> ${apt.service}<br>
+                        <strong>Data:</strong> ${apt.date} às ${apt.time}<br>
+                        <strong>Status:</strong> ${apt.status}<br>
+                        <strong>Valor:</strong> R$ ${apt.price}
+                    </div>
+                `;
+            });
+            
+            listDiv.innerHTML = html;
+        }
+        
+        // Função para simular o ClientDashboard (como deveria funcionar agora)
+        async function simulateClientDashboard() {
+            log('🖥️ Simulando ClientDashboard...', 'info');
+            
+            try {
+                // 1. Obter agendamentos do Supabase
+                const supabaseAppointments = await getSupabaseAppointments();
+                log(`📊 Total de agendamentos no Supabase: ${supabaseAppointments.length}`, 'success');
+                
+                // 2. Filtrar para o cliente específico
+                const clientPhone = document.getElementById('clientPhone').value;
+                const clientAppointments = filterAppointmentsForClient(supabaseAppointments, clientPhone);
+                
+                // 3. Mostrar resultados
+                displayAppointments(clientAppointments);
+                
+                if (clientAppointments.length > 0) {
+                    log('✅ SIMULAÇÃO CONCLUÍDA: Agendamentos estão sendo filtrados corretamente', 'success');
+                    return { 
+                        success: true, 
+                        message: `✅ Encontrados ${clientAppointments.length} agendamentos para o cliente`,
+                        appointments: clientAppointments
+                    };
+                } else {
+                    log('❌ SIMULAÇÃO CONCLUÍDA: Nenhum agendamento encontrado para o cliente', 'error');
+                    return { 
+                        success: false, 
+                        message: '❌ Nenhum agendamento encontrado para o cliente - problema na filtragem',
+                        appointments: []
+                    };
+                }
+            } catch (error) {
+                log(`❌ Erro na simulação: ${error.message}`, 'error');
+                return { 
+                    success: false, 
+                    message: `❌ Erro na simulação: ${error.message}`,
+                    appointments: []
+                };
+            }
+        }
+        
+        // Função principal para executar o teste completo
+        async function runFullTest() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('appointmentsList').innerHTML = '';
+            
+            log('🚀 Iniciando teste completo...', 'info');
+            
+            try {
+                // 1. Criar agendamento de teste
+                log('🔧 Criando agendamento de teste...', 'info');
+                const testAppointment = await createTestAppointment();
+                
+                if (!testAppointment) {
+                    showResult('❌ Falha ao criar agendamento de teste', 'error');
+                    return;
+                }
+                
+                // Aguardar um pouco para garantir que o agendamento foi salvo
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 2. Simular ClientDashboard
+                const result = await simulateClientDashboard();
+                
+                showResult(result.message, result.success ? 'success' : 'error');
+                
+                log('🏁 Teste completo finalizado!', 'info');
+            } catch (error) {
+                log(`❌ Erro durante o teste: ${error.message}`, 'error');
+                showResult(`❌ Erro durante o teste: ${error.message}`, 'error');
+            }
+        }
+        
+        // Função para limpar dados de teste
+        async function clearTestData() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('appointmentsList').innerHTML = '';
+            
+            // Limpar apenas agendamentos de teste do Supabase
+            try {
+                const { error } = await supabase
+                    .from('appointments')
+                    .delete()
+                    .ilike('id', 'test-%');
+                
+                if (error) {
+                    log(`❌ Erro ao limpar dados de teste: ${error.message}`, 'error');
+                    showResult(`❌ Erro ao limpar dados de teste: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log('🗑️ Dados de teste limpos do Supabase', 'info');
+                showResult('✅ Dados de teste limpos com sucesso', 'success');
+            } catch (error) {
+                log(`❌ Erro ao limpar dados de teste: ${error.message}`, 'error');
+                showResult(`❌ Erro ao limpar dados de teste: ${error.message}`, 'error');
+            }
+        }
+        
+        // Executar verificação inicial ao carregar a página
+        window.addEventListener('load', () => {
+            log('🔧 Ferramenta de teste carregada', 'info');
+            log('📋 Esta ferramenta testa se o fix da separação entre clientes e designers resolveu o problema', 'info');
+        });
+    </script>
+</body>
+</html>

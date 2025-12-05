@@ -13,6 +13,7 @@ import {
 } from '../utils/supabaseUtils';
 import { serviceService } from '../utils/supabaseUtils';
 import { supabase } from '../lib/supabase';
+import { getAvailableTimeSlots as getTimeSlotsConfig } from '../utils/timeSlots';
 
 interface AdminDashboardProps {
   designer: NailDesigner;
@@ -61,7 +62,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       price: totalPrice.toFixed(2) // Formata para 2 casas decimais
     }));
   }, [newClientData.service, selectedExtraServices, regularServices]); // Dependências para recalcular quando mudarem
-  
+
   // Estados para horários disponíveis
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
@@ -69,11 +70,11 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   // Novo estado para disponibilidade da designer
   const [designerAvailability, setDesignerAvailability] = useState<any[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  
-  console.log('🔍 [DEBUG] Estado inicial do componente AdminDashboard:', { 
+
+  console.log('🔍 [DEBUG] Estado inicial do componente AdminDashboard:', {
     // Removido designerId pois não existe na interface Client
     // designerId: designer.id,
-    clientType, 
+    clientType,
     clientsCount: clients.length,
     servicesCount: services.length,
     showClientModal
@@ -87,12 +88,12 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
     loadServices(); // Adicionando carregamento de serviços
     loadDesignerAvailability(); // Carregar disponibilidade da designer
   }, [designer.id]);
-  
+
   // Monitorar mudanças de estado para debug
   useEffect(() => {
-    console.log('🔍 [DEBUG] Estado atualizado:', { 
-      clientType, 
-      showNameSuggestions, 
+    console.log('🔍 [DEBUG] Estado atualizado:', {
+      clientType,
+      showNameSuggestions,
       nameSuggestionsLength: nameSuggestions.length,
       newClientDataName: newClientData.name
     });
@@ -104,7 +105,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       console.log('🔍 Carregando serviços para o designer:', designer.id);
       const designerServices = await serviceService.getByDesignerId(designer.id);
       console.log('🔍 Serviços recebidos:', designerServices);
-      
+
       // Converter os serviços do formato do Supabase para o formato local
       const convertedServices = designerServices.map(service => ({
         id: service.id,
@@ -115,7 +116,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         description: service.description || '',
         category: (service.category as 'services' | 'extras') || 'services'
       }));
-      
+
       console.log('📊 Serviços convertidos:', convertedServices);
       setServices(convertedServices);
       // NOVO: Separar serviços por categoria
@@ -131,7 +132,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        suggestionsRef.current && 
+        suggestionsRef.current &&
         !suggestionsRef.current.contains(event.target as Node) &&
         nameInputRef.current &&
         !nameInputRef.current.contains(event.target as Node)
@@ -155,7 +156,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       const data = await getSupabaseAppointments();
       console.log('📊 AdminDashboard: Total de agendamentos do Supabase:', data.length);
       console.log('📋 AdminDashboard: Dados brutos:', data);
-      
+
       // Filter by designer_id (Supabase field) or designerId (localStorage field)
       const designerAppointments = data.filter((apt: any) => {
         const matches = apt.designer_id === designer.id || apt.designerId === designer.id;
@@ -164,7 +165,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         }
         return matches;
       });
-      
+
       console.log('🎯 AdminDashboard: Agendamentos filtrados para designer:', designerAppointments.length);
       setAppointments(designerAppointments);
     } catch (err) {
@@ -178,7 +179,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       // Carregar clientes da tabela clients correta
       const data = await getSupabaseClients();
       console.log('🔍 Clientes carregados:', data);
-      
+
       // Converter para o formato Client esperado
       const convertedClients = data.map((client: any) => {
         const convertedClient: Client = {
@@ -226,27 +227,27 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         // Removido designer_id pois não existe na interface Client
         // designer_id: client.designerId
       };
-      
+
       // Usar a função createClientRecord para salvar no Supabase
       const { createClientRecord } = await import('../utils/supabaseUtils');
       const savedClient = await createClientRecord(clientData);
-      
+
       if (savedClient) {
         console.log('✅ Cliente salvo no Supabase:', savedClient);
-        
+
         // Atualizar estado local
         const existingIndex = clients.findIndex((c: Client) => c.id === client.id);
         let updatedClients;
-        
+
         if (existingIndex >= 0) {
           updatedClients = [...clients];
           updatedClients[existingIndex] = client;
         } else {
           updatedClients = [...clients, client];
         }
-        
+
         setClients(updatedClients);
-        
+
         // Disparar evento para sincronizar com outros componentes
         window.dispatchEvent(new CustomEvent('clientCreated', {
           detail: { client: savedClient }
@@ -255,32 +256,32 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         // Fallback para estado local apenas
         const existingIndex = clients.findIndex((c: Client) => c.id === client.id);
         let updatedClients;
-        
+
         if (existingIndex >= 0) {
           updatedClients = [...clients];
           updatedClients[existingIndex] = client;
         } else {
           updatedClients = [...clients, client];
         }
-        
+
         setClients(updatedClients);
       }
     } catch (err) {
       console.error('Erro ao salvar cliente no Supabase:', err);
       setError('Erro ao salvar cliente');
-      
+
       // Fallback para estado local em caso de erro
       try {
         const existingIndex = clients.findIndex((c: Client) => c.id === client.id);
         let updatedClients;
-        
+
         if (existingIndex >= 0) {
           updatedClients = [...clients];
           updatedClients[existingIndex] = client;
         } else {
           updatedClients = [...clients, client];
         }
-        
+
         setClients(updatedClients);
       } catch (localErr) {
         console.error('Erro ao salvar cliente localmente:', localErr);
@@ -296,19 +297,19 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
 
   const findClientsByName = (name: string): Client[] => {
     if (name.length < 1) return [];
-    
+
     const clients = getClients();
     console.log('🔍 Buscando clientes por nome. Total de clientes:', clients.length, 'Nome buscado:', name);
-    
+
     // Se não há clientes, retornar array vazio
     if (clients.length === 0) {
       console.log('🔍 Nenhum cliente cadastrado no sistema');
       return [];
     }
-    
+
     const searchTerm = name.toLowerCase().trim();
     console.log('🔍 Termo de busca normalizado:', searchTerm);
-    
+
     // Buscar por nome (apenas por nome agora)
     const matchingClients = clients.filter(c => {
       // Verificar se o cliente tem nome definido
@@ -316,32 +317,32 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         console.log('🔍 Cliente sem nome:', c);
         return false;
       }
-      
+
       const clientName = c.name.toLowerCase();
       const nameMatch = clientName.includes(searchTerm);
       console.log(`🔍 Verificando cliente ${c.name}: clientName=${clientName}, searchTerm=${searchTerm}, nameMatch=${nameMatch}`);
       return nameMatch;
     });
-    
+
     console.log('🔍 Clientes encontrados na busca:', matchingClients);
-    
+
     // Ordenar por relevância: primeiro os que começam com o termo, depois os que contêm
     return matchingClients.sort((a, b) => {
       const aNameStartsWith = a.name.toLowerCase().startsWith(searchTerm);
       const bNameStartsWith = b.name.toLowerCase().startsWith(searchTerm);
-      
+
       // Priorizar nomes que começam com o termo
       if (aNameStartsWith && !bNameStartsWith) return -1;
       if (!aNameStartsWith && bNameStartsWith) return 1;
-      
+
       // Se ambos começam ou ambos não começam, manter ordem original
       return 0;
     });
   };
 
   const handleManualBooking = async () => {
-    if (!newClientData.name || !newClientData.phone || !newClientData.service || 
-        !newClientData.date || !newClientData.time || !newClientData.price) {
+    if (!newClientData.name || !newClientData.phone || !newClientData.service ||
+      !newClientData.date || !newClientData.time || !newClientData.price) {
       alert('Por favor, preencha todos os campos obrigatórios');
       return;
     }
@@ -352,10 +353,10 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
     try {
       // Check for time conflicts
       const existingAppointments = getAppointments();
-      const conflictingAppointment = existingAppointments.find(apt => 
+      const conflictingAppointment = existingAppointments.find(apt =>
         apt.date === newClientData.date && apt.time === newClientData.time
       );
-      
+
       if (conflictingAppointment) {
         alert(`Este horário já está ocupado por ${conflictingAppointment.clientName}. Por favor, escolha outro horário.`);
         setLoading(false);
@@ -373,7 +374,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
         isActive: true,
         createdAt: existingClient?.createdAt || new Date().toISOString()
       };
-      
+
       await saveClient(client);
 
       // Save appointment
@@ -392,20 +393,20 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       };
 
       const savedAppointment = await createAppointment(appointment);
-      
+
       if (savedAppointment) {
         console.log('✅ Agendamento salvo no Supabase:', savedAppointment);
-        
+
         // Disparar evento para sincronizar com outros componentes
         window.dispatchEvent(new CustomEvent('appointmentCreated', {
           detail: { appointment: savedAppointment }
         }));
-        
+
         // 🆕 NOVO: Enviar notificações de agendamento
         await sendAppointmentNotifications(savedAppointment);
-        
+
         await loadAppointments(); // Recarregar lista
-        
+
         // Reset form
         setNewClientData({
           name: '', phone: '', email: '', service: '', date: '', time: '', price: ''
@@ -418,7 +419,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
       } else {
         throw new Error('Falha ao salvar agendamento');
       }
-      
+
     } catch (err) {
       console.error('Erro ao criar agendamento:', err);
       setError('Erro ao criar agendamento: ' + (err as Error).message);
@@ -443,19 +444,19 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
     try {
       setLoading(true);
       console.log('🔄 Iniciando atualização da chave PIX:', { designerId: designer.id, pixKey });
-      
+
       const result = await updateNailDesigner(designer.id, { pixKey });
       console.log('✅ Resultado da atualização:', result);
-      
+
       if (result) {
         console.log('✅ Chave PIX atualizada com sucesso no Supabase');
         // Atualizar o estado local do designer
         const updatedDesigner = { ...designer, pixKey };
         console.log('🔄 Atualizando estado local do designer:', updatedDesigner);
-        
+
         // Disparar evento para atualizar dados globais
         window.dispatchEvent(new CustomEvent('designerUpdated', { detail: updatedDesigner }));
-        
+
         setShowPixModal(false);
       } else {
         console.error('❌ Falha na atualização - resultado null');
@@ -515,7 +516,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   // Check for existing client when phone changes
   const handlePhoneChange = (phone: string) => {
     setNewClientData(prev => ({ ...prev, phone }));
-    
+
     if (phone.length >= 10) { // Basic phone validation
       const client = findClientByPhone(phone);
       if (client) {
@@ -550,7 +551,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
     } else {
       // Quando selecionar "cliente existente", garantir que as sugestões estejam visíveis
       console.log('🔍 [DEBUG] Cliente existente selecionado');
-      
+
       // Sempre mostrar todas as clientes quando selecionar "cliente existente"
       const allClients = getClients();
       console.log('🔍 [DEBUG] Total de clientes disponíveis:', allClients.length);
@@ -585,7 +586,7 @@ export default function AdminDashboard({ designer, onViewChange }: AdminDashboar
   const handleNameChange = (name: string) => {
     console.log('🔍 [DEBUG] handleNameChange chamado com:', name);
     setNewClientData(prev => ({ ...prev, name }));
-    
+
     // Apenas filtrar sugestões se estiver no modo "cliente existente"
     if (clientType === 'existing') {
       if (name.length >= 1) {
@@ -666,7 +667,7 @@ Nos vemos em breve! 💖`;
   const pendingAppointments = appointments.filter(apt => (apt as any).status === 'pending');
   const todayAppointments = appointments.filter(apt => apt.date === selectedDate && apt.status !== 'cancelled' && apt.status !== 'canceled');
   const upcomingAppointments = appointments.filter(apt => apt.date > selectedDate);
-  
+
   // Get next 7 days appointments - filtrar apenas agendamentos confirmados
   const nextWeekAppointments = appointments.filter(apt => {
     // Verificar se o agendamento está confirmado antes de incluir na lista
@@ -682,8 +683,8 @@ Nos vemos em breve! 💖`;
   const currentMonth = new Date(selectedDate);
   const monthlyClients = appointments.filter(apt => {
     const aptDate = new Date(apt.date + 'T00:00:00');
-    return aptDate.getMonth() === currentMonth.getMonth() && 
-           aptDate.getFullYear() === currentMonth.getFullYear();
+    return aptDate.getMonth() === currentMonth.getMonth() &&
+      aptDate.getFullYear() === currentMonth.getFullYear();
   });
 
   const todayRevenue = todayAppointments.reduce((sum, apt) => sum + apt.price, 0);
@@ -693,7 +694,8 @@ Nos vemos em breve! 💖`;
   const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
     const selectedDate = newClientData.date;
     if (!selectedDate) {
-      return ['08:00', '10:00', '13:00', '15:00', '17:00'];
+      // 🎄 HORÁRIOS DINÂMICOS: Dezembro 2025 ou horários normais
+      return getTimeSlotsConfig();
     }
 
     try {
@@ -731,12 +733,12 @@ Nos vemos em breve! 💖`;
       }
 
       // Filtrar apenas agendamentos ativos (não cancelados)
-      const activeAppointments = appointments.filter(apt => 
+      const activeAppointments = appointments.filter(apt =>
         apt.status !== 'cancelled' && apt.status !== 'canceled'
       );
-      
+
       console.log(`📊 [${cacheBreaker}] Agendamentos ativos (não cancelados):`, activeAppointments.length);
-      
+
       // Extrair horários ocupados por agendamentos
       const bookedTimes = activeAppointments.map(apt => {
         // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
@@ -744,9 +746,9 @@ Nos vemos em breve! 💖`;
       });
       console.log(`⏰ [${cacheBreaker}] Horários ocupados por agendamentos (normalizados):`, bookedTimes);
 
-      // Horários padrão
-      const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-      
+      // 🎄 HORÁRIOS DINÂMICOS: Dezembro 2025 ou horários normais
+      const defaultTimeSlots = getTimeSlotsConfig();
+
       // Verificar bloqueios de disponibilidade para a data selecionada
       const blockedTimes = designerAvailability
         .filter((avail: any) => {
@@ -764,30 +766,30 @@ Nos vemos em breve! 💖`;
           return null;
         })
         .filter(time => time !== null);
-      
+
       console.log(`🚫 [${cacheBreaker}] Horários bloqueados por disponibilidade:`, blockedTimes);
-      
+
       // Se há um bloqueio de dia inteiro, nenhum horário está disponível
       const hasFullDayBlock = designerAvailability.some((avail: any) => {
         if (!avail || !avail.specificDate || !avail.isActive) return false;
         const normalizedAvailDate = String(avail.specificDate).split('T')[0];
         const normalizedSelectedDate = selectedDate.split('T')[0];
-        return normalizedAvailDate === normalizedSelectedDate && 
-               avail.startTime === '00:00' && avail.endTime === '23:59';
+        return normalizedAvailDate === normalizedSelectedDate &&
+          avail.startTime === '00:00' && avail.endTime === '23:59';
       });
-      
+
       if (hasFullDayBlock) {
         console.log(`🚫 [${cacheBreaker}] Dia inteiro bloqueado`);
         return [];
       }
-      
+
       // Combinar horários ocupados por agendamentos e bloqueios de disponibilidade
       const allBlockedTimes = [...bookedTimes, ...blockedTimes];
-      
+
       // Filtrar horários disponíveis
       const availableSlots = defaultTimeSlots.filter(time => !allBlockedTimes.includes(time));
       console.log(`✨ [${cacheBreaker}] Horários disponíveis:`, availableSlots);
-      
+
       return availableSlots;
     } catch (err) {
       console.error('Erro ao buscar horários disponíveis:', err);
@@ -800,11 +802,11 @@ Nos vemos em breve! 💖`;
     try {
       setLoadingAvailability(true);
       console.log('🔄 Carregando disponibilidade para designer:', designer.id);
-      
+
       // Carregar disponibilidade do Supabase
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
-      
+
       // Mapear campos do Supabase para o formato esperado
       // IMPORTANTE: is_available = true significa DISPONÍVEL, então isActive = !is_available significa BLOQUEADO
       const mappedAvailability = supabaseAvailability
@@ -818,7 +820,7 @@ Nos vemos em breve! 💖`;
           isActive: !avail.is_available, // isActive = bloqueio ativo (quando is_available = false)
           specificDate: avail.specific_date
         }));
-      
+
       console.log('📊 Disponibilidade carregada:', mappedAvailability);
       setDesignerAvailability(mappedAvailability);
     } catch (err) {
@@ -833,16 +835,16 @@ Nos vemos em breve! 💖`;
   const sendAppointmentNotifications = async (appointment: any) => {
     try {
       console.log('📤 Enviando notificações para agendamento:', appointment);
-      
+
       // Enviar notificação imediata para a cliente
       await sendImmediateNotificationToClient(appointment);
-      
+
       // Enviar notificação imediata para a nail designer
       await sendImmediateNotificationToDesigner(appointment);
-      
+
       // Agendar lembretes (24h e 6h antes)
       await scheduleReminders(appointment);
-      
+
       console.log('✅ Todas as notificações enviadas com sucesso');
     } catch (error) {
       console.error('❌ Erro ao enviar notificações:', error);
@@ -875,7 +877,7 @@ Nos vemos em breve! 💖`;
   const sendImmediateNotificationToDesigner = async (appointment: any) => {
     // Primeiro, obter dados da designer
     const designer = await getNailDesignerById(appointment.designer_id);
-    
+
     if (designer) {
       const message = `Olá ${designer.name}!
 
@@ -908,7 +910,7 @@ Você tem um novo agendamento:
       appointment: appointment,
       scheduled_time: calculateReminderTime(appointment.date, appointment.time, -24) // 24h antes
     });
-    
+
     // Agendar lembrete de 6h antes
     await sendToN8nWebhook({
       type: 'schedule_reminder',
@@ -923,10 +925,10 @@ Você tem um novo agendamento:
     // Combinar data e hora
     const dateTimeString = `${date}T${time}:00`;
     const appointmentDateTime = new Date(dateTimeString);
-    
+
     // Subtrair horas
     const reminderDateTime = new Date(appointmentDateTime.getTime() + (hoursBefore * 60 * 60 * 1000));
-    
+
     return reminderDateTime.toISOString();
   };
 
@@ -935,14 +937,14 @@ Você tem um novo agendamento:
     try {
       // 🆕 Melhor tratamento de variáveis de ambiente
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
-      
+
       // Se nem a variável de ambiente nem a URL padrão estiverem disponíveis, logar erro detalhado
       if (!webhookUrl) {
         console.error("❌ VITE_N8N_WEBHOOK_URL não está definida e nenhuma URL padrão foi fornecida.");
         console.error("💡 Solução: Configure a variável de ambiente VITE_N8N_WEBHOOK_URL no seu serviço de hospedagem.");
         return false;
       }
-      
+
       // Determinar a URL correta (relativa ou absoluta)
       let url: string;
       if (webhookUrl.startsWith('http')) {
@@ -952,7 +954,7 @@ Você tem um novo agendamento:
         // Para URLs relativas, usar o proxy do Vite
         url = webhookUrl;
       }
-      
+
       // 🆕 Adicionar tratamento para ambiente de produção
       if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
         // Em produção, usar URL direta (não precisa de proxy)
@@ -970,7 +972,7 @@ Você tem um novo agendamento:
           url = webhookUrl;
         }
       }
-      
+
       // Ajuste: só enviar Authorization se ambos estiverem definidos no .env
       const username = import.meta.env.VITE_N8N_USERNAME || '';
       const password = import.meta.env.VITE_N8N_PASSWORD || '';
@@ -1052,18 +1054,19 @@ Você tem um novo agendamento:
     if (newClientData.date) {
       const loadTimeSlots = async () => {
         setLoadingTimeSlots(true);
-        
+
         try {
           const slots = await getAvailableTimeSlots();
           setAvailableTimeSlots(slots);
         } catch (error) {
           console.error('Erro ao carregar horários:', error);
-          setAvailableTimeSlots(['08:00', '10:00', '13:00', '15:00', '17:00']);
+          // 🎄 HORÁRIOS DINÂMICOS: Dezembro 2025 ou horários normais
+          setAvailableTimeSlots(getTimeSlotsConfig());
         } finally {
           setLoadingTimeSlots(false);
         }
       };
-      
+
       loadTimeSlots();
     } else {
       // Reset time slots when no date selected
@@ -1173,7 +1176,7 @@ Você tem um novo agendamento:
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Agendar Manualmente</h2>
-            
+
             <div className="space-y-4">
               {/* Seletor de tipo de cliente */}
               <div>
@@ -1182,22 +1185,20 @@ Você tem um novo agendamento:
                   <button
                     type="button"
                     onClick={() => handleClientTypeChange('existing')}
-                    className={`flex-1 p-3 rounded-lg font-semibold transition-colors ${
-                      clientType === 'existing'
+                    className={`flex-1 p-3 rounded-lg font-semibold transition-colors ${clientType === 'existing'
                         ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                      }`}
                   >
                     Cliente Existente
                   </button>
                   <button
                     type="button"
                     onClick={() => handleClientTypeChange('new')}
-                    className={`flex-1 p-3 rounded-lg font-semibold transition-colors ${
-                      clientType === 'new'
+                    className={`flex-1 p-3 rounded-lg font-semibold transition-colors ${clientType === 'new'
                         ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                      }`}
                   >
                     Nova Cliente
                   </button>
@@ -1222,12 +1223,12 @@ Você tem um novo agendamento:
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       placeholder="Digite o nome da cliente"
                     />
-                    
+
                     {/* Debug info */}
                     <div className="mt-1 text-xs text-gray-500">
                       Debug: clientType={clientType}, name="{newClientData.name}", showNameSuggestions={showNameSuggestions.toString()}, suggestions={nameSuggestions.length}
                     </div>
-                    
+
                     {/* Name Suggestions */}
                     {showNameSuggestions && nameSuggestions.length > 0 && (
                       <div ref={suggestionsRef} className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg max-h-60 overflow-y-auto z-10 relative">
@@ -1242,7 +1243,7 @@ Você tem um novo agendamento:
                           const allAppointments = getAppointments();
                           const clientAppointments = allAppointments.filter(apt => apt.clientPhone === client.phone);
                           const completedAppointments = clientAppointments.filter(apt => (apt as any).status === 'completed' || !(apt as any).status);
-                          
+
                           return (
                             <button
                               key={client.id}
@@ -1279,8 +1280,8 @@ Você tem um novo agendamento:
                                     Último agendamento:
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {client.createdAt ? 
-                                      new Date(client.createdAt).toLocaleDateString('pt-BR') : 
+                                    {client.createdAt ?
+                                      new Date(client.createdAt).toLocaleDateString('pt-BR') :
                                       'Nunca'
                                     }
                                   </p>
@@ -1296,7 +1297,7 @@ Você tem um novo agendamento:
                         })}
                       </div>
                     )}
-                    
+
                     {/* Mensagem quando não há clientes cadastrados */}
                     {showNameSuggestions && nameSuggestions.length === 0 && newClientData.name.length > 0 && (
                       <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -1305,7 +1306,7 @@ Você tem um novo agendamento:
                         </p>
                       </div>
                     )}
-                    
+
                     {/* Mensagem quando não há texto digitado */}
                     {showNameSuggestions && nameSuggestions.length === 0 && newClientData.name.length === 0 && (
                       <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1325,7 +1326,7 @@ Você tem um novo agendamento:
                   />
                 )}
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Telefone *</label>
                 <input
@@ -1338,7 +1339,7 @@ Você tem um novo agendamento:
                   disabled={clientType === 'existing' && !!existingClient}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                 <input
@@ -1351,7 +1352,7 @@ Você tem um novo agendamento:
                   disabled={clientType === 'existing' && !!existingClient}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Serviço *</label>
                 <select
@@ -1376,7 +1377,7 @@ Você tem um novo agendamento:
                   ))}
                 </select>
               </div>
-              
+
               {/* NOVO: Seção de Serviços Extras */}
               {newClientData.service && extraServices.length > 0 && (
                 <div>
@@ -1393,11 +1394,10 @@ Você tem um novo agendamento:
                               : [...prev, service]
                           );
                         }}
-                        className={`p-3 border rounded-lg text-left transition-colors ${
-                          selectedExtraServices.some(s => s.id === service.id)
+                        className={`p-3 border rounded-lg text-left transition-colors ${selectedExtraServices.some(s => s.id === service.id)
                             ? 'border-pink-500 bg-pink-50 text-pink-700'
                             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <h4 className="font-semibold">{service.name}</h4>
                         <p className="text-sm text-gray-600">R$ {service.price.toFixed(2)}</p>
@@ -1438,8 +1438,8 @@ Você tem um novo agendamento:
                           .filter(avail => avail && avail.specificDate && avail.isActive)
                           .slice(0, 5) // Mostrar apenas as primeiras 5 datas
                           .map((avail: any) => (
-                            <span 
-                              key={avail.id} 
+                            <span
+                              key={avail.id}
                               className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded"
                             >
                               {new Date(String(avail.specificDate) + 'T00:00:00').toLocaleDateString('pt-BR')}
@@ -1457,7 +1457,7 @@ Você tem um novo agendamento:
                     <p className="mt-2 text-xs text-green-600">✅ Calendário liberado. Nenhum dia bloqueado.</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Horário *</label>
                   {loadingTimeSlots ? (
@@ -1488,7 +1488,7 @@ Você tem um novo agendamento:
                       Selecione uma data primeiro
                     </div>
                   )}
-                  
+
                   {newClientData.date && (
                     <button
                       onClick={forceRefreshTimeSlots}
@@ -1499,7 +1499,7 @@ Você tem um novo agendamento:
                   )}
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Valor (R$) *</label>
                 <input
@@ -1512,7 +1512,7 @@ Você tem um novo agendamento:
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowClientModal(false)}
@@ -1537,7 +1537,7 @@ Você tem um novo agendamento:
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Configurar Chave PIX</h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1555,7 +1555,7 @@ Você tem um novo agendamento:
                 </p>
               </div>
             </div>
-            
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowPixModal(false)}
@@ -1582,7 +1582,7 @@ Você tem um novo agendamento:
             <h2 className="text-xl font-bold text-gray-800 mb-4">
               {confirmAction.type === 'approve' ? 'Aprovar Agendamento' : 'Rejeitar Agendamento'}
             </h2>
-            
+
             {confirmAction.appointment && (
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
                 <h3 className="font-medium text-gray-800 mb-2">{confirmAction.appointment.clientName}</h3>
@@ -1595,13 +1595,13 @@ Você tem um novo agendamento:
                 </div>
               </div>
             )}
-            
+
             <p className="text-gray-600 mb-6">
-              {confirmAction.type === 'approve' 
+              {confirmAction.type === 'approve'
                 ? 'Tem certeza que deseja aprovar este agendamento? A cliente será notificada da confirmação.'
                 : 'Tem certeza que deseja rejeitar este agendamento? A cliente será notificada do cancelamento.'}
             </p>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowConfirmModal(false)}
@@ -1612,13 +1612,12 @@ Você tem um novo agendamento:
               <button
                 onClick={confirmAppointmentAction}
                 disabled={loading}
-                className={`flex-1 p-3 text-white rounded-lg font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                  confirmAction.type === 'approve' 
-                    ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                className={`flex-1 p-3 text-white rounded-lg font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${confirmAction.type === 'approve'
+                    ? 'bg-gradient-to-r from-green-500 to-green-600'
                     : 'bg-gradient-to-r from-red-500 to-red-600'
-                }`}
+                  }`}
               >
-                {loading 
+                {loading
                   ? (confirmAction.type === 'approve' ? 'Aprovando...' : 'Rejeitando...')
                   : (confirmAction.type === 'approve' ? 'Aprovar' : 'Rejeitar')
                 }
@@ -1635,11 +1634,10 @@ Você tem um novo agendamento:
       </div>
 
       {/* Personal Link & Status */}
-      <div className={`backdrop-blur-md rounded-xl p-4 shadow-sm border ${
-        designer.isActive 
-          ? 'bg-green-500/20 border-green-300/30' 
+      <div className={`backdrop-blur-md rounded-xl p-4 shadow-sm border ${designer.isActive
+          ? 'bg-green-500/20 border-green-300/30'
           : 'bg-red-500/20 border-red-300/30'
-      }`}>
+        }`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-white">Seu Link Pessoal</h3>
           <div className="flex items-center gap-2">
@@ -1659,13 +1657,13 @@ Você tem um novo agendamento:
             </button>
           </div>
         </div>
-        
+
         <div className="bg-white/10 rounded-lg p-3 mb-3">
           <p className="text-sm text-purple-100 break-all">
             /{designer.name.toLowerCase().replace(/\s+/g, '-')}-nail
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={copyPersonalLink}
@@ -1698,13 +1696,13 @@ Você tem um novo agendamento:
             <Edit3 className="w-4 h-4" />
           </button>
         </div>
-        
+
         <div className="bg-white/10 rounded-lg p-3 mb-3">
           <p className="text-sm text-purple-100 break-all">
             {designer.pixKey || 'Nenhuma chave PIX configurada'}
           </p>
         </div>
-        
+
         {!designer.pixKey && (
           <p className="text-xs text-yellow-300">
             Configure sua chave PIX para receber pagamentos das clientes
@@ -1725,7 +1723,7 @@ Você tem um novo agendamento:
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 shadow-sm border border-white/20">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -1749,7 +1747,7 @@ Você tem um novo agendamento:
             </h2>
             <p className="text-sm text-yellow-700 mt-1">Aguardando sua aprovação</p>
           </div>
-          
+
           <div className="divide-y divide-yellow-100">
             {pendingAppointments
               .sort((a, b) => new Date(a.date + 'T' + a.time).getTime() - new Date(b.date + 'T' + b.time).getTime())
@@ -1776,21 +1774,21 @@ Você tem um novo agendamento:
                       </div>
                     </div>
                     <div className="flex gap-2 ml-4">
-                       <button
-                         onClick={() => handleApproveClick(appointment.id)}
-                         className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
-                         title="Aprovar agendamento"
-                       >
-                         Aprovar
-                       </button>
-                       <button
-                         onClick={() => handleRejectClick(appointment.id)}
-                         className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-                         title="Rejeitar agendamento"
-                       >
-                         Rejeitar
-                       </button>
-                     </div>
+                      <button
+                        onClick={() => handleApproveClick(appointment.id)}
+                        className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                        title="Aprovar agendamento"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => handleRejectClick(appointment.id)}
+                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                        title="Rejeitar agendamento"
+                      >
+                        Rejeitar
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1819,7 +1817,7 @@ Você tem um novo agendamento:
             Agendamentos - {selectedDate ? formatSelectedDate(selectedDate) : 'Selecione uma data'}
           </h2>
         </div>
-        
+
         {todayAppointments.length === 0 ? (
           <div className="p-6 text-center">
             <p className="text-gray-600">Nenhum agendamento para este dia.</p>
@@ -1932,7 +1930,7 @@ Você tem um novo agendamento:
           Gerenciar Serviços
         </button>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-4">
         <button
           onClick={() => onViewChange('availability')}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useReducer, useRef } from 'rea
 import { ArrowLeft, Calendar, Clock, User, Phone, Mail, MessageCircle, CheckCircle, AlertTriangle, Copy, CreditCard } from 'lucide-react';
 import { NailDesigner } from '../App';
 import { supabase } from '../lib/supabase';
+import { getAvailableTimeSlots as getTimeSlotsConfig } from '../utils/timeSlots';
 
 interface Service {
   id: string;
@@ -57,7 +58,7 @@ const loadingReducer = (state: boolean, action: { type: 'START' | 'FINISH' }) =>
 
 const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, onBack, loggedClient, onNavigateToClientDashboard, isOnline = true }) => {
   console.log('🔧 BookingPage montado. Props recebidas:', { initialDesigner, loggedClient, isOnline });
-  
+
   // 🆕 NOVO: Se designer já está selecionada (link personalizado), começa no Step 2
   const [step, setStep] = useState(initialDesigner ? 2 : 1);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -77,15 +78,15 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   // Função auxiliar para formatar o número de telefone
   const formatPhoneNumber = (phoneNumber: string): string => {
     if (!phoneNumber) return '';
-    
+
     // Remove todos os caracteres não numéricos
     let cleaned = phoneNumber.replace(/\D/g, '');
-    
+
     // Se o número começar com 55 (código do Brasil), removemos
     if (cleaned.startsWith('55')) {
       cleaned = cleaned.substring(2);
     }
-    
+
     // Formata para o padrão brasileiro (XX) XXXXX-XXXX
     if (cleaned.length >= 10) {
       // Se for um número de celular (11 dígitos) ou telefone fixo (10 dígitos)
@@ -97,7 +98,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6, 10)}`;
       }
     }
-    
+
     // Se não tiver o tamanho esperado, retorna o número limpo
     return cleaned;
   };
@@ -139,14 +140,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   // Remover o estado duplicado:
   // const [selectedExtraService, setSelectedExtraService] = useState<Service | null>(null);
-  
+
   const extraServiceRef = useRef<HTMLDivElement>(null); // Adicionado useRef para a seção de serviço extra
 
   useEffect(() => {
     // Listener para cancelamentos de agendamentos
     const handleAppointmentCancelled = (event: CustomEvent) => {
       console.log('🔄 BookingPage: Recebido evento de cancelamento:', event.detail);
-      
+
       // 🆕 NOVO: Aguardar um pouco para garantir que o Supabase foi atualizado
       setTimeout(() => {
         // Forçar atualização dos horários disponíveis
@@ -155,7 +156,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           console.log('📊 Forçando reload devido a cancelamento:', newValue);
           return newValue;
         });
-        
+
         // 🆕 NOVO: Forçar recarregamento dos horários se estivermos no passo 4
         if (step === 4 && selectedDate) {
           console.log('🔄 Recarregando horários imediatamente após cancelamento');
@@ -164,10 +165,10 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         }
       }, 1000); // Aguardar 1 segundo para sincronização
     };
-    
+
     // Adicionar listener
     window.addEventListener('appointmentCancelled', handleAppointmentCancelled as EventListener);
-    
+
     // Cleanup
     return () => {
       window.removeEventListener('appointmentCancelled', handleAppointmentCancelled as EventListener);
@@ -192,7 +193,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     };
 
     window.addEventListener('appointmentCreated', handleAppointmentCreated);
-    
+
     return () => {
       window.removeEventListener('appointmentCreated', handleAppointmentCreated);
     };
@@ -228,7 +229,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       console.log('⚠️ Nenhum cliente logado detectado');
     }
   }, [loggedClient]);
-  
+
   // Adicionar um useEffect para monitorar as mudanças nos campos
   useEffect(() => {
     console.log('🔄 Campos atualizados - Nome:', clientName, 'Telefone:', clientPhone, 'Email:', clientEmail);
@@ -249,7 +250,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     const loadDesigners = async () => {
       console.log('🚀 Iniciando carregamento de designers no useEffect...');
       setDesignersLoaded(false); // Sempre resetar para garantir carregamento
-      
+
       try {
         const designersList = await getDesigners();
         console.log('📋 Designers carregados:', designersList?.length || 0);
@@ -265,7 +266,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         setDesignersLoaded(true);
       }
     };
-    
+
     loadDesigners();
   }, []); // Remover designersLoaded como dependência para forçar carregamento
 
@@ -302,7 +303,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           console.log('📋 Disponibilidade carregada (completo):', designerAvailability?.length || 0);
           console.log('📋 Dados de disponibilidade (completo):', JSON.stringify(designerAvailability, null, 2));
           setAvailability(designerAvailability);
-          
+
           // Carregar prévia de datas bloqueadas
           const blockedPreview = await getBlockedDatesPreview();
           console.log('📋 Datas bloqueadas carregadas (completo):', blockedPreview?.length || 0);
@@ -337,44 +338,44 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
 
   const getDesigners = async (): Promise<NailDesigner[]> => {
     console.log('🔍 Iniciando carregamento de designers...');
-    
+
     try {
       console.log('📡 Tentando buscar designers do Supabase...');
       // Buscar do Supabase
       const { getNailDesigners } = await import('../utils/supabaseUtils');
       const supabaseDesigners = await getNailDesigners();
       console.log('✅ Designers do Supabase:', supabaseDesigners?.length || 0);
-      
+
       // Buscar do localStorage
       console.log('💾 Buscando designers do localStorage...');
       const saved = localStorage.getItem('nail_designers');
       const localDesigners = saved ? JSON.parse(saved) : [];
       console.log('📱 Designers do localStorage:', localDesigners?.length || 0);
-      
+
       // Combinar e remover duplicatas, priorizando Supabase
       const allDesigners = [...(supabaseDesigners || []), ...localDesigners];
-      
+
       // Remover duplicatas baseado no ID
       const uniqueDesigners = allDesigners.filter((designer, index, self) =>
         index === self.findIndex(d => d.id === designer.id)
       );
-      
+
       console.log('🔄 Total de designers combinados (únicos):', uniqueDesigners?.length || 0);
-      
+
       // Filtrar apenas designers ativos (verificar ambos os formatos de campo)
       const activeDesigners = uniqueDesigners.filter(d => {
         const isActive = (d as any).isActive || (d as any).is_active;
         console.log(`👤 Designer ${d.name}: ativo = ${isActive}`);
         return isActive;
       });
-      
+
       console.log('✅ Designers ativos encontrados:', activeDesigners?.length || 0);
       return activeDesigners as NailDesigner[];
-      
+
     } catch (error: any) {
       console.error('❌ Erro detalhado ao buscar designers:', error);
       console.error('📊 Stack trace:', error.stack);
-      
+
       // Fallback para localStorage
       console.log('🔄 Usando fallback para localStorage...');
       try {
@@ -404,7 +405,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       const { serviceService } = await import('../utils/supabaseUtils');
       const supabaseServices = await serviceService.getByDesignerId(selectedDesigner.id);
       console.log('📡 Serviços do Supabase:', supabaseServices?.length || 0);
-      
+
       // Mapear campos do Supabase para o formato esperado (inclui category)
       const mappedServices = supabaseServices.map(service => ({
         id: service.id,
@@ -414,12 +415,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         designerId: service.designer_id,
         category: (service as any).category || undefined
       }));
-      
+
       if (mappedServices.length > 0) {
         console.log('✅ Serviços mapeados do Supabase:', mappedServices.length);
         return mappedServices;
       }
-      
+
       // Fallback para localStorage se não houver dados no Supabase
       console.log('💾 Buscando serviços do localStorage...');
       const saved = localStorage.getItem('nail_services');
@@ -449,19 +450,19 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   const getAppointments = useCallback(async (): Promise<Appointment[]> => {
     if (!selectedDesigner) return [];
     console.log('🔍 Buscando agendamentos para designer:', selectedDesigner.id);
-    
+
     try {
       // Buscar do Supabase primeiro
       const { getSupabaseAppointments } = await import('../utils/supabaseUtils');
       const supabaseAppointments = await getSupabaseAppointments();
       console.log('📡 Agendamentos do Supabase:', supabaseAppointments?.length || 0);
-      
+
       // Garantir que supabaseAppointments é um array válido
       if (!Array.isArray(supabaseAppointments)) {
         console.warn('⚠️ getAppointments: supabaseAppointments is not an array:', supabaseAppointments);
         throw new Error('Invalid appointments data from Supabase');
       }
-      
+
       if (supabaseAppointments.length > 0) {
         // Filtrar agendamentos do designer e mapear campos
         const designerAppointments = supabaseAppointments
@@ -471,18 +472,18 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
             return designerId === selectedDesigner.id;
           })
           .map((apt: any) => ({
-              id: apt.id || crypto.randomUUID(),
-              designerId: apt.designer_id || apt.designerId,
-              clientName: apt.client_name || apt.clientName || '',
-              clientPhone: apt.client_phone || apt.clientPhone || '',
-              clientEmail: apt.client_email || apt.clientEmail || '',
-              service: apt.service || '',
-              date: apt.date || '',
-              time: apt.time || '',
-              status: apt.status || 'pending',
-              price: apt.price || 0
+            id: apt.id || crypto.randomUUID(),
+            designerId: apt.designer_id || apt.designerId,
+            clientName: apt.client_name || apt.clientName || '',
+            clientPhone: apt.client_phone || apt.clientPhone || '',
+            clientEmail: apt.client_email || apt.clientEmail || '',
+            service: apt.service || '',
+            date: apt.date || '',
+            time: apt.time || '',
+            status: apt.status || 'pending',
+            price: apt.price || 0
           }));
-        
+
         console.log('✅ Agendamentos filtrados do Supabase:', designerAppointments.length);
         if (designerAppointments.length > 0) {
           return designerAppointments;
@@ -491,21 +492,21 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     } catch (error) {
       console.error('❌ Erro ao buscar agendamentos do Supabase:', error);
     }
-    
+
     // Fallback para localStorage se Supabase falhar ou não tiver dados
     try {
       console.log('💾 Buscando agendamentos do localStorage...');
       const saved = localStorage.getItem('nail_appointments');
       const allAppointments = saved ? JSON.parse(saved) : [];
       console.log('📱 Agendamentos do localStorage:', allAppointments?.length || 0);
-      
+
       // Garantir que allAppointments é um array válido
       if (!Array.isArray(allAppointments)) {
         console.warn('localStorage appointments is not an array');
         return [];
       }
-      
-      const filteredAppointments = allAppointments.filter((apt: Appointment) => 
+
+      const filteredAppointments = allAppointments.filter((apt: Appointment) =>
         apt && apt.designerId === selectedDesigner.id
       );
       console.log('🎯 Agendamentos filtrados do localStorage:', filteredAppointments.length);
@@ -523,13 +524,13 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       return [];
     }
     console.log('🔍 Buscando disponibilidade para designer:', selectedDesigner.id);
-    
+
     try {
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(selectedDesigner.id);
       console.log('📡 Disponibilidade do Supabase:', supabaseAvailability?.length || 0);
       console.log('📋 Dados brutos de disponibilidade:', JSON.stringify(supabaseAvailability, null, 2));
-      
+
       // Mapear campos do Supabase (snake_case) para o formato esperado pelo frontend (camelCase)
       const mappedAvailability = supabaseAvailability
         .filter(avail => {
@@ -548,12 +549,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
             specificDate: avail.specific_date
           };
           console.log(`🔍 Mapeando availability ${index}:`, { original: avail, mapped });
-          
+
           // Verificar se os dados mapeados são válidos
           if (!mapped.specificDate || !mapped.startTime || !mapped.endTime) {
             console.warn('⚠️ Dados de availability mapeados incompletos:', mapped);
           }
-          
+
           // Verificar o formato da data
           try {
             const dateObj = new Date(mapped.specificDate || '');
@@ -569,13 +570,13 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
               error: dateError
             });
           }
-          
+
           return mapped;
         });
-      
+
       console.log('✅ Disponibilidade mapeada:', mappedAvailability.length);
       console.log('📋 Dados mapeados de disponibilidade (final):', JSON.stringify(mappedAvailability, null, 2));
-      
+
       // Verificar se há bloqueios ativos
       const activeBlocks = mappedAvailability.filter(avail => avail.isActive);
       console.log('🔒 Bloqueios ativos encontrados:', activeBlocks.length);
@@ -587,7 +588,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           formatted: new Date(block.specificDate + 'T00:00:00').toLocaleDateString('pt-BR')
         });
       });
-      
+
       // Sempre retornar os dados do Supabase, nunca usar localStorage como fallback
       return mappedAvailability;
     } catch (error) {
@@ -603,20 +604,20 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
       return [];
     }
     console.log('🔍 Buscando prévia de datas bloqueadas para designer:', selectedDesigner.id);
-    
+
     try {
       const blocked = await getDesignerAvailability();
       console.log('📡 Datas bloqueadas encontradas:', blocked?.length || 0);
       console.log('📋 Dados de bloqueio para prévia (completo):', JSON.stringify(blocked, null, 2));
-      
+
       const filteredBlocked = blocked.filter(avail => {
         const isValid = avail.isActive;
         console.log(`🔍 Filtrando bloqueio - válido: ${isValid}`, avail);
         return isValid;
       });
-      
+
       console.log('📋 Bloqueios ativos filtrados:', filteredBlocked.length);
-      
+
       const blockedDates = filteredBlocked.map((avail, index) => {
         const mapped = {
           date: avail.specificDate,
@@ -627,7 +628,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         console.log(`🔍 Mapeando bloqueio ${index}:`, { original: avail, mapped });
         return mapped;
       });
-      
+
       console.log('✅ Datas bloqueadas filtradas:', blockedDates.length);
       console.log('📋 Dados filtrados para prévia (final):', JSON.stringify(blockedDates, null, 2));
       return blockedDates;
@@ -640,7 +641,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
   // Check if a specific date and time slot is available - disponível se NÃO estiver bloqueada
   const isDateAvailable = async (date: string, checkStartTime: string, checkEndTime: string) => {
     const blocked = await getDesignerAvailability();
-    
+
     // Verificar se há algum bloqueio ativo que se sobreponha ao horário solicitado
     const isBlocked = blocked.some(avail => {
       if (!avail.isActive) return false; // Ignorar bloqueios inativos
@@ -673,7 +674,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
     try {
       // Salvar no Supabase
       const { createAppointment } = await import('../utils/supabaseUtils');
-      
+
       // Mapear para o formato do Supabase
       const supabaseAppointment = {
         id: appointment.id,
@@ -687,9 +688,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         price: appointment.price,
         status: appointment.status || 'pending'
       };
-      
+
       const savedAppointment = await createAppointment(supabaseAppointment);
-      
+
       if (savedAppointment) {
         console.log("Agendamento salvo com sucesso:", savedAppointment);
         // Sucesso no Supabase - também salvar no localStorage para cache
@@ -697,12 +698,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         const allAppointments = saved ? JSON.parse(saved) : [];
         allAppointments.push(appointment);
         localStorage.setItem('nail_appointments', JSON.stringify(allAppointments));
-      
+
         // Disparar evento para sincronizar outros componentes
         window.dispatchEvent(new CustomEvent('appointmentCreated', {
           detail: { appointment: savedAppointment }
         }));
-      
+
         // 🆕 NOVO: Enviar notificação imediata e agendar lembretes
         const webhookSent = await sendToN8nWebhook(savedAppointment);
         if (webhookSent) {
@@ -710,7 +711,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
         } else {
           console.error("Falha ao enviar dados do agendamento para o n8n.");
         }
-      
+
         console.log('✅ Agendamento salvo no Supabase e sincronizado');
         return savedAppointment;
       } else {
@@ -765,14 +766,14 @@ Nos vemos em breve! 💖`;
     });
   };
 
-// 🆕 NOVA FUNÇÃO: Enviar notificação imediata para a designer
-const sendImmediateNotificationToDesigner = async (appointment: any): Promise<boolean> => {
-  // Primeiro, obter dados da designer
-  const { getNailDesignerById } = await import('../utils/supabaseUtils');
-  const designer = await getNailDesignerById(appointment.designer_id);
-  
-  if (designer) {
-    const message = `Olá ${designer.name}!
+  // 🆕 NOVA FUNÇÃO: Enviar notificação imediata para a designer
+  const sendImmediateNotificationToDesigner = async (appointment: any): Promise<boolean> => {
+    // Primeiro, obter dados da designer
+    const { getNailDesignerById } = await import('../utils/supabaseUtils');
+    const designer = await getNailDesignerById(appointment.designer_id);
+
+    if (designer) {
+      const message = `Olá ${designer.name}!
 
 Você tem um novo agendamento:
 
@@ -783,458 +784,459 @@ Você tem um novo agendamento:
 ⏰ *Horário:* ${appointment.time}
 💰 *Valor:* R$ ${appointment.price.toFixed(2)}`;
 
-    // Enviar via webhook para n8n
-    return await sendToN8nWebhook({
-      type: 'appointment_created',
-      recipient: 'designer',
+      // Enviar via webhook para n8n
+      return await sendToN8nWebhook({
+        type: 'appointment_created',
+        recipient: 'designer',
+        appointment: appointment,
+        designer_phone: designer.phone, // Assumindo que a designer tem um campo phone
+        message: message
+      });
+    }
+    return true; // sem designer: não é um erro crítico neste contexto
+  };
+
+
+  // 🆕 NOVA FUNÇÃO: Agendar lembretes
+  const scheduleReminders = async (appointment: any): Promise<boolean> => {
+    const ok24 = await sendToN8nWebhook({
+      type: 'schedule_reminder',
+      reminder_type: '24h',
       appointment: appointment,
-      designer_phone: designer.phone, // Assumindo que a designer tem um campo phone
-      message: message
+      scheduled_time: calculateReminderTime(appointment.date, appointment.time, -24) // 24h antes
     });
-  }
-  return true; // sem designer: não é um erro crítico neste contexto
-};
 
+    const ok6 = await sendToN8nWebhook({
+      type: 'schedule_reminder',
+      reminder_type: '6h',
+      appointment: appointment,
+      scheduled_time: calculateReminderTime(appointment.date, appointment.time, -6) // 6h antes
+    });
 
-// 🆕 NOVA FUNÇÃO: Agendar lembretes
-const scheduleReminders = async (appointment: any): Promise<boolean> => {
-  const ok24 = await sendToN8nWebhook({
-    type: 'schedule_reminder',
-    reminder_type: '24h',
-    appointment: appointment,
-    scheduled_time: calculateReminderTime(appointment.date, appointment.time, -24) // 24h antes
-  });
-  
-  const ok6 = await sendToN8nWebhook({
-    type: 'schedule_reminder',
-    reminder_type: '6h',
-    appointment: appointment,
-    scheduled_time: calculateReminderTime(appointment.date, appointment.time, -6) // 6h antes
-  });
+    return ok24 && ok6;
+  };
 
-  return ok24 && ok6;
-};
-
-// 🆕 NOVA FUNÇÃO: Calcular horário do lembrete
-const calculateReminderTime = (date: string, time: string, hoursBefore: number): string => {
-  try {
-    // Normalizar o formato do time para remover segundos se existirem
-    let normalizedTime = time;
-    if (time.split(':').length > 2) {
-      // Se tiver segundos, remover (ex: "14:00:00" -> "14:00")
-      normalizedTime = time.split(':').slice(0, 2).join(':');
-    }
-    
-    // Combinar data e hora
-    const dateTimeString = `${date}T${normalizedTime}:00`;
-    const appointmentDateTime = new Date(dateTimeString);
-    
-    // Verificar se a data é válida
-    if (isNaN(appointmentDateTime.getTime())) {
-      console.error('❌ Data inválida:', dateTimeString);
-      // Retornar uma data padrão se a data for inválida
-      return new Date().toISOString();
-    }
-    
-    // Subtrair horas
-    const reminderDateTime = new Date(appointmentDateTime.getTime() + (hoursBefore * 60 * 60 * 1000));
-    
-    // Verificar se a data resultante é válida
-    if (isNaN(reminderDateTime.getTime())) {
-      console.error('❌ Data de lembrete inválida:', reminderDateTime);
-      // Retornar uma data padrão se a data for inválida
-      return new Date().toISOString();
-    }
-    
-    return reminderDateTime.toISOString();
-  } catch (error) {
-    console.error('❌ Erro ao calcular horário do lembrete:', error);
-    // Retornar uma data padrão em caso de erro
-    return new Date().toISOString();
-  }
-};
-
-const sendToN8nWebhook = async (data: any): Promise<boolean> => {
-  // 🆕 Melhor tratamento de variáveis de ambiente
-  const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
-  
-  // Se nem a variável de ambiente nem a URL padrão estiverem disponíveis, logar erro detalhado
-  if (!webhookUrl) {
-    console.error("❌ VITE_N8N_WEBHOOK_URL não está definida e nenhuma URL padrão foi fornecida.");
-    console.error("💡 Solução: Configure a variável de ambiente VITE_N8N_WEBHOOK_URL no seu serviço de hospedagem.");
-    return false;
-  }
-
-  try {
-    console.log("📤 Enviando dados para o webhook do n8n:", data);
-    
-    // Determinar a URL correta (relativa ou absoluta)
-    let url: string;
-    if (webhookUrl.startsWith('http')) {
-      // Para URLs absolutas, usar proxy do Vite em desenvolvimento ou URL direta em produção
-      url = webhookUrl;
-    } else {
-      // Para URLs relativas, usar o proxy do Vite
-      url = webhookUrl;
-    }
-    
-    // 🆕 Adicionar tratamento para ambiente de produção
-    if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
-      // Em produção, usar URL direta (não precisa de proxy)
-      url = webhookUrl;
-    } else if (import.meta.env.DEV && webhookUrl.startsWith('http')) {
-      // Em desenvolvimento, tentar usar proxy se for localhost
-      if (webhookUrl.includes('localhost')) {
-        url = webhookUrl; // O Vite já faz proxy automático para localhost
-      } else if (webhookUrl.includes('railway.app')) {
-        // Para URLs da Railway em desenvolvimento, usar URL direta (sem aviso de CORS)
-        url = webhookUrl;
-      } else {
-        // Para outras URLs externas em desenvolvimento, pode haver problemas de CORS
-        console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
-        url = webhookUrl;
+  // 🆕 NOVA FUNÇÃO: Calcular horário do lembrete
+  const calculateReminderTime = (date: string, time: string, hoursBefore: number): string => {
+    try {
+      // Normalizar o formato do time para remover segundos se existirem
+      let normalizedTime = time;
+      if (time.split(':').length > 2) {
+        // Se tiver segundos, remover (ex: "14:00:00" -> "14:00")
+        normalizedTime = time.split(':').slice(0, 2).join(':');
       }
-    }
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
 
-    if (response.ok) {
-      console.log("✅ Webhook chamado com sucesso!");
-      return true;
-    } else {
-      const errorText = await response.text();
-      console.error(`❌ Chamada ao webhook falhou: ${response.status} - ${errorText}`);
+      // Combinar data e hora
+      const dateTimeString = `${date}T${normalizedTime}:00`;
+      const appointmentDateTime = new Date(dateTimeString);
+
+      // Verificar se a data é válida
+      if (isNaN(appointmentDateTime.getTime())) {
+        console.error('❌ Data inválida:', dateTimeString);
+        // Retornar uma data padrão se a data for inválida
+        return new Date().toISOString();
+      }
+
+      // Subtrair horas
+      const reminderDateTime = new Date(appointmentDateTime.getTime() + (hoursBefore * 60 * 60 * 1000));
+
+      // Verificar se a data resultante é válida
+      if (isNaN(reminderDateTime.getTime())) {
+        console.error('❌ Data de lembrete inválida:', reminderDateTime);
+        // Retornar uma data padrão se a data for inválida
+        return new Date().toISOString();
+      }
+
+      return reminderDateTime.toISOString();
+    } catch (error) {
+      console.error('❌ Erro ao calcular horário do lembrete:', error);
+      // Retornar uma data padrão em caso de erro
+      return new Date().toISOString();
+    }
+  };
+
+  const sendToN8nWebhook = async (data: any): Promise<boolean> => {
+    // 🆕 Melhor tratamento de variáveis de ambiente
+    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || '/webhook/3a2f1b4c-5d6e-7f8g-9h0i-jk1l2m3n4o5p';
+
+    // Se nem a variável de ambiente nem a URL padrão estiverem disponíveis, logar erro detalhado
+    if (!webhookUrl) {
+      console.error("❌ VITE_N8N_WEBHOOK_URL não está definida e nenhuma URL padrão foi fornecida.");
+      console.error("💡 Solução: Configure a variável de ambiente VITE_N8N_WEBHOOK_URL no seu serviço de hospedagem.");
       return false;
     }
-  } catch (error) {
-    console.error("❌ Erro ao enviar dados para o webhook do n8n:", error);
-    // 🆕 Adicionar mensagem de ajuda para configuração
-    console.error("💡 Dica: Verifique se a variável de ambiente VITE_N8N_WEBHOOK_URL está configurada corretamente no seu serviço de hospedagem.");
-    console.error("💡 Dica adicional: Se estiver usando n8n local, certifique-se de que ele está acessível publicamente (use ngrok ou similar).");
-    return false;
-  }
-};
 
-// 🆕 NOVA FUNÇÃO: Salvar em fila para reprocessamento
-const saveToRetryQueue = async (data: any) => {
-  try {
-    const queue = JSON.parse(localStorage.getItem('notification_queue') || '[]');
-    queue.push({
-      id: Date.now(),
-      data: data,
-      timestamp: new Date().toISOString(),
-      retries: 0
-    });
-    localStorage.setItem('notification_queue', JSON.stringify(queue));
-    console.log('📥 Dados salvos na fila para reprocessamento');
-  } catch (error) {
-    console.error('❌ Erro ao salvar na fila:', error);
-  }
-};
+    try {
+      console.log("📤 Enviando dados para o webhook do n8n:", data);
 
- // Generate time slots
-const defaultTimeSlots = [
-  '08:00', '10:00', '13:00', '15:00', '17:00'
-];
+      // Determinar a URL correta (relativa ou absoluta)
+      let url: string;
+      if (webhookUrl.startsWith('http')) {
+        // Para URLs absolutas, usar proxy do Vite em desenvolvimento ou URL direta em produção
+        url = webhookUrl;
+      } else {
+        // Para URLs relativas, usar o proxy do Vite
+        url = webhookUrl;
+      }
 
-const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
-  const cacheBreaker = Date.now().toString(); // Define cacheBreaker aqui
-  console.log(`🔄 [${cacheBreaker}] Iniciando getAvailableTimeSlots`, { 
-    selectedDate, 
-    selectedDesignerId: selectedDesigner?.id,
-    selectedDesignerName: selectedDesigner?.name
-  });
-  
-  if (!selectedDate || !selectedDesigner) {
-    console.log(`🔄 [${cacheBreaker}] Sem data ou designer selecionado, retornando horários padrão`);
-    return defaultTimeSlots;
-  }
-
-  // Verificar o formato da data selecionada
-  console.log(`📅 [${cacheBreaker}] Formato da data selecionada:`, {
-    rawDate: selectedDate,
-    type: typeof selectedDate,
-    isString: typeof selectedDate === 'string',
-    length: typeof selectedDate === 'string' ? selectedDate.length : 'N/A'
-  });
-
-  // Checar bloqueios específicos de horário antes de buscar agendamentos
-  try {
-    console.log(`🔄 [${cacheBreaker}] Buscando disponibilidade do designer`);
-    const blocked = await getDesignerAvailability();
-    console.log(`🔄 [${cacheBreaker}] Disponibilidade carregada:`, blocked?.length || 0);
-    
-    // Normalizar a data selecionada para garantir o formato correto
-    const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
-    console.log(`📅 [${cacheBreaker}] Data selecionada normalizada:`, normalizedSelectedDate);
-
-    // Check for a full-day block first
-    const dayBlockedCompletely = blocked.some(avail => {
-      const isFullDayBlock = avail.specificDate === normalizedSelectedDate && 
-                            avail.startTime === '00:00' && 
-                            avail.endTime === '23:59' && 
-                            avail.isActive;
-      console.log(`🔍 [${cacheBreaker}] Verificando bloqueio de dia inteiro:`, {
-        dateMatch: avail.specificDate === normalizedSelectedDate,
-        timeMatch: avail.startTime === '00:00' && avail.endTime === '23:59',
-        isActive: avail.isActive,
-        isFullDayBlock
-      });
-      return isFullDayBlock;
-    });
-
-    if (dayBlockedCompletely) {
-      // If the entire day is blocked, no slots are available
-      console.log(`🚫 [${cacheBreaker}] Dia inteiro bloqueado`);
-      return [];
-    }
-
-    let appointments: any[] = [];
-    let retryCount = 0;
-    const maxRetries = 5; // Aumentado de 3 para 5
-
-    // Buscar agendamentos do Supabase com retry
-    while (retryCount < maxRetries) {
-      try {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select('*')
-          .eq('date', selectedDate)
-          .eq('designer_id', selectedDesigner.id);
-
-        if (error) throw error;
-        appointments = data || [];
-        console.log(`✅ [${cacheBreaker}] Agendamentos do Supabase (tentativa ${retryCount + 1}):`, appointments.length);
-        break;
-      } catch (error) {
-        retryCount++;
-        console.warn(`⚠️ [${cacheBreaker}] Erro na tentativa ${retryCount}:`, error);
-        if (retryCount >= maxRetries) {
-          console.error(`❌ [${cacheBreaker}] Falha após ${maxRetries} tentativas`);
-          appointments = [];
+      // 🆕 Adicionar tratamento para ambiente de produção
+      if (import.meta.env.PROD && webhookUrl.startsWith('http')) {
+        // Em produção, usar URL direta (não precisa de proxy)
+        url = webhookUrl;
+      } else if (import.meta.env.DEV && webhookUrl.startsWith('http')) {
+        // Em desenvolvimento, tentar usar proxy se for localhost
+        if (webhookUrl.includes('localhost')) {
+          url = webhookUrl; // O Vite já faz proxy automático para localhost
+        } else if (webhookUrl.includes('railway.app')) {
+          // Para URLs da Railway em desenvolvimento, usar URL direta (sem aviso de CORS)
+          url = webhookUrl;
         } else {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          // Para outras URLs externas em desenvolvimento, pode haver problemas de CORS
+          console.warn("⚠️ Usando URL externa em desenvolvimento, pode haver problemas de CORS");
+          url = webhookUrl;
         }
       }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        console.log("✅ Webhook chamado com sucesso!");
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.error(`❌ Chamada ao webhook falhou: ${response.status} - ${errorText}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("❌ Erro ao enviar dados para o webhook do n8n:", error);
+      // 🆕 Adicionar mensagem de ajuda para configuração
+      console.error("💡 Dica: Verifique se a variável de ambiente VITE_N8N_WEBHOOK_URL está configurada corretamente no seu serviço de hospedagem.");
+      console.error("💡 Dica adicional: Se estiver usando n8n local, certifique-se de que ele está acessível publicamente (use ngrok ou similar).");
+      return false;
+    }
+  };
+
+  // 🆕 NOVA FUNÇÃO: Salvar em fila para reprocessamento
+  const saveToRetryQueue = async (data: any) => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('notification_queue') || '[]');
+      queue.push({
+        id: Date.now(),
+        data: data,
+        timestamp: new Date().toISOString(),
+        retries: 0
+      });
+      localStorage.setItem('notification_queue', JSON.stringify(queue));
+      console.log('📥 Dados salvos na fila para reprocessamento');
+    } catch (error) {
+      console.error('❌ Erro ao salvar na fila:', error);
+    }
+  };
+
+  // Generate time slots
+  // 🎄 HORÁRIOS DINÂMICOS: Usa horários especiais em Dezembro 2025, horários normais nos outros meses
+  // Configuração original (antes de Dez/2025): ['08:00', '10:00', '13:00', '15:00', '17:00']
+  // Configuração Dezembro 2025: ['08:00', '09:00', '10:00', '13:00', '14:00', '15:00', '16:00', '17:00']
+  const defaultTimeSlots = getTimeSlotsConfig();
+
+  const getAvailableTimeSlots = useCallback(async (): Promise<string[]> => {
+    const cacheBreaker = Date.now().toString(); // Define cacheBreaker aqui
+    console.log(`🔄[${cacheBreaker}] Iniciando getAvailableTimeSlots`, {
+      selectedDate,
+      selectedDesignerId: selectedDesigner?.id,
+      selectedDesignerName: selectedDesigner?.name
+    });
+
+    if (!selectedDate || !selectedDesigner) {
+      console.log(`🔄[${cacheBreaker}] Sem data ou designer selecionado, retornando horários padrão`);
+      return defaultTimeSlots;
     }
 
-    // Filtrar apenas agendamentos ativos (não cancelados)
-    const activeAppointments = appointments.filter(apt => 
-      apt.status !== 'cancelled' && apt.status !== 'canceled'
-    );
-    
-    console.log(`📊 [${cacheBreaker}] Agendamentos ativos (não cancelados):`, activeAppointments.length);
-    console.log(`🚫 [${cacheBreaker}] Agendamentos cancelados:`, appointments.length - activeAppointments.length);
-    
-    // Log detalhado dos agendamentos
-
-    activeAppointments.forEach(apt => {
-      console.log(`   ✓ Ativo: ${apt.time} - Status: ${apt.status}`);
-    });
-    
-    const cancelledAppointments = appointments.filter(apt => 
-      apt.status === 'cancelled' || apt.status === 'canceled'
-    );
-    cancelledAppointments.forEach(apt => {
-      console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status}`);
+    // Verificar o formato da data selecionada
+    console.log(`📅[${cacheBreaker}] Formato da data selecionada: `, {
+      rawDate: selectedDate,
+      type: typeof selectedDate,
+      isString: typeof selectedDate === 'string',
+      length: typeof selectedDate === 'string' ? selectedDate.length : 'N/A'
     });
 
-    // Verificar localStorage para agendamentos locais
-    const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
-    const localActiveAppointments = localAppointments.filter((apt: any) => 
-      apt.date === selectedDate && 
-      apt.designerId === selectedDesigner.id &&
-      apt.status !== 'cancelled' && 
-      apt.status !== 'canceled'
-    );
+    // Checar bloqueios específicos de horário antes de buscar agendamentos
+    try {
+      console.log(`🔄[${cacheBreaker}] Buscando disponibilidade do designer`);
+      const blocked = await getDesignerAvailability();
+      console.log(`🔄[${cacheBreaker}] Disponibilidade carregada: `, blocked?.length || 0);
 
-console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveAppointments.length);
+      // Normalizar a data selecionada para garantir o formato correto
+      const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
+      console.log(`📅[${cacheBreaker}] Data selecionada normalizada: `, normalizedSelectedDate);
 
-    // Combinar agendamentos sem duplicatas
-    const allAppointments = [...activeAppointments];
-    localActiveAppointments.forEach((localApt: any) => {
-      const exists = allAppointments.some(apt => 
-        apt.time === localApt.time && apt.date === localApt.date
-      );
-      if (!exists) {
-        allAppointments.push(localApt);
-      }
-    });
-
-    // Log dos agendamentos cancelados
-    cancelledAppointments.forEach(apt => {
-      console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status}`);
-    });
-
-    // Extrair e normalizar horários ocupados por agendamentos (remover segundos se existirem)
-    const bookedTimes = activeAppointments.map(apt => {
-      // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
-      return apt.time.length > 5 ? apt.time.substring(0, 5) : apt.time;
-    });
-    console.log(`⏰ [${cacheBreaker}] Horários ocupados por agendamentos (normalizados):`, bookedTimes);
-
-    // Verificar bloqueios de disponibilidade para a data selecionada
-    const blockedTimes: string[] = [];
-    
-    // Verificar cada bloqueio ativo para a data selecionada
-    blocked.forEach((avail: any) => {
-      if (!avail || !avail.specificDate || !avail.isActive) {
-        console.log(`🔍 [${cacheBreaker}] Bloqueio inválido ou inativo, pulando:`, avail);
-        return;
-      }
-      
-      try {
-        // Normalizar as datas para comparação (remover informações de hora se existirem)
-        const normalizedAvailDate = new Date(avail.specificDate).toISOString().split('T')[0];
-        const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
-        
-        // Adicionar log detalhado das datas sendo comparadas
-        console.log(`🔍 [${cacheBreaker}] Comparando datas:`, {
-          bloqueioDate: avail.specificDate,
-          bloqueioDateNormalizado: normalizedAvailDate,
-          selecionadaDate: selectedDate,
-          selecionadaDateNormalizado: normalizedSelectedDate,
-          saoIguais: normalizedAvailDate === normalizedSelectedDate
+      // Check for a full-day block first
+      const dayBlockedCompletely = blocked.some(avail => {
+        const isFullDayBlock = avail.specificDate === normalizedSelectedDate &&
+          avail.startTime === '00:00' &&
+          avail.endTime === '23:59' &&
+          avail.isActive;
+        console.log(`🔍[${cacheBreaker}] Verificando bloqueio de dia inteiro: `, {
+          dateMatch: avail.specificDate === normalizedSelectedDate,
+          timeMatch: avail.startTime === '00:00' && avail.endTime === '23:59',
+          isActive: avail.isActive,
+          isFullDayBlock
         });
-        
-        if (normalizedAvailDate === normalizedSelectedDate) {
-          console.log(`✅ [${cacheBreaker}] Data corresponde - Verificando bloqueio:`, {
-            startTime: avail.startTime,
-            endTime: avail.endTime,
-            isFullDay: avail.startTime === '00:00' && avail.endTime === '23:59'
-          });
-          // Se for um bloqueio de dia inteiro
-          if (avail.startTime === '00:00' && avail.endTime === '23:59') {
-            // Adicionar todos os horários padrão como bloqueados
-            blockedTimes.push(...defaultTimeSlots);
-            console.log(`🔒 [${cacheBreaker}] Dia inteiro bloqueado - todos os horários bloqueados`);
+        return isFullDayBlock;
+      });
+
+      if (dayBlockedCompletely) {
+        // If the entire day is blocked, no slots are available
+        console.log(`🚫[${cacheBreaker}] Dia inteiro bloqueado`);
+        return [];
+      }
+
+      let appointments: any[] = [];
+      let retryCount = 0;
+      const maxRetries = 5; // Aumentado de 3 para 5
+
+      // Buscar agendamentos do Supabase com retry
+      while (retryCount < maxRetries) {
+        try {
+          const { data, error } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('date', selectedDate)
+            .eq('designer_id', selectedDesigner.id);
+
+          if (error) throw error;
+          appointments = data || [];
+          console.log(`✅[${cacheBreaker}] Agendamentos do Supabase(tentativa ${retryCount + 1}): `, appointments.length);
+          break;
+        } catch (error) {
+          retryCount++;
+          console.warn(`⚠️[${cacheBreaker}] Erro na tentativa ${retryCount}: `, error);
+          if (retryCount >= maxRetries) {
+            console.error(`❌[${cacheBreaker}] Falha após ${maxRetries} tentativas`);
+            appointments = [];
           } else {
-            // Verificar sobreposição com horários padrão
-            console.log(`🔍 [${cacheBreaker}] Verificando bloqueios parciais para:`, {
-              startTime: avail.startTime,
-              endTime: avail.endTime
-            });
-            
-            defaultTimeSlots.forEach(time => {
-              try {
-                // Converter horários para minutos desde a meia-noite para comparação
-                const timeParts = time.split(':').map(Number);
-                const timeMinutes = timeParts[0] * 60 + timeParts[1];
-                
-                const startParts = avail.startTime.split(':').map(Number);
-                const startMinutes = startParts[0] * 60 + startParts[1];
-                
-                const endParts = avail.endTime.split(':').map(Number);
-                const endMinutes = endParts[0] * 60 + endParts[1];
-                
-                console.log(`🔍 [${cacheBreaker}] Verificando sobreposição:`, {
-                  horarioPadrao: time,
-                  horarioPadraoMinutos: timeMinutes,
-                  bloqueioInicio: avail.startTime,
-                  bloqueioInicioMinutos: startMinutes,
-                  bloqueioFim: avail.endTime,
-                  bloqueioFimMinutos: endMinutes,
-                  condicao1: timeMinutes >= startMinutes,
-                  condicao2: timeMinutes < endMinutes,
-                  estaBloqueado: timeMinutes >= startMinutes && timeMinutes < endMinutes
-                });
-                
-                // Verificar se o horário padrão se sobrepõe com o bloqueio
-                // Corrigido: verificar se o horário está dentro do intervalo bloqueado
-                if (timeMinutes >= startMinutes && timeMinutes < endMinutes) {
-                  blockedTimes.push(time);
-                  console.log(`🔒 [${cacheBreaker}] Horário ${time} bloqueado (entre ${avail.startTime} e ${avail.endTime})`);
-                }
-              } catch (timeError) {
-                console.error(`❌ [${cacheBreaker}] Erro ao processar horário:`, {
-                  time: time,
-                  startTime: avail.startTime,
-                  endTime: avail.endTime,
-                  error: timeError
-                });
-              }
-            });
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
           }
         }
-      } catch (dateError) {
-        console.error(`❌ [${cacheBreaker}] Erro ao processar datas:`, {
-          specificDate: avail.specificDate,
-          selectedDate: selectedDate,
-          error: dateError
-        });
       }
-    });
-    
-    console.log(`🚫 [${cacheBreaker}] Horários bloqueados para a data selecionada:`, blockedTimes);
 
-    // Filtrar horários disponíveis
-    const availableTimes = defaultTimeSlots.filter(time => {
-      return !blockedTimes.includes(time) && !bookedTimes.includes(time);
-    });
-    console.log(`🚫 [${cacheBreaker}] Horários bloqueados por disponibilidade:`, blockedTimes);
-    
-    // Combinar horários ocupados por agendamentos e bloqueios de disponibilidade
-    // Remover duplicatas dos horários bloqueados
-    const uniqueBlockedTimes = [...new Set([...bookedTimes, ...blockedTimes])];
-    
-    console.log(`📋 [${cacheBreaker}] Horários ocupados:`, bookedTimes);
-    console.log(`📋 [${cacheBreaker}] Horários bloqueados:`, blockedTimes);
-    console.log(`📋 [${cacheBreaker}] Horários bloqueados únicos:`, uniqueBlockedTimes);
-    
-    // Filtrar horários disponíveis
-    const availableSlots = defaultTimeSlots.filter(time => {
-      const isBlocked = uniqueBlockedTimes.includes(time);
-      console.log(`🔍 [${cacheBreaker}] Verificando disponibilidade do horário ${time}:`, {
-        isBlocked,
-        booked: bookedTimes.includes(time),
-        blocked: blockedTimes.includes(time),
-        uniqueBlocked: uniqueBlockedTimes.includes(time)
+      // Filtrar apenas agendamentos ativos (não cancelados)
+      const activeAppointments = appointments.filter(apt =>
+        apt.status !== 'cancelled' && apt.status !== 'canceled'
+      );
+
+      console.log(`📊[${cacheBreaker}] Agendamentos ativos(não cancelados): `, activeAppointments.length);
+      console.log(`🚫[${cacheBreaker}] Agendamentos cancelados: `, appointments.length - activeAppointments.length);
+
+      // Log detalhado dos agendamentos
+
+      activeAppointments.forEach(apt => {
+        console.log(`   ✓ Ativo: ${apt.time} - Status: ${apt.status} `);
       });
-      return !isBlocked;
-    });
-    console.log(`✨ [${cacheBreaker}] Horários disponíveis FINAIS:`, availableSlots);
-    
-    // Verificação adicional - garantir que os horários bloqueados não estão nos disponíveis
-    const verification = defaultTimeSlots.filter(time => {
-      const shouldBeAvailable = !uniqueBlockedTimes.includes(time);
-      const isActuallyAvailable = availableSlots.includes(time);
-      if (shouldBeAvailable !== isActuallyAvailable) {
-        console.warn(`⚠️ [${cacheBreaker}] Inconsistência na disponibilidade do horário ${time}:`, {
-          shouldBeAvailable,
-          isActuallyAvailable
+
+      const cancelledAppointments = appointments.filter(apt =>
+        apt.status === 'cancelled' || apt.status === 'canceled'
+      );
+      cancelledAppointments.forEach(apt => {
+        console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status} `);
+      });
+
+      // Verificar localStorage para agendamentos locais
+      const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+      const localActiveAppointments = localAppointments.filter((apt: any) =>
+        apt.date === selectedDate &&
+        apt.designerId === selectedDesigner.id &&
+        apt.status !== 'cancelled' &&
+        apt.status !== 'canceled'
+      );
+
+      console.log(`💾[${cacheBreaker}] Agendamentos locais ativos: `, localActiveAppointments.length);
+
+      // Combinar agendamentos sem duplicatas
+      const allAppointments = [...activeAppointments];
+      localActiveAppointments.forEach((localApt: any) => {
+        const exists = allAppointments.some(apt =>
+          apt.time === localApt.time && apt.date === localApt.date
+        );
+        if (!exists) {
+          allAppointments.push(localApt);
+        }
+      });
+
+      // Log dos agendamentos cancelados
+      cancelledAppointments.forEach(apt => {
+        console.log(`   ❌ Cancelado: ${apt.time} - Status: ${apt.status} `);
+      });
+
+      // Extrair e normalizar horários ocupados por agendamentos (remover segundos se existirem)
+      const bookedTimes = activeAppointments.map(apt => {
+        // Normalizar formato: se tem segundos, remover (08:00:00 -> 08:00)
+        return apt.time.length > 5 ? apt.time.substring(0, 5) : apt.time;
+      });
+      console.log(`⏰[${cacheBreaker}] Horários ocupados por agendamentos(normalizados): `, bookedTimes);
+
+      // Verificar bloqueios de disponibilidade para a data selecionada
+      const blockedTimes: string[] = [];
+
+      // Verificar cada bloqueio ativo para a data selecionada
+      blocked.forEach((avail: any) => {
+        if (!avail || !avail.specificDate || !avail.isActive) {
+          console.log(`🔍[${cacheBreaker}] Bloqueio inválido ou inativo, pulando: `, avail);
+          return;
+        }
+
+        try {
+          // Normalizar as datas para comparação (remover informações de hora se existirem)
+          const normalizedAvailDate = new Date(avail.specificDate).toISOString().split('T')[0];
+          const normalizedSelectedDate = new Date(selectedDate).toISOString().split('T')[0];
+
+          // Adicionar log detalhado das datas sendo comparadas
+          console.log(`🔍[${cacheBreaker}] Comparando datas: `, {
+            bloqueioDate: avail.specificDate,
+            bloqueioDateNormalizado: normalizedAvailDate,
+            selecionadaDate: selectedDate,
+            selecionadaDateNormalizado: normalizedSelectedDate,
+            saoIguais: normalizedAvailDate === normalizedSelectedDate
+          });
+
+          if (normalizedAvailDate === normalizedSelectedDate) {
+            console.log(`✅[${cacheBreaker}] Data corresponde - Verificando bloqueio: `, {
+              startTime: avail.startTime,
+              endTime: avail.endTime,
+              isFullDay: avail.startTime === '00:00' && avail.endTime === '23:59'
+            });
+            // Se for um bloqueio de dia inteiro
+            if (avail.startTime === '00:00' && avail.endTime === '23:59') {
+              // Adicionar todos os horários padrão como bloqueados
+              blockedTimes.push(...defaultTimeSlots);
+              console.log(`🔒[${cacheBreaker}] Dia inteiro bloqueado - todos os horários bloqueados`);
+            } else {
+              // Verificar sobreposição com horários padrão
+              console.log(`🔍[${cacheBreaker}] Verificando bloqueios parciais para: `, {
+                startTime: avail.startTime,
+                endTime: avail.endTime
+              });
+
+              defaultTimeSlots.forEach(time => {
+                try {
+                  // Converter horários para minutos desde a meia-noite para comparação
+                  const timeParts = time.split(':').map(Number);
+                  const timeMinutes = timeParts[0] * 60 + timeParts[1];
+
+                  const startParts = avail.startTime.split(':').map(Number);
+                  const startMinutes = startParts[0] * 60 + startParts[1];
+
+                  const endParts = avail.endTime.split(':').map(Number);
+                  const endMinutes = endParts[0] * 60 + endParts[1];
+
+                  console.log(`🔍[${cacheBreaker}] Verificando sobreposição: `, {
+                    horarioPadrao: time,
+                    horarioPadraoMinutos: timeMinutes,
+                    bloqueioInicio: avail.startTime,
+                    bloqueioInicioMinutos: startMinutes,
+                    bloqueioFim: avail.endTime,
+                    bloqueioFimMinutos: endMinutes,
+                    condicao1: timeMinutes >= startMinutes,
+                    condicao2: timeMinutes < endMinutes,
+                    estaBloqueado: timeMinutes >= startMinutes && timeMinutes < endMinutes
+                  });
+
+                  // Verificar se o horário padrão se sobrepõe com o bloqueio
+                  // Corrigido: verificar se o horário está dentro do intervalo bloqueado
+                  if (timeMinutes >= startMinutes && timeMinutes < endMinutes) {
+                    blockedTimes.push(time);
+                    console.log(`🔒[${cacheBreaker}] Horário ${time} bloqueado(entre ${avail.startTime} e ${avail.endTime})`);
+                  }
+                } catch (timeError) {
+                  console.error(`❌[${cacheBreaker}] Erro ao processar horário: `, {
+                    time: time,
+                    startTime: avail.startTime,
+                    endTime: avail.endTime,
+                    error: timeError
+                  });
+                }
+              });
+            }
+          }
+        } catch (dateError) {
+          console.error(`❌[${cacheBreaker}] Erro ao processar datas: `, {
+            specificDate: avail.specificDate,
+            selectedDate: selectedDate,
+            error: dateError
+          });
+        }
+      });
+
+      console.log(`🚫[${cacheBreaker}] Horários bloqueados para a data selecionada: `, blockedTimes);
+
+      // Filtrar horários disponíveis
+      const availableTimes = defaultTimeSlots.filter(time => {
+        return !blockedTimes.includes(time) && !bookedTimes.includes(time);
+      });
+      console.log(`🚫[${cacheBreaker}] Horários bloqueados por disponibilidade: `, blockedTimes);
+
+      // Combinar horários ocupados por agendamentos e bloqueios de disponibilidade
+      // Remover duplicatas dos horários bloqueados
+      const uniqueBlockedTimes = [...new Set([...bookedTimes, ...blockedTimes])];
+
+      console.log(`📋[${cacheBreaker}] Horários ocupados: `, bookedTimes);
+      console.log(`📋[${cacheBreaker}] Horários bloqueados: `, blockedTimes);
+      console.log(`📋[${cacheBreaker}] Horários bloqueados únicos: `, uniqueBlockedTimes);
+
+      // Filtrar horários disponíveis
+      const availableSlots = defaultTimeSlots.filter(time => {
+        const isBlocked = uniqueBlockedTimes.includes(time);
+        console.log(`🔍[${cacheBreaker}] Verificando disponibilidade do horário ${time}: `, {
+          isBlocked,
+          booked: bookedTimes.includes(time),
+          blocked: blockedTimes.includes(time),
+          uniqueBlocked: uniqueBlockedTimes.includes(time)
         });
+        return !isBlocked;
+      });
+      console.log(`✨[${cacheBreaker}] Horários disponíveis FINAIS: `, availableSlots);
+
+      // Verificação adicional - garantir que os horários bloqueados não estão nos disponíveis
+      const verification = defaultTimeSlots.filter(time => {
+        const shouldBeAvailable = !uniqueBlockedTimes.includes(time);
+        const isActuallyAvailable = availableSlots.includes(time);
+        if (shouldBeAvailable !== isActuallyAvailable) {
+          console.warn(`⚠️[${cacheBreaker}] Inconsistência na disponibilidade do horário ${time}: `, {
+            shouldBeAvailable,
+            isActuallyAvailable
+          });
+        }
+        return shouldBeAvailable;
+      });
+
+      if (JSON.stringify(verification.sort()) !== JSON.stringify(availableSlots.sort())) {
+        console.warn(`⚠️[${cacheBreaker}] Inconsistência detectada nos horários disponíveis`);
+        console.log(`📋[${cacheBreaker}] Verificação: `, verification);
+        return verification;
       }
-      return shouldBeAvailable;
-    });
-    
-    if (JSON.stringify(verification.sort()) !== JSON.stringify(availableSlots.sort())) {
-      console.warn(`⚠️ [${cacheBreaker}] Inconsistência detectada nos horários disponíveis`);
-      console.log(`📋 [${cacheBreaker}] Verificação:`, verification);
-      return verification;
+
+      // Log dos horários liberados (cancelados)
+      const freedTimes = defaultTimeSlots.filter(time => {
+        const wasCancelled = cancelledAppointments.some(apt => apt.time === time);
+        const isNotBooked = !bookedTimes.includes(time);
+        return wasCancelled && isNotBooked;
+      });
+      if (freedTimes.length > 0) {
+        console.log(`🔓[${cacheBreaker}] Horários liberados por cancelamento: `, freedTimes);
+      }
+
+      return availableSlots;
+    } catch (error) {
+      console.error('❌ Erro ao buscar horários disponíveis:', error);
+      return defaultTimeSlots;
     }
-    
-    // Log dos horários liberados (cancelados)
-    const freedTimes = defaultTimeSlots.filter(time => {
-      const wasCancelled = cancelledAppointments.some(apt => apt.time === time);
-      const isNotBooked = !bookedTimes.includes(time);
-      return wasCancelled && isNotBooked;
-    });
-    if (freedTimes.length > 0) {
-      console.log(`🔓 [${cacheBreaker}] Horários liberados por cancelamento:`, freedTimes);
-    }
-    
-    return availableSlots;
-  } catch (error) {
-    console.error('❌ Erro ao buscar horários disponíveis:', error);
-    return defaultTimeSlots;
-  }
-}, [selectedDate, selectedDesigner, forceReload]); // Adicionado forceReload como dependência
+  }, [selectedDate, selectedDesigner, forceReload]); // Adicionado forceReload como dependência
 
   // Load available time slots when date is selected
   useEffect(() => {
@@ -1244,26 +1246,26 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       step,
       forceReload
     });
-    
+
     if (!isInitialized) {
       console.log('🔄 useEffect: Aplicação ainda não inicializada');
       return;
     }
-    
+
     if (selectedDate && step === 4) {
       console.log('🔄 useEffect: Data selecionada e no passo 4, carregando horários');
       const loadTimeSlots = async () => {
         setLoadingTimeSlots(true);
-        
+
         try {
           // Forçar nova consulta sem cache
           const slots = await getAvailableTimeSlots();
-          
+
           const defaultTimeSlots = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-          
+
           // Garantir que sempre temos um array válido
           const finalSlots = Array.isArray(slots) && slots.length >= 0 ? slots : defaultTimeSlots;
-          
+
           console.log('🎯 Horários carregados no useEffect:', finalSlots);
           setAvailableTimeSlots(finalSlots);
         } catch (error) {
@@ -1274,7 +1276,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
           setLoadingTimeSlots(false);
         }
       };
-      
+
       loadTimeSlots();
     } else {
       console.log('🔄 useEffect: Resetando horários');
@@ -1287,19 +1289,19 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   // Get unique client names from appointments for suggestions
   const getClientSuggestions = async (input: string) => {
     if (input.length < 2) return [];
-    
+
     try {
       const appointments = await getAppointments();
-      
+
       // Garantir que appointments é um array válido
       if (!Array.isArray(appointments)) {
         return [];
       }
-      
+
       const validAppointments = appointments.filter(apt => apt && apt.clientName);
       const uniqueNames = [...new Set(validAppointments.map(apt => apt.clientName))];
-      
-      return uniqueNames.filter(name => 
+
+      return uniqueNames.filter(name =>
         name && name.toLowerCase().includes(input.toLowerCase())
       ).slice(0, 5);
     } catch (error) {
@@ -1318,16 +1320,16 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
   const selectNameSuggestion = async (name: string) => {
     setClientName(name);
     setShowSuggestions(false);
-    
+
     try {
       // Auto-fill phone and email if available
       const appointments = await getAppointments();
-      
+
       // Garantir que appointments é um array válido
       if (!Array.isArray(appointments)) {
         return;
       }
-      
+
       const existingClient = appointments.find(apt => apt && apt.clientName === name);
       if (existingClient) {
         setClientPhone(formatPhoneNumber(existingClient.clientPhone || '')); // Aplica a formatação aqui
@@ -1340,35 +1342,35 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
 
   const handleConfirmBooking = async () => {
     if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime) return;
-    
+
     // 🆕 Verificar conexão antes de confirmar
     if (!isOnline) {
       alert('⚠️ Sem conexão com a internet. Por favor, verifique sua conexão e tente novamente.');
       return;
     }
-    
+
     // Logs para verificar o ID da designer selecionada
     console.log('🔍 Verificando designer selecionada:', {
       designerId: selectedDesigner.id,
       designerName: selectedDesigner.name,
       selectedDesigner: selectedDesigner
     });
-    
+
     // Verificar se o ID é válido (não deve ser 'kika6')
     if (selectedDesigner.id === 'kika6') {
       console.warn('⚠️ ID incorreto detectado: kika6. Tentando corrigir...');
       // Buscar o ID correto da Klicia
-      const kliciaDesigner = designers.find(d => 
-        d.name.toLowerCase().includes('klicia') || 
+      const kliciaDesigner = designers.find(d =>
+        d.name.toLowerCase().includes('klicia') ||
         d.name.toLowerCase().includes('kika')
       );
-      
+
       if (kliciaDesigner && kliciaDesigner.id !== 'kika6') {
         console.log('✅ ID correto encontrado para Klicia:', kliciaDesigner.id);
         selectedDesigner.id = kliciaDesigner.id;
       }
     }
-    
+
     // Remover verificação de conflito - horários ocupados devem ser filtrados no passo 4
     // Construir descrição com todos os serviços selecionados
     let serviceDescription = selectedService.name;
@@ -1377,8 +1379,8 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
     }
 
     // Calcular preço total
-    const totalPrice = (selectedService.price || 0) + 
-                    selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
+    const totalPrice = (selectedService.price || 0) +
+      selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
 
     const newAppointment: Appointment = {
       id: crypto.randomUUID(),
@@ -1392,7 +1394,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       price: totalPrice,
       status: 'pending'
     };
-    
+
     console.log('💾 Salvando agendamento com dados:', {
       appointmentId: newAppointment.id,
       designerId: newAppointment.designerId,
@@ -1402,13 +1404,13 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       date: newAppointment.date,
       time: newAppointment.time
     });
-    
+
     try {
       await saveAppointment(newAppointment);
-      
+
       // Forçar atualização dos horários disponíveis
       setForceReload(prev => prev + 1);
-      
+
       setShowConfirmation(true);
     } catch (error) {
       // Apenas tratar erros de conexão/sistema, não conflitos de horário
@@ -1421,7 +1423,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
     console.log('🔄 Resetando formulário');
     setIsResetting(true); // Marca que estamos resetando
     setShowConfirmation(false);
-    
+
     // Força o reset completo
     setTimeout(() => {
       setStep(1); // Sempre volta para o step 1 (seleção de designer)
@@ -1431,7 +1433,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
       setShowExtraServiceOption(false); // Resetar opção de extra
       setSelectedDate('');
       setSelectedTime('');
-      
+
       // Se há uma cliente logada, preencher automaticamente os campos
       if (loggedClient) {
         setClientName(loggedClient.name);
@@ -1442,9 +1444,9 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
         setClientPhone('');
         setClientEmail('');
       }
-      
+
       setShowSuggestions(false);
-      
+
       // Remove a flag de reset
       setIsResetting(false);
       console.log('✅ Formulário resetado');
@@ -1471,17 +1473,17 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
 
   const generateWhatsAppMessage = () => {
     if (!selectedDesigner || !selectedService || !selectedDate || !selectedTime || !clientName) return '';
-    
+
     // Construir descrição dos serviços
     let serviceDescription = selectedService.name;
     if (selectedExtraServices.length > 0) {
       serviceDescription += ' + ' + selectedExtraServices.map(service => service.name).join(' + ');
     }
-    
+
     // Calcular preço total
-    const totalPrice = (selectedService.price || 0) + 
-                      selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
-    
+    const totalPrice = (selectedService.price || 0) +
+      selectedExtraServices.reduce((sum, service) => sum + (service?.price || 0), 0);
+
     const message = `Olá! Gostaria de confirmar meu agendamento:
     
 👤 Cliente: ${clientName}
@@ -1492,7 +1494,7 @@ console.log(`💾 [${cacheBreaker}] Agendamentos locais ativos:`, localActiveApp
 💰 Valor: R$ ${totalPrice.toFixed(2)}
 
 Aguardo confirmação!`;
-    
+
     return encodeURIComponent(message);
   };
 
@@ -1534,7 +1536,7 @@ Aguardo confirmação!`;
             <h3 className="text-lg font-semibold text-white mb-4 bg-gradient-to-r from-pink-400 to-yellow-400 bg-clip-text text-transparent">
               Detalhes do Agendamento
             </h3>
-            
+
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-white/80">
@@ -1543,7 +1545,7 @@ Aguardo confirmação!`;
                 </div>
                 <span className="text-white font-medium">{selectedDesigner?.name}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-white/80">
                   <div className="w-3 h-3 bg-pink-400 rounded-full mr-3"></div>
@@ -1551,7 +1553,7 @@ Aguardo confirmação!`;
                 </div>
                 <span className="text-white font-medium">{clientName}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-white/80">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
@@ -1566,7 +1568,7 @@ Aguardo confirmação!`;
                   )}
                 </span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-white/80">
                   <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
@@ -1574,7 +1576,7 @@ Aguardo confirmação!`;
                 </div>
                 <span className="text-white font-medium">{formatDate(selectedDate)}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-white/80">
                   <div className="w-3 h-3 bg-blue-400 rounded-full mr-3"></div>
@@ -1582,7 +1584,7 @@ Aguardo confirmação!`;
                 </div>
                 <span className="text-white font-medium">{selectedTime}</span>
               </div>
-              
+
               <div className="flex justify-between items-center pt-2 border-t border-white/20">
                 <div className="flex items-center text-white/80">
                   <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-yellow-400 rounded-full mr-3"></div>
@@ -1604,21 +1606,21 @@ Aguardo confirmação!`;
                 <CreditCard className="w-5 h-5 text-green-400" />
                 Pagamento PIX
               </h3>
-              
+
               <p className="text-purple-100 text-sm mb-3">
                 Copie a chave PIX abaixo para pagamento:
               </p>
-              
+
               <p className="text-purple-100 text-sm mb-4">
                 Copie e pague com o PIX abaixo:
               </p>
-              
+
               <div className="bg-white/10 rounded-lg p-3 mb-3 border border-white/20">
                 <p className="text-white font-mono text-sm break-all">
                   {selectedDesigner.pixKey}
                 </p>
               </div>
-              
+
               <button
                 onClick={copyPixKey}
                 className="w-full flex items-center justify-center gap-2 p-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold transition-all"
@@ -1635,13 +1637,13 @@ Aguardo confirmação!`;
               <CreditCard className="w-8 h-8 text-purple-400 mx-auto mb-2" />
               <h3 className="text-purple-100 font-semibold text-lg mb-2">Pagamento via PIX</h3>
               <p className="text-purple-200 text-sm mb-4">Copie a chave PIX para pagamento</p>
-              
+
               <div className="bg-purple-900/30 rounded-lg p-4 mb-4">
                 <p className="text-purple-100 font-mono text-sm break-all">
                   {selectedDesigner?.pixKey || 'chavepix@exemplo.com'}
                 </p>
               </div>
-              
+
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(selectedDesigner?.pixKey || 'chavepix@exemplo.com');
@@ -1654,7 +1656,7 @@ Aguardo confirmação!`;
                 {showPixCopied ? 'Chave PIX Copiada!' : 'Copiar Chave PIX'}
               </button>
             </div>
-            
+
             {/* Aviso de Comprovante */}
             <div className="bg-orange-500/20 backdrop-blur-sm border border-orange-400/30 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -1688,7 +1690,7 @@ Aguardo confirmação!`;
           >
             Agendar Novo Serviço
           </button>
-          
+
           {/* Back to Home Button */}
           <button
             onClick={onBack}
@@ -1726,7 +1728,7 @@ Aguardo confirmação!`;
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">
-                {selectedDesigner ? `Agendamento com ${selectedDesigner.name}` : 'Fazer Agendamento'}
+                {selectedDesigner ? `Agendamento com ${selectedDesigner.name} ` : 'Fazer Agendamento'}
               </h1>
               <p className="text-white/70">
                 {selectedDesigner ? 'Complete seu agendamento' : 'Escolha sua nail designer preferida'}
@@ -1771,54 +1773,53 @@ Aguardo confirmação!`;
                       </div>
                     ) : (
                       designers.map((designer) => (
-                      <button
-                        key={designer.id}
-                        onClick={() => {
-                          console.log('👆 Designer selecionada:', {
-                            id: designer.id,
-                            name: designer.name
-                          });
-                          
-                          // Verificar se é o ID problemático 'kika6'
-                          if (designer.id === 'kika6') {
-                            console.warn('⚠️ ID problemático detectado na seleção: kika6');
-                            console.log('🔍 Buscando ID correto para Klicia...');
-                            
-                            // Buscar o designer correto da Klicia
-                            const correctDesigner = designers.find(d => 
-                              d.name.toLowerCase().includes('klicia') && d.id !== 'kika6'
-                            );
-                            
-                            if (correctDesigner) {
-                              console.log('✅ Designer correto encontrado:', correctDesigner);
-                              setSelectedDesigner(correctDesigner);
+                        <button
+                          key={designer.id}
+                          onClick={() => {
+                            console.log('👆 Designer selecionada:', {
+                              id: designer.id,
+                              name: designer.name
+                            });
+
+                            // Verificar se é o ID problemático 'kika6'
+                            if (designer.id === 'kika6') {
+                              console.warn('⚠️ ID problemático detectado na seleção: kika6');
+                              console.log('🔍 Buscando ID correto para Klicia...');
+
+                              // Buscar o designer correto da Klicia
+                              const correctDesigner = designers.find(d =>
+                                d.name.toLowerCase().includes('klicia') && d.id !== 'kika6'
+                              );
+
+                              if (correctDesigner) {
+                                console.log('✅ Designer correto encontrado:', correctDesigner);
+                                setSelectedDesigner(correctDesigner);
+                              } else {
+                                console.log('❌ Designer correto não encontrado, usando o selecionado');
+                                setSelectedDesigner(designer);
+                              }
                             } else {
-                              console.log('❌ Designer correto não encontrado, usando o selecionado');
                               setSelectedDesigner(designer);
                             }
-                          } else {
-                            setSelectedDesigner(designer);
-                          }
-                          
-                          setStep(2);
-                        }}
-                        className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
-                          selectedDesigner?.id === designer.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
-                        }`}
-                      >
-                        <div className="flex items-center mb-4">
-                          <div className="w-12 h-12 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center mr-4">
-                            <User className="w-6 h-6 text-white" />
+
+                            setStep(2);
+                          }}
+                          className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${selectedDesigner?.id === designer.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                            } `}
+                        >
+                          <div className="flex items-center mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center mr-4">
+                              <User className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-white mb-1">{designer.name}</h4>
+                              <p className="text-white/70 text-sm">Especialista em unhas</p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-white mb-1">{designer.name}</h4>
-                            <p className="text-white/70 text-sm">Especialista em unhas</p>
-                          </div>
-                        </div>
-                        <p className="text-pink-400 font-medium text-sm">
-                          Clique para ver os serviços disponíveis
-                        </p>
-                      </button>
+                          <p className="text-pink-400 font-medium text-sm">
+                            Clique para ver os serviços disponíveis
+                          </p>
+                        </button>
                       ))
                     )}
                   </div>
@@ -1833,8 +1834,8 @@ Aguardo confirmação!`;
                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
                       <div className="flex items-start gap-4">
                         {selectedDesigner.photoUrl && (
-                          <img 
-                            src={selectedDesigner.photoUrl} 
+                          <img
+                            src={selectedDesigner.photoUrl}
                             alt={selectedDesigner.name}
                             className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
                           />
@@ -1888,9 +1889,8 @@ Aguardo confirmação!`;
                             setSelectedService(service);
                             setShowExtraServiceOption(true);
                           }}
-                          className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
-                            selectedService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
-                          }`}
+                          className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${selectedService?.id === service.id ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                            }`}
                         >
                           <h4 className="font-semibold text-white mb-2">{service.name}</h4>
                           <p className="text-white/70 text-sm mb-3">{service.duration} minutos</p>
@@ -1903,7 +1903,7 @@ Aguardo confirmação!`;
                   {selectedService && showExtraServiceOption && (
                     <div className="mt-8" ref={extraServiceRef}> {/* Adicionado ref aqui */}
                       <h4 className="text-white font-semibold mb-3">Deseja serviço extra?</h4>
-                      
+
                       {extraServices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {extraServices.map((service) => {
@@ -1924,9 +1924,8 @@ Aguardo confirmação!`;
                                     }
                                   }
                                 }}
-                                className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${
-                                  isSelected ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
-                                }`}
+                                className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-left hover:bg-white/20 transition-all duration-300 hover:scale-105 ${isSelected ? 'ring-2 ring-pink-400 bg-pink-500/20' : ''
+                                  }`}
                                 disabled={!isSelected && selectedExtraServices.length >= 3}
                               >
                                 <h5 className="font-semibold text-white mb-1">{service.name}</h5>
@@ -2005,8 +2004,8 @@ Aguardo confirmação!`;
                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
                       <div className="flex items-start gap-4">
                         {selectedDesigner.photoUrl && (
-                          <img 
-                            src={selectedDesigner.photoUrl} 
+                          <img
+                            src={selectedDesigner.photoUrl}
                             alt={selectedDesigner.name}
                             className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
                           />
@@ -2050,24 +2049,24 @@ Aguardo confirmação!`;
                           if (selectedDateValue && selectedDesigner) {
                             const blocked = await getDesignerAvailability();
                             const normalizedSelectedDate = selectedDateValue.split('T')[0];
-                            
+
                             // Verificar se há algum bloqueio ativo para a data selecionada
                             const isBlocked = blocked.some((avail: any) => {
                               if (!avail || !avail.specificDate || !avail.isActive) return false;
                               const normalizedAvailDate = String(avail.specificDate).split('T')[0];
-                              
+
                               // Se for um bloqueio de dia inteiro (00:00-23:59)
-                              if (normalizedAvailDate === normalizedSelectedDate && 
-                                  avail.startTime === '00:00' && 
-                                  avail.endTime === '23:59') {
+                              if (normalizedAvailDate === normalizedSelectedDate &&
+                                avail.startTime === '00:00' &&
+                                avail.endTime === '23:59') {
                                 return true;
                               }
-                              
+
                               // Se for um bloqueio parcial, ainda permitir avançar para o step 4
                               // onde serão filtrados os horários específicos
                               return false;
                             });
-                            
+
                             if (isBlocked) {
                               alert('Este dia está completamente bloqueado pela designer e não pode ser agendado.');
                               return;
@@ -2076,13 +2075,13 @@ Aguardo confirmação!`;
                           setSelectedDate(selectedDateValue);
                           if (selectedDateValue) setStep(4);
                         };
-                        
+
                         checkDateBlocked();
                       }}
                       min={new Date().toISOString().split('T')[0]}
                       className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                     />
-                  {loadingAvailability ? (
+                    {loadingAvailability ? (
                       <div className="mt-3 p-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
                         <div className="flex items-center justify-center py-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white/70 mr-2"></div>
@@ -2093,7 +2092,7 @@ Aguardo confirmação!`;
                       <div className="mt-3 p-3 bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm border border-purple-400/30 rounded-xl">
                         <p className="text-purple-100 text-sm font-medium mb-2">📆 Calendário atualizado</p>
                         <p className="text-purple-200 text-xs mb-3">Os dias e horários bloqueados pela designer já estão refletidos no calendário abaixo.</p>
-                        
+
                         {/* Preview de dias bloqueados */}
                         {blockedDatesPreview.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-purple-400/20">
@@ -2101,9 +2100,9 @@ Aguardo confirmação!`;
                             <div className="max-h-20 overflow-y-auto">
                               {blockedDatesPreview.map((blocked, index) => (
                                 <div key={index} className="text-purple-200 text-xs mb-1">
-                                  {blocked.isFullDay 
+                                  {blocked.isFullDay
                                     ? `📅 ${new Date(blocked.date + 'T00:00:00').toLocaleDateString('pt-BR')} (dia inteiro bloqueado)`
-                                    : `⏰ ${new Date(blocked.date + 'T00:00:00').toLocaleDateString('pt-BR')} das ${blocked.startTime} às ${blocked.endTime}`
+                                    : `⏰ ${new Date(blocked.date + 'T00:00:00').toLocaleDateString('pt-BR')} das ${blocked.startTime} às ${blocked.endTime} `
                                   }
                                 </div>
                               ))}
@@ -2124,8 +2123,8 @@ Aguardo confirmação!`;
                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
                       <div className="flex items-start gap-4">
                         {selectedDesigner.photoUrl && (
-                          <img 
-                            src={selectedDesigner.photoUrl} 
+                          <img
+                            src={selectedDesigner.photoUrl}
                             alt={selectedDesigner.name}
                             className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
                           />
@@ -2155,7 +2154,7 @@ Aguardo confirmação!`;
                       ← Voltar
                     </button>
                   </div>
-                  
+
                   <div className="mb-4">
                     <button
                       onClick={forceRefreshTimeSlots}
@@ -2192,11 +2191,10 @@ Aguardo confirmação!`;
                               setSelectedTime(time);
                               setStep(5);
                             }}
-                            className={`p-3 rounded-lg font-medium transition-all ${
-                              selectedTime === time
-                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                            className={`p - 3 rounded - lg font - medium transition - all ${selectedTime === time
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              } `}
                           >
                             {time}
                           </button>
@@ -2220,8 +2218,8 @@ Aguardo confirmação!`;
                     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
                       <div className="flex items-start gap-4">
                         {selectedDesigner.photoUrl && (
-                          <img 
-                            src={selectedDesigner.photoUrl} 
+                          <img
+                            src={selectedDesigner.photoUrl}
                             alt={selectedDesigner.name}
                             className="w-20 h-20 rounded-full object-cover border-2 border-pink-400"
                           />
@@ -2266,7 +2264,7 @@ Aguardo confirmação!`;
                         className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500"
                         required
                       />
-                      
+
                       {/* Name Suggestions */}
                       {showSuggestions && nameSuggestions.length > 0 && (
                         <div className="absolute z-10 w-full mt-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl overflow-hidden">
@@ -2326,7 +2324,7 @@ Aguardo confirmação!`;
                           <span>Serviços:</span>
                           <span>
                             {selectedService?.name}
-                            {selectedExtraServices.length > 0 ? ` + ${selectedExtraServices.map(service => service.name).join(' + ')}` : ''}
+                            {selectedExtraServices.length > 0 ? ` + ${selectedExtraServices.map(service => service.name).join(' + ')} ` : ''}
                           </span>
                         </div>
                         <div className="flex justify-between text-white font-medium pt-3 border-t border-white/20">
@@ -2356,7 +2354,7 @@ Aguardo confirmação!`;
               <p className="text-white/70 text-sm">
                 Preencha os detalhes para ver o resumo.
               </p>
-              
+
               {selectedService && (
                 <div className="mt-6 space-y-3">
                   <div className="flex justify-between text-white/80">

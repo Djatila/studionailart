@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Clock, Calendar, X } from 'lucide-react';
 import { NailDesigner, Availability } from '../App';
+import { getAvailableTimeSlots as getTimeSlotsConfig } from '../utils/timeSlots';
 
 interface AvailabilityManagerProps {
   designer: NailDesigner;
@@ -24,8 +25,8 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     console.log('Estado de availability atualizado:', availability);
   }, [availability]);
 
-  // Horários específicos disponíveis
-  const availableHours = ['08:00', '10:00', '13:00', '15:00', '17:00'];
+  // 🎄 HORÁRIOS DINÂMICOS: Dezembro 2025 ou horários normais
+  const availableHours = getTimeSlotsConfig();
 
   // Load availability data on component mount
   useEffect(() => {
@@ -61,11 +62,11 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = await availabilityService.getByDesignerId(designer.id);
       console.log('Dados do Supabase:', supabaseAvailability);
-      
+
       // Filtrar apenas os registros com specific_date (bloqueios de datas específicas)
       const filteredAvailability = supabaseAvailability.filter(avail => avail.specific_date);
       console.log('Dados filtrados:', filteredAvailability);
-      
+
       const mappedAvailability = filteredAvailability.map(avail => {
         return {
           id: avail.id, // Usar o ID do Supabase
@@ -76,12 +77,12 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           isActive: !avail.is_available // isActive = bloqueio ativo (quando is_available = false)
         };
       });
-      
+
       console.log('Dados mapeados:', mappedAvailability);
-      
+
       // Sempre salvar os dados do Supabase no localStorage para manter consistência local
       localStorage.setItem('nail_availability', JSON.stringify(mappedAvailability));
-      
+
       console.log('=== Finalizando getAvailability (com dados do Supabase) ===');
       return mappedAvailability;
     } catch (error) {
@@ -96,9 +97,9 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       ...availability,
       id: availability.id || `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
-    
+
     console.log('Salvando disponibilidade:', availabilityWithId);
-    
+
     try {
       const { availabilityService } = await import('../utils/supabaseUtils');
       const supabaseAvailability = {
@@ -110,7 +111,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
         specific_date: availabilityWithId.specificDate
       };
       const savedAvailability = await availabilityService.create(supabaseAvailability);
-      
+
       if (savedAvailability) {
         console.log('Disponibilidade salva no Supabase:', savedAvailability);
         // Atualizar o ID se foi gerado pelo Supabase
@@ -120,18 +121,18 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       console.error('Erro ao salvar disponibilidade no Supabase:', error);
       // Mesmo em caso de erro, continuar com o processo de salvamento local
     }
-    
+
     // Também salvar no localStorage para compatibilidade
     const saved = localStorage.getItem('nail_availability');
     let allAvailability = saved ? JSON.parse(saved) : [];
-    
+
     // Garantir que allAvailability seja um array
     if (!Array.isArray(allAvailability)) {
       allAvailability = [];
     }
-    
+
     console.log('Dados atuais no localStorage antes de salvar:', allAvailability);
-    
+
     // Verificar se já existe um item com este ID
     const existingIndex = allAvailability.findIndex((item: Availability) => item.id === availabilityWithId.id);
     if (existingIndex >= 0) {
@@ -143,10 +144,10 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       console.log('Adicionando novo item');
       allAvailability.push(availabilityWithId);
     }
-    
+
     console.log('Dados a serem salvos no localStorage:', allAvailability);
     localStorage.setItem('nail_availability', JSON.stringify(allAvailability));
-    
+
     // Recarregar os dados para garantir consistência
     await loadAvailability();
   };
@@ -155,18 +156,18 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     console.log('=== Iniciando deleteAvailability ===');
     console.log('ID a ser excluído:', availabilityId);
     console.log('Tipo do ID:', typeof availabilityId);
-    
+
     // Verificar se o ID parece ser um UUID válido do Supabase antes de tentar deletar
     const isUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(availabilityId);
     console.log('ID está no formato UUID válido:', isUuidFormat);
-    
+
     // Deletar do Supabase apenas se for um UUID válido
     if (isUuidFormat) {
       try {
         const { availabilityService } = await import('../utils/supabaseUtils');
         console.log('Tentando deletar do Supabase...');
         const deleted = await availabilityService.delete(availabilityId);
-        
+
         if (deleted) {
           console.log('Disponibilidade deletada do Supabase:', availabilityId);
         } else {
@@ -178,24 +179,24 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     } else {
       console.log('Pulando deleção no Supabase - ID não é UUID válido:', availabilityId);
     }
-    
+
     // Também deletar do localStorage
     try {
       console.log('Tentando deletar do localStorage...');
       const saved = localStorage.getItem('nail_availability');
       let allAvailability = saved ? JSON.parse(saved) : [];
-      
+
       console.log('Dados atuais no localStorage:', allAvailability);
       console.log('Tipo de allAvailability:', typeof allAvailability);
       console.log('É array?', Array.isArray(allAvailability));
-      
+
       // Verificar se allAvailability é um array
       if (!Array.isArray(allAvailability)) {
         allAvailability = [];
       }
-      
+
       console.log('Total de itens antes da filtragem:', allAvailability.length);
-      
+
       // Filtrar para remover apenas o item específico
       const filtered = allAvailability.filter((avail: any) => {
         // Verificar se avail existe
@@ -203,25 +204,25 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           console.log('Item nulo ou indefinido encontrado');
           return true; // Manter itens válidos
         }
-        
+
         // Verificar se o item tem ID
         const itemId = avail.id;
         if (!itemId) {
           console.log('Item sem ID encontrado:', avail);
           return true; // Manter itens válidos
         }
-        
+
         // Comparar IDs como strings para garantir compatibilidade
         const shouldKeep = String(itemId) !== String(availabilityId);
         console.log(`Comparando IDs - Item: ${itemId} (${typeof itemId}) | Target: ${availabilityId} (${typeof availabilityId}) | Manter: ${shouldKeep}`);
         return shouldKeep;
       });
-      
+
       console.log('Resultado da filtragem:', filtered);
       console.log('Total de itens após filtragem:', filtered.length);
-      
+
       localStorage.setItem('nail_availability', JSON.stringify(filtered));
-      
+
       // Atualizar o estado local imediatamente para refletir a mudança
       setAvailability(prev => {
         console.log('Atualizando estado local...');
@@ -239,7 +240,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     } catch (error) {
       console.error('Erro ao deletar do localStorage:', error);
     }
-    
+
     // Recarregar dados do Supabase para garantir consistência
     try {
       console.log('Recarregando dados do Supabase...');
@@ -262,7 +263,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
         return String(itemId) !== String(availabilityId);
       }));
     }
-    
+
     console.log('=== Finalizando deleteAvailability ===');
   };
 
@@ -271,7 +272,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       const saved = localStorage.getItem('nail_availability');
       const allAvailability = saved ? JSON.parse(saved) : [];
       const currentAvail = allAvailability.find((avail: Availability) => avail.id === availabilityId);
-      
+
       if (currentAvail) {
         const { availabilityService } = await import('../utils/supabaseUtils');
         // Se bloqueado (isActive = true), ao alternar vira liberado => is_available: true
@@ -288,7 +289,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
     // Atualizar localStorage (inverter bloqueio)
     const saved = localStorage.getItem('nail_availability');
     const allAvailability = saved ? JSON.parse(saved) : [];
-    const updated = allAvailability.map((avail: Availability) => 
+    const updated = allAvailability.map((avail: Availability) =>
       avail.id === availabilityId ? { ...avail, isActive: !avail.isActive } : avail
     );
     localStorage.setItem('nail_availability', JSON.stringify(updated));
@@ -297,12 +298,12 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Verificar se já existe um bloqueio para esta data
-    const existing = availability.find(avail => 
+    const existing = availability.find(avail =>
       avail.specificDate === formData.specificDate && avail.isActive
     );
-    
+
     if (existing) {
       alert('Já existe um bloqueio ativo para esta data!');
       return;
@@ -314,7 +315,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
         alert('O horário de início deve ser anterior ao horário de fim!');
         return;
       }
-      
+
       const newAvailability: Availability = {
         id: `avail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID único
         designerId: designer.id,
@@ -323,7 +324,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
         endTime: formData.endTime,
         isActive: true
       };
-      
+
       await saveAvailability(newAvailability);
     } else {
       // Bloqueio de horários específicos
@@ -331,17 +332,17 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
         alert('Selecione pelo menos um horário para bloquear!');
         return;
       }
-      
+
       // Criar um bloqueio para cada horário selecionado
       for (const hour of formData.specificHours) {
         // Converter hora para formato de início e fim (ex: '08:00' -> '08:00' a '09:00')
         const [hours, minutes] = hour.split(':').map(Number);
         const startHour = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        
+
         // Calcular hora de término (adicionar 1 hora)
         const endHours = (hours + 1) % 24;
         const endHour = `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        
+
         const newAvailability: Availability = {
           id: `avail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID único
           designerId: designer.id,
@@ -350,15 +351,15 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           endTime: endHour,
           isActive: true
         };
-        
+
         await saveAvailability(newAvailability);
       }
     }
-    
+
     setShowForm(false);
-    setFormData({ 
-      specificDate: '', 
-      startTime: '00:00', 
+    setFormData({
+      specificDate: '',
+      startTime: '00:00',
       endTime: '23:59',
       blockType: 'fullDay',
       specificHours: []
@@ -369,9 +370,9 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
 
   const handleCancel = () => {
     setShowForm(false);
-    setFormData({ 
-      specificDate: '', 
-      startTime: '00:00', 
+    setFormData({
+      specificDate: '',
+      startTime: '00:00',
       endTime: '23:59',
       blockType: 'fullDay',
       specificHours: []
@@ -384,7 +385,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
       const newHours = prev.specificHours.includes(hour)
         ? prev.specificHours.filter(h => h !== hour)
         : [...prev.specificHours, hour];
-      
+
       return {
         ...prev,
         specificHours: newHours
@@ -396,24 +397,24 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
   const syncLocalAvailabilityToSupabase = async () => {
     try {
       console.log('=== Iniciando sincronização de dados locais com Supabase ===');
-      
+
       const saved = localStorage.getItem('nail_availability');
       let localAvailability = saved ? JSON.parse(saved) : [];
-      
+
       // Garantir que localAvailability seja um array
       if (!Array.isArray(localAvailability)) {
         localAvailability = [];
       }
-      
+
       if (localAvailability.length === 0) {
         console.log('Nenhum dado local encontrado para sincronização');
         return;
       }
-      
+
       console.log(`Encontrados ${localAvailability.length} itens para sincronização`);
-      
+
       const { availabilityService } = await import('../utils/supabaseUtils');
-      
+
       // Processar cada item local
       for (const localItem of localAvailability) {
         // Verificar se o item já tem um ID válido do Supabase
@@ -421,7 +422,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           console.log(`Item ${localItem.id} já possui ID do Supabase, pulando...`);
           continue;
         }
-        
+
         // Criar item no Supabase
         const supabaseItem = {
           designer_id: localItem.designerId || designer.id,
@@ -431,24 +432,24 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           is_available: localItem.isActive !== undefined ? !localItem.isActive : true,
           specific_date: localItem.specificDate
         };
-        
+
         console.log('Criando item no Supabase:', supabaseItem);
         const created = await availabilityService.create(supabaseItem);
-        
+
         if (created) {
           console.log('Item criado com sucesso no Supabase:', created.id);
-          
+
           // Atualizar o item local com o ID do Supabase
           localItem.id = created.id;
         } else {
           console.warn('Falha ao criar item no Supabase:', localItem);
         }
       }
-      
+
       // Salvar os itens atualizados no localStorage
       localStorage.setItem('nail_availability', JSON.stringify(localAvailability));
       console.log('=== Finalizando sincronização de dados locais com Supabase ===');
-      
+
       // Recarregar os dados para garantir consistência
       await loadAvailability();
     } catch (error) {
@@ -474,7 +475,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
           </button>
           <h1 className="text-xl font-semibold text-gray-800">Bloqueios de Dias</h1>
         </div>
-        
+
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
@@ -511,7 +512,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -527,7 +528,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                 required
               />
             </div>
-            
+
             {/* Tipo de bloqueio */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -537,28 +538,26 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, blockType: 'fullDay' })}
-                  className={`p-3 rounded-lg font-medium transition-colors ${
-                    formData.blockType === 'fullDay'
+                  className={`p-3 rounded-lg font-medium transition-colors ${formData.blockType === 'fullDay'
                       ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   Dia Inteiro
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, blockType: 'specificHours' })}
-                  className={`p-3 rounded-lg font-medium transition-colors ${
-                    formData.blockType === 'specificHours'
+                  className={`p-3 rounded-lg font-medium transition-colors ${formData.blockType === 'specificHours'
                       ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   Apenas Horários Específicos
                 </button>
               </div>
             </div>
-            
+
             {formData.blockType === 'fullDay' ? (
               // Formulário para bloqueio de dia inteiro
               <div className="grid grid-cols-2 gap-4">
@@ -575,7 +574,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Clock className="w-4 h-4 inline mr-1" />
@@ -603,11 +602,10 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                       key={hour}
                       type="button"
                       onClick={() => toggleSpecificHour(hour)}
-                      className={`p-3 rounded-lg font-medium transition-colors ${
-                        formData.specificHours.includes(hour)
+                      className={`p-3 rounded-lg font-medium transition-colors ${formData.specificHours.includes(hour)
                           ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       {hour}
                     </button>
@@ -625,7 +623,7 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                 )}
               </div>
             )}
-            
+
             <div className="flex gap-3">
               <button
                 type="button"
@@ -682,30 +680,28 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
                         day: 'numeric'
                       })}
                     </h3>
-                    
+
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <Clock className="w-4 h-4 text-pink-600" />
                         <span className="font-medium text-gray-800">
                           {avail.startTime} - {avail.endTime}
                         </span>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          avail.isActive 
-                            ? 'bg-red-100 text-red-600' 
+                        <span className={`px-2 py-1 text-xs rounded-full ${avail.isActive
+                            ? 'bg-red-100 text-red-600'
                             : 'bg-green-100 text-green-600'
-                        }`}>
+                          }`}>
                           {avail.isActive ? 'Bloqueado' : 'Liberado'}
                         </span>
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <button
                           onClick={() => toggleAvailability(avail.id!)}
-                          className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                            avail.isActive
+                          className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${avail.isActive
                               ? 'bg-green-100 text-green-700 hover:bg-green-200'
                               : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                          }`}
+                            }`}
                         >
                           {avail.isActive ? 'Desbloquear' : 'Bloquear'}
                         </button>
@@ -734,68 +730,68 @@ export default function AvailabilityManager({ designer, onBack }: AvailabilityMa
   );
 }
 
-  // Função para sincronizar dados locais com Supabase quando necessário
-  const syncLocalDataWithSupabaseIfNeeded = async (supabaseData: Availability[]) => {
-    try {
-      const saved = localStorage.getItem('nail_availability');
-      let localAvailability = saved ? JSON.parse(saved) : [];
-      
-      // Garantir que localAvailability seja um array
-      if (!Array.isArray(localAvailability)) {
-        localAvailability = [];
-      }
-      
-      if (localAvailability.length === 0) {
-        return;
-      }
-      
-      // Verificar se há itens locais que não estão no Supabase
-      const localItemsNotInSupabase = localAvailability.filter(localItem => {
-        // Verificar se o item local já tem um ID do Supabase
-        if (localItem.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(localItem.id)) {
-          // Verificar se o item já existe no Supabase
-          return !supabaseData.some(supabaseItem => supabaseItem.id === localItem.id);
-        }
-        // Itens locais sem ID do Supabase precisam ser sincronizados
-        return true;
-      });
-      
-      if (localItemsNotInSupabase.length > 0) {
-        console.log(`Encontrados ${localItemsNotInSupabase.length} itens locais para sincronização com Supabase`);
-        
-        const { availabilityService } = await import('../utils/supabaseUtils');
-        
-        // Sincronizar cada item local
-        for (const localItem of localItemsNotInSupabase) {
-          // Criar item no Supabase
-          const supabaseItem = {
-            designer_id: localItem.designerId || designer.id,
-            day_of_week: localItem.specificDate ? new Date(localItem.specificDate).getDay() : 0,
-            start_time: localItem.startTime || '00:00',
-            end_time: localItem.endTime || '23:59',
-            is_available: localItem.isActive !== undefined ? !localItem.isActive : true,
-            specific_date: localItem.specificDate
-          };
-          
-          console.log('Sincronizando item local com Supabase:', supabaseItem);
-          const created = await availabilityService.create(supabaseItem);
-          
-          if (created) {
-            console.log('Item sincronizado com sucesso:', created.id);
-            
-            // Atualizar o item local com o ID do Supabase
-            localItem.id = created.id;
-          } else {
-            console.warn('Falha ao sincronizar item local:', localItem);
-          }
-        }
-        
-        // Salvar os itens atualizados no localStorage
-        localStorage.setItem('nail_availability', JSON.stringify(localAvailability));
-        console.log('Dados locais atualizados após sincronização');
-      }
-    } catch (error) {
-      console.error('Erro ao sincronizar dados locais com Supabase:', error);
+// Função para sincronizar dados locais com Supabase quando necessário
+const syncLocalDataWithSupabaseIfNeeded = async (supabaseData: Availability[]) => {
+  try {
+    const saved = localStorage.getItem('nail_availability');
+    let localAvailability = saved ? JSON.parse(saved) : [];
+
+    // Garantir que localAvailability seja um array
+    if (!Array.isArray(localAvailability)) {
+      localAvailability = [];
     }
-  };
+
+    if (localAvailability.length === 0) {
+      return;
+    }
+
+    // Verificar se há itens locais que não estão no Supabase
+    const localItemsNotInSupabase = localAvailability.filter(localItem => {
+      // Verificar se o item local já tem um ID do Supabase
+      if (localItem.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(localItem.id)) {
+        // Verificar se o item já existe no Supabase
+        return !supabaseData.some(supabaseItem => supabaseItem.id === localItem.id);
+      }
+      // Itens locais sem ID do Supabase precisam ser sincronizados
+      return true;
+    });
+
+    if (localItemsNotInSupabase.length > 0) {
+      console.log(`Encontrados ${localItemsNotInSupabase.length} itens locais para sincronização com Supabase`);
+
+      const { availabilityService } = await import('../utils/supabaseUtils');
+
+      // Sincronizar cada item local
+      for (const localItem of localItemsNotInSupabase) {
+        // Criar item no Supabase
+        const supabaseItem = {
+          designer_id: localItem.designerId || designer.id,
+          day_of_week: localItem.specificDate ? new Date(localItem.specificDate).getDay() : 0,
+          start_time: localItem.startTime || '00:00',
+          end_time: localItem.endTime || '23:59',
+          is_available: localItem.isActive !== undefined ? !localItem.isActive : true,
+          specific_date: localItem.specificDate
+        };
+
+        console.log('Sincronizando item local com Supabase:', supabaseItem);
+        const created = await availabilityService.create(supabaseItem);
+
+        if (created) {
+          console.log('Item sincronizado com sucesso:', created.id);
+
+          // Atualizar o item local com o ID do Supabase
+          localItem.id = created.id;
+        } else {
+          console.warn('Falha ao sincronizar item local:', localItem);
+        }
+      }
+
+      // Salvar os itens atualizados no localStorage
+      localStorage.setItem('nail_availability', JSON.stringify(localAvailability));
+      console.log('Dados locais atualizados após sincronização');
+    }
+  } catch (error) {
+    console.error('Erro ao sincronizar dados locais com Supabase:', error);
+  }
+};
 

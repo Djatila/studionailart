@@ -11,6 +11,9 @@ import DesignerSettings from './components/DesignerSettings';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import ClientDashboard from './components/ClientDashboard';
 import ConnectionStatus from './components/ConnectionStatus';
+// 🎄 Holiday Theme Components
+import SnowEffect from './components/SnowEffect';
+import HolidayDecorations from './components/HolidayDecorations';
 
 import { cleanOldAppointments } from './utils/appointmentUtils';
 import { notificationService } from './services/notificationService';
@@ -91,7 +94,7 @@ function App() {
     const handleStorageChange = () => {
       setRefreshKey(prev => prev + 1);
     };
-    
+
     // Listen for designer updates from components
     const handleDesignerUpdate = (event: CustomEvent) => {
       const updatedDesigner = event.detail;
@@ -101,28 +104,28 @@ function App() {
         setCurrentDesigner(updatedDesigner);
       }
     };
-    
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('designerUpdated', handleDesignerUpdate as EventListener);
-    
+
     // 🆕 NOVO: Check if accessing via designer's personal link
     const checkPersonalLink = async () => {
       const slug = extractSlugFromPath(window.location.pathname);
       console.log('🔍 Verificando URL:', window.location.pathname, '| Slug extraído:', slug);
-      
+
       // Verificar se tem slug salvo no localStorage
       const savedSlug = localStorage.getItem('designerSlug');
       const activeSlug = slug || savedSlug;
-      
+
       if (activeSlug) {
         console.log('🔗 Link personalizado detectado:', activeSlug, slug ? '(da URL)' : '(do localStorage)');
         setDesignerSlug(activeSlug);
-        
+
         // Salvar no localStorage para persistir após navegação
         if (slug) {
           localStorage.setItem('designerSlug', slug);
         }
-        
+
         try {
           // Buscar designer pelo slug no Supabase
           const designers = await designerService.getAll();
@@ -131,13 +134,13 @@ function App() {
             slug: d.slug || generateSlug(d.name),
             active: d.is_active
           })));
-          
+
           const designer = designers.find(d => {
             const designerSlug = d.slug || generateSlug(d.name);
             console.log(`🔎 Comparando: "${designerSlug}" === "${slug}"?`, designerSlug === slug);
             return designerSlug === slug && d.is_active;
           });
-          
+
           if (designer) {
             console.log('✅ Designer encontrada:', designer.name);
             // Converter campos do Supabase para formato do App
@@ -159,7 +162,7 @@ function App() {
               photoUrl: designer.photo_url || undefined,
               photo_url: designer.photo_url || undefined,
             };
-            
+
             // Salvar designer mas NÃO fazer login automático
             // Cliente precisa fazer login normalmente primeiro
             setCurrentDesigner(mappedDesigner);
@@ -193,30 +196,30 @@ function App() {
         }
       }
     };
-    
+
     checkPersonalLink();
 
     // Clean old appointments on app load
     cleanOldAppointments();
-    
+
     // Set up daily cleanup
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
-    
+
     const timeoutId = setTimeout(() => {
       cleanOldAppointments();
       // Set up recurring daily cleanup
       setInterval(cleanOldAppointments, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
-    
+
     // 🆕 NOVO: Iniciar serviço de notificações
     console.log('🚀 Iniciando serviço de notificações');
     notificationService.startQueueProcessing();
-    
+
     return () => {
       clearTimeout(timeoutId);
       window.removeEventListener('storage', handleStorageChange);
@@ -303,6 +306,10 @@ function App() {
   if (currentView === 'login') {
     return (
       <>
+        {/* 🎄 Holiday Theme Effects */}
+        <SnowEffect />
+        <HolidayDecorations />
+
         <ConnectionStatus onConnectionChange={setIsOnline} />
         <LoginPage onLogin={handleLogin} onSuperAdminLogin={handleSuperAdminLogin} isOnline={isOnline} />
       </>
@@ -312,6 +319,10 @@ function App() {
   if (currentView === 'superadmin') {
     return (
       <>
+        {/* 🎄 Holiday Theme Effects */}
+        <SnowEffect />
+        <HolidayDecorations />
+
         <ConnectionStatus />
         <SuperAdminDashboard onBack={handleLogout} />
       </>
@@ -321,15 +332,19 @@ function App() {
   if (currentView === 'client') {
     return (
       <>
+        {/* 🎄 Holiday Theme Effects */}
+        <SnowEffect />
+        <HolidayDecorations />
+
         <ConnectionStatus />
-        <ClientDashboard 
-          client={currentClient!} 
+        <ClientDashboard
+          client={currentClient!}
           onBack={handleLogout}
           onBookService={() => {
             // Antes de abrir booking, recuperar designer do localStorage se necessário
             const savedSlug = localStorage.getItem('designerSlug');
             const savedDesignerStr = localStorage.getItem('preSelectedDesigner');
-            
+
             if (savedSlug && savedDesignerStr && !currentDesigner) {
               try {
                 const savedDesigner = JSON.parse(savedDesignerStr);
@@ -340,7 +355,7 @@ function App() {
                 console.error('❌ Erro ao recuperar designer:', e);
               }
             }
-            
+
             setCurrentView('booking');
           }}
         />
@@ -353,9 +368,9 @@ function App() {
     // Sempre verificar localStorage primeiro (mais confiável que estado)
     const savedSlug = localStorage.getItem('designerSlug');
     const savedDesignerStr = localStorage.getItem('preSelectedDesigner');
-    
+
     let initialDesigner: NailDesigner | undefined = currentDesigner || undefined;
-    
+
     // Se tem no localStorage mas não no estado, usar do localStorage
     if (savedSlug && savedDesignerStr && !currentDesigner) {
       try {
@@ -367,7 +382,7 @@ function App() {
         initialDesigner = undefined;
       }
     }
-    
+
     console.log('🎯 Abrindo BookingPage:', {
       temSlug: !!(designerSlug || savedSlug),
       temDesigner: !!initialDesigner,
@@ -375,11 +390,15 @@ function App() {
       nomeDesigner: initialDesigner?.name,
       fonte: currentDesigner ? 'estado' : 'localStorage'
     });
-    
+
     return (
       <>
+        {/* 🎄 Holiday Theme Effects */}
+        <SnowEffect />
+        <HolidayDecorations />
+
         <ConnectionStatus onConnectionChange={setIsOnline} />
-        <BookingPage 
+        <BookingPage
           designer={initialDesigner}
           onBack={handleLogout}
           loggedClient={currentClient || undefined}
@@ -391,9 +410,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-pink-600">
+      {/* 🎄 Holiday Theme Effects */}
+      <SnowEffect />
+      <HolidayDecorations />
+
       {/* Connection Status Monitor */}
       <ConnectionStatus />
-      
+
       {/* Navigation */}
       <nav className="bg-white/10 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-lg mx-auto px-4 py-3">
@@ -414,42 +437,42 @@ function App() {
       {/* Content */}
       <div className="max-w-lg mx-auto px-4 py-6">
         {currentView === 'admin' && (
-          <AdminDashboard 
+          <AdminDashboard
             designer={currentDesigner!}
             onViewChange={setCurrentView}
           />
         )}
-        
+
         {currentView === 'services' && (
-          <ServicesManager 
+          <ServicesManager
             designer={currentDesigner!}
             onBack={() => setCurrentView('admin')}
           />
         )}
-        
+
         {currentView === 'stats' && (
-          <Statistics 
+          <Statistics
             designer={currentDesigner!}
             onBack={() => setCurrentView('admin')}
           />
         )}
 
         {currentView === 'availability' && (
-          <AvailabilityManager 
+          <AvailabilityManager
             designer={currentDesigner!}
             onBack={() => setCurrentView('admin')}
           />
         )}
 
         {currentView === 'settings' && (
-          <DesignerSettings 
+          <DesignerSettings
             designer={currentDesigner!}
             onBack={() => setCurrentView('admin')}
           />
         )}
 
         {currentView === 'booking' && (
-          <BookingPage 
+          <BookingPage
             designer={undefined} // Sempre undefined para começar no step 1 (seleção de designer)
             onBack={() => {
               // Se é uma cliente logada, volta para o painel da cliente
@@ -475,23 +498,21 @@ function App() {
             <div className="flex justify-around">
               <button
                 onClick={() => setCurrentView('admin')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${
-                  currentView === 'admin' 
-                    ? 'bg-white/20 text-pink-300' 
-                    : 'text-purple-100 hover:text-pink-300'
-                }`}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${currentView === 'admin'
+                  ? 'bg-white/20 text-pink-300'
+                  : 'text-purple-100 hover:text-pink-300'
+                  }`}
               >
                 <Calendar size={18} />
                 <span className="text-xs mt-1">Agenda</span>
               </button>
-              
+
               <button
                 onClick={() => setCurrentView('services')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${
-                  currentView === 'services' 
-                    ? 'bg-white/20 text-pink-300' 
-                    : 'text-purple-100 hover:text-pink-300'
-                }`}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${currentView === 'services'
+                  ? 'bg-white/20 text-pink-300'
+                  : 'text-purple-100 hover:text-pink-300'
+                  }`}
               >
                 <Settings size={18} />
                 <span className="text-xs mt-1">Serviços</span>
@@ -499,23 +520,21 @@ function App() {
 
               <button
                 onClick={() => setCurrentView('availability')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${
-                  currentView === 'availability' 
-                    ? 'bg-white/20 text-pink-300' 
-                    : 'text-purple-100 hover:text-pink-300'
-                }`}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${currentView === 'availability'
+                  ? 'bg-white/20 text-pink-300'
+                  : 'text-purple-100 hover:text-pink-300'
+                  }`}
               >
                 <Users size={18} />
                 <span className="text-xs mt-1">Horários</span>
               </button>
-              
+
               <button
                 onClick={() => setCurrentView('stats')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${
-                  currentView === 'stats' 
-                    ? 'bg-white/20 text-pink-300' 
-                    : 'text-purple-100 hover:text-pink-300'
-                }`}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${currentView === 'stats'
+                  ? 'bg-white/20 text-pink-300'
+                  : 'text-purple-100 hover:text-pink-300'
+                  }`}
               >
                 <BarChart3 size={18} />
                 <span className="text-xs mt-1">Estatísticas</span>
@@ -523,11 +542,10 @@ function App() {
 
               <button
                 onClick={() => setCurrentView('settings')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${
-                  currentView === 'settings' 
-                    ? 'bg-white/20 text-pink-300' 
-                    : 'text-purple-100 hover:text-pink-300'
-                }`}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all ${currentView === 'settings'
+                  ? 'bg-white/20 text-pink-300'
+                  : 'text-purple-100 hover:text-pink-300'
+                  }`}
               >
                 <Lock size={18} />
                 <span className="text-xs mt-1">Configurações</span>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Supabase - Studio Nail Art</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #666; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Supabase - Studio Nail Art</h1>
+        
+        <div class="section">
+            <h2>1. Status da Conexão</h2>
+            <button onclick="testarConexao()">Testar Conexão</button>
+            <div id="conexao-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>2. Verificar Tabelas</h2>
+            <button onclick="verificarTabelas()">Verificar Todas as Tabelas</button>
+            <div id="tabelas-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>3. Testar Designers</h2>
+            <button onclick="testarDesigners()">Listar Designers</button>
+            <button onclick="criarDesignerTeste()">Criar Designer Teste</button>
+            <div id="designers-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>4. Testar Clientes (PROBLEMA PRINCIPAL)</h2>
+            <button onclick="testarClientes()">Testar Tabela Clients</button>
+            <div id="clientes-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>5. Solução</h2>
+            <div class="warning">
+                <strong>⚠️ AÇÃO NECESSÁRIA:</strong><br>
+                A tabela 'clients' não existe no Supabase. Você precisa:
+                <ol>
+                    <li>Acessar <a href="https://supabase.com" target="_blank">https://supabase.com</a></li>
+                    <li>Ir no projeto <strong>vhvxjiorcggilujjtdbr</strong></li>
+                    <li>Abrir o <strong>SQL Editor</strong></li>
+                    <li>Executar o SQL do arquivo <code>INSTRUCOES_CRIAR_TABELA_CLIENTS.md</code></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase (credenciais reais do projeto)
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type;
+            element.innerHTML += `<div class="status ${className}">${message}</div>`;
+        }
+        
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+        
+        async function testarConexao() {
+            clearLog('conexao-result');
+            log('conexao-result', '🔄 Testando conexão com Supabase...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (error) {
+                    log('conexao-result', `❌ Erro na conexão: ${error.message}`, 'error');
+                } else {
+                    log('conexao-result', '✅ Conexão com Supabase estabelecida com sucesso!', 'success');
+                    log('conexao-result', `📊 URL: ${supabaseUrl}`, 'info');
+                }
+            } catch (err) {
+                log('conexao-result', `❌ Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function verificarTabelas() {
+            clearLog('tabelas-result');
+            log('tabelas-result', '🔍 Verificando tabelas...', 'info');
+            
+            const tabelas = [
+                { nome: 'nail_designers', descricao: 'Designers de unhas' },
+                { nome: 'clients', descricao: 'Clientes (PROBLEMA)' },
+                { nome: 'appointments', descricao: 'Agendamentos' },
+                { nome: 'services', descricao: 'Serviços' },
+                { nome: 'availability', descricao: 'Disponibilidade' }
+            ];
+            
+            for (const tabela of tabelas) {
+                try {
+                    const { data, error } = await supabase
+                        .from(tabela.nome)
+                        .select('count', { count: 'exact', head: true });
+                    
+                    if (error) {
+                        log('tabelas-result', `❌ ${tabela.nome}: NÃO EXISTE - ${error.message}`, 'error');
+                    } else {
+                        log('tabelas-result', `✅ ${tabela.nome}: EXISTE - ${tabela.descricao}`, 'success');
+                    }
+                } catch (err) {
+                    log('tabelas-result', `❌ ${tabela.nome}: ERRO - ${err.message}`, 'error');
+                }
+            }
+        }
+        
+        async function testarDesigners() {
+            clearLog('designers-result');
+            log('designers-result', '👩‍🎨 Listando designers...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log('designers-result', `❌ Erro: ${error.message}`, 'error');
+                } else {
+                    log('designers-result', `✅ Encontrados ${data.length} designers`, 'success');
+                    const ativos = data.filter(d => d.is_active);
+                    log('designers-result', `🟢 Designers ativos: ${ativos.length}`, 'success');
+                    
+                    if (data.length > 0) {
+                        log('designers-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    }
+                }
+            } catch (err) {
+                log('designers-result', `❌ Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function criarDesignerTeste() {
+            clearLog('designers-result');
+            log('designers-result', '🧪 Criando designer de teste...', 'info');
+            
+            const testDesigner = {
+                name: 'Designer Teste ' + Date.now(),
+                email: 'teste' + Date.now() + '@nail.com',
+                password: '1234',
+                phone: '11' + Date.now().toString().slice(-8),
+                is_active: true
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('nail_designers')
+                    .insert([testDesigner])
+                    .select();
+                
+                if (error) {
+                    log('designers-result', `❌ Erro ao criar: ${error.message}`, 'error');
+                } else {
+                    log('designers-result', '✅ Designer de teste criado com sucesso!', 'success');
+                    log('designers-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                }
+            } catch (err) {
+                log('designers-result', `❌ Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function testarClientes() {
+            clearLog('clientes-result');
+            log('clientes-result', '👥 Testando tabela de clientes...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('*')
+                    .limit(5);
+                
+                if (error) {
+                    log('clientes-result', `❌ PROBLEMA CONFIRMADO: ${error.message}`, 'error');
+                    log('clientes-result', '🚨 A tabela "clients" não existe no Supabase!', 'error');
+                    log('clientes-result', '📝 Por isso os clientes não estão sendo salvos no banco.', 'warning');
+                    log('clientes-result', '💡 Solução: Execute o SQL do arquivo INSTRUCOES_CRIAR_TABELA_CLIENTS.md', 'warning');
+                } else {
+                    log('clientes-result', `✅ Tabela clients existe! Encontrados ${data.length} clientes`, 'success');
+                    if (data.length > 0) {
+                        log('clientes-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    }
+                }
+            } catch (err) {
+                log('clientes-result', `❌ Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        // Executar diagnóstico automático ao carregar
+        window.onload = function() {
+            setTimeout(() => {
+                testarConexao();
+                setTimeout(() => verificarTabelas(), 1000);
+                setTimeout(() => testarClientes(), 2000);
+            }, 500);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Data 27-08 - Problema de Sincronização</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .section h2 {
+            color: #555;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .warning { color: #ffd43b; }
+        .info { color: #74c0fc; }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th {
+            background: #f2f2f2;
+            font-weight: bold;
+        }
+        .highlight {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug: Data 27-08 não aparece para clientes</h1>
+        
+        <div class="section">
+            <h2>⚙️ Configuração do Supabase</h2>
+            <input type="text" id="supabaseUrl" placeholder="URL do Supabase" style="width: 300px; padding: 8px; margin: 5px;">
+            <input type="password" id="supabaseKey" placeholder="Chave Anon do Supabase" style="width: 300px; padding: 8px; margin: 5px;">
+            <button onclick="connectSupabase()">🔗 Conectar</button>
+            <div id="connectionStatus"></div>
+        </div>
+
+        <div class="section">
+            <h2>👩‍💼 Designers</h2>
+            <button onclick="loadDesigners()">📋 Carregar Designers</button>
+            <select id="designerSelect" onchange="selectDesigner()" style="width: 300px; padding: 8px; margin: 5px;">
+                <option value="">Selecione uma designer</option>
+            </select>
+            <div id="designerInfo"></div>
+        </div>
+
+        <div class="section">
+            <h2>🗓️ Investigação da Data 27-08</h2>
+            <button onclick="searchDate2708()">🔍 Buscar Data 27-08</button>
+            <button onclick="searchAllAvailability()">📊 Buscar Toda Disponibilidade</button>
+            <button onclick="testBookingPageLogic()">🧪 Testar Lógica do BookingPage</button>
+            <div id="dateResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Logs de Debug</h2>
+            <button onclick="clearLogs()">🗑️ Limpar Logs</button>
+            <div id="logs" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+        let selectedDesignerId = null;
+        let designers = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function connectSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                log('❌ Por favor, preencha URL e chave do Supabase', 'error');
+                return;
+            }
+
+            try {
+                const { createClient } = supabase;
+                supabaseClient = createClient(url, key);
+                
+                // Testar conexão
+                const { data, error } = await supabaseClient.from('designers').select('count').limit(1);
+                
+                if (error) {
+                    log(`❌ Erro de conexão: ${error.message}`, 'error');
+                    document.getElementById('connectionStatus').innerHTML = '<span class="error">❌ Falha na conexão</span>';
+                    return;
+                }
+                
+                log('✅ Conectado ao Supabase com sucesso!', 'success');
+                document.getElementById('connectionStatus').innerHTML = '<span class="success">✅ Conectado</span>';
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error');
+                document.getElementById('connectionStatus').innerHTML = '<span class="error">❌ Erro de conexão</span>';
+            }
+        }
+
+        async function loadDesigners() {
+            if (!supabaseClient) {
+                log('❌ Conecte-se ao Supabase primeiro', 'error');
+                return;
+            }
+
+            log('👩‍💼 Carregando designers...');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('designers')
+                    .select('*')
+                    .order('name');
+                
+                if (error) {
+                    log(`❌ Erro ao carregar designers: ${error.message}`, 'error');
+                    return;
+                }
+                
+                designers = data || [];
+                log(`✅ ${designers.length} designers carregadas`, 'success');
+                
+                // Preencher select
+                const select = document.getElementById('designerSelect');
+                select.innerHTML = '<option value="">Selecione uma designer</option>';
+                
+                designers.forEach(designer => {
+                    const option = document.createElement('option');
+                    option.value = designer.id;
+                    option.textContent = `${designer.name} (${designer.is_active ? 'Ativa' : 'Inativa'})`;
+                    select.appendChild(option);
+                });
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        function selectDesigner() {
+            const select = document.getElementById('designerSelect');
+            selectedDesignerId = select.value;
+            
+            if (!selectedDesignerId) {
+                document.getElementById('designerInfo').innerHTML = '';
+                return;
+            }
+            
+            const designer = designers.find(d => d.id === selectedDesignerId);
+            if (designer) {
+                log(`👩‍💼 Designer selecionada: ${designer.name}`, 'success');
+                document.getElementById('designerInfo').innerHTML = `
+                    <div class="info">
+                        <strong>Nome:</strong> ${designer.name}<br>
+                        <strong>ID:</strong> ${designer.id}<br>
+                        <strong>Status:</strong> ${designer.is_active ? '✅ Ativa' : '❌ Inativa'}<br>
+                        <strong>Email:</strong> ${designer.email || 'N/A'}
+                    </div>
+                `;
+            }
+        }
+
+        async function searchDate2708() {
+            if (!supabaseClient) {
+                log('❌ Conecte-se ao Supabase primeiro', 'error');
+                return;
+            }
+
+            log('🔍 Buscando registros para data 27-08...');
+            
+            try {
+                // Buscar todas as possíveis variações da data 27-08
+                const searchPatterns = [
+                    '2024-08-27',
+                    '2024-27-08', 
+                    '27-08-2024',
+                    '27-08',
+                    '2024/08/27',
+                    '27/08/2024',
+                    '27/08'
+                ];
+                
+                let allResults = [];
+                
+                for (const pattern of searchPatterns) {
+                    log(`🔍 Testando padrão: ${pattern}`);
+                    
+                    const { data, error } = await supabaseClient
+                        .from('availability')
+                        .select('*')
+                        .ilike('specific_date', `%${pattern}%`);
+                    
+                    if (error) {
+                        log(`❌ Erro ao buscar padrão ${pattern}: ${error.message}`, 'error');
+                        continue;
+                    }
+                    
+                    if (data && data.length > 0) {
+                        log(`✅ Encontrados ${data.length} registros para padrão ${pattern}`, 'success');
+                        allResults = [...allResults, ...data];
+                    }
+                }
+                
+                // Remover duplicatas
+                const uniqueResults = allResults.filter((item, index, self) => 
+                    index === self.findIndex(t => t.id === item.id)
+                );
+                
+                displayDateResults(uniqueResults, '27-08');
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function searchAllAvailability() {
+            if (!supabaseClient || !selectedDesignerId) {
+                log('❌ Conecte-se ao Supabase e selecione uma designer', 'error');
+                return;
+            }
+
+            log(`📊 Buscando toda disponibilidade da designer ${selectedDesignerId}...`);
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('availability')
+                    .select('*')
+                    .eq('designer_id', selectedDesignerId)
+                    .order('specific_date');
+                
+                if (error) {
+                    log(`❌ Erro ao buscar disponibilidade: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Encontrados ${data.length} registros de disponibilidade`, 'success');
+                displayDateResults(data, 'Toda Disponibilidade');
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBookingPageLogic() {
+            if (!supabaseClient || !selectedDesignerId) {
+                log('❌ Conecte-se ao Supabase e selecione uma designer', 'error');
+                return;
+            }
+
+            log('🧪 Testando lógica do BookingPage...');
+            
+            try {
+                // Simular exatamente o que o BookingPage faz
+                const { data, error } = await supabaseClient
+                    .from('availability')
+                    .select('*')
+                    .eq('designer_id', selectedDesignerId)
+                    .order('day_of_week', { ascending: true })
+                    .order('start_time', { ascending: true });
+                
+                if (error) {
+                    log(`❌ Erro na consulta: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`📊 Total de registros encontrados: ${data.length}`);
+                
+                // Aplicar o filtro is_active como no BookingPage
+                const activeAvailability = data.filter(avail => avail.is_active);
+                log(`✅ Registros ativos após filtro: ${activeAvailability.length}`, activeAvailability.length > 0 ? 'success' : 'warning');
+                
+                // Mapear campos como no BookingPage
+                const mappedAvailability = activeAvailability.map(avail => ({
+                    id: avail.id,
+                    designerId: avail.designer_id,
+                    dayOfWeek: avail.day_of_week,
+                    startTime: avail.start_time,
+                    endTime: avail.end_time,
+                    isActive: avail.is_active,
+                    specificDate: avail.specific_date
+                }));
+                
+                log(`🔄 Dados mapeados: ${mappedAvailability.length} registros`);
+                
+                // Verificar especificamente a data 27-08
+                const date2708 = mappedAvailability.filter(avail => 
+                    avail.specificDate && avail.specificDate.includes('27-08')
+                );
+                
+                if (date2708.length > 0) {
+                    log(`🎯 ENCONTRADA data 27-08: ${date2708.length} registros!`, 'success');
+                } else {
+                    log(`❌ Data 27-08 NÃO encontrada nos dados mapeados`, 'error');
+                }
+                
+                displayDateResults(data, 'Teste BookingPage Logic');
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        function displayDateResults(results, title) {
+            const container = document.getElementById('dateResults');
+            
+            if (!results || results.length === 0) {
+                container.innerHTML = `<div class="info">📭 Nenhum resultado encontrado para: ${title}</div>`;
+                return;
+            }
+            
+            let html = `<h3>📊 Resultados: ${title} (${results.length} registros)</h3>`;
+            html += '<table class="data-table">';
+            html += '<tr><th>ID</th><th>Designer ID</th><th>Data Específica</th><th>Dia da Semana</th><th>Início</th><th>Fim</th><th>Ativo</th><th>Disponível</th></tr>';
+            
+            results.forEach(result => {
+                const isDate2708 = result.specific_date && result.specific_date.includes('27-08');
+                const rowClass = isDate2708 ? 'highlight' : '';
+                
+                html += `<tr class="${rowClass}">`;
+                html += `<td>${result.id}</td>`;
+                html += `<td>${result.designer_id}</td>`;
+                html += `<td>${result.specific_date || 'N/A'}</td>`;
+                html += `<td>${result.day_of_week || 'N/A'}</td>`;
+                html += `<td>${result.start_time}</td>`;
+                html += `<td>${result.end_time}</td>`;
+                html += `<td>${result.is_active ? '✅' : '❌'}</td>`;
+                html += `<td>${result.is_available ? '✅' : '❌'}</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            
+            if (results.some(r => r.specific_date && r.specific_date.includes('27-08'))) {
+                html += '<div class="success">🎯 Data 27-08 encontrada nos resultados!</div>';
+            } else {
+                html += '<div class="warning">⚠️ Data 27-08 não encontrada nos resultados</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Inicialização
+        window.addEventListener('load', () => {
+            log('🚀 Debug da data 27-08 iniciado');
+            log('📝 Configure o Supabase e selecione uma designer para começar');
+        });
+    </script>
+</body>
+</html>

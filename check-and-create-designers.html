@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar e Criar Designers</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button.success {
+            background: #27ae60;
+        }
+        .button.success:hover {
+            background: #229954;
+        }
+        .button.warning {
+            background: #f39c12;
+        }
+        .button.warning:hover {
+            background: #e67e22;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .designer-item {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .designer-item.active {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👩‍🎨 Verificar e Criar Designers</h1>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button" onclick="checkDesigners()">🔍 Verificar Designers</button>
+            <button class="button success" onclick="showCreateForm()">➕ Criar Nova Designer</button>
+            <button class="button warning" onclick="createKikaDesigner()">👩‍🎨 Criar Designer Kika</button>
+        </div>
+
+        <!-- Formulário para criar designer -->
+        <div class="form-section" id="createForm" style="display: none;">
+            <h3>➕ Criar Nova Designer</h3>
+            <div class="form-group">
+                <label>Nome:</label>
+                <input type="text" id="designerName" placeholder="Nome da designer">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="designerEmail" placeholder="email@exemplo.com">
+            </div>
+            <div class="form-group">
+                <label>Telefone:</label>
+                <input type="text" id="designerPhone" placeholder="(11) 99999-9999">
+            </div>
+            <div class="form-group">
+                <label>Senha:</label>
+                <input type="password" id="designerPassword" placeholder="Senha">
+            </div>
+            <div class="form-group">
+                <label>Chave PIX (opcional):</label>
+                <input type="text" id="designerPix" placeholder="Chave PIX">
+            </div>
+            <button class="button success" onclick="createDesigner()">✅ Criar Designer</button>
+            <button class="button" onclick="hideCreateForm()">❌ Cancelar</button>
+        </div>
+
+        <div class="log" id="log">Clique em "Verificar Designers" para começar...</div>
+        
+        <div id="designersList"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let allDesigners = [];
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        async function checkDesigners() {
+            try {
+                log('🔄 Verificando designers no Supabase...');
+                
+                const { data: designers, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`❌ Erro ao buscar designers: ${error.message}`);
+                    return;
+                }
+                
+                allDesigners = designers || [];
+                log(`✅ ${allDesigners.length} designers encontradas`);
+                
+                if (allDesigners.length === 0) {
+                    log('⚠️ Nenhuma designer encontrada no banco de dados!');
+                    log('💡 Clique em "Criar Designer Kika" para criar uma designer de exemplo.');
+                } else {
+                    const activeDesigners = allDesigners.filter(d => d.is_active);
+                    log(`🟢 ${activeDesigners.length} designers ativas`);
+                    displayDesigners();
+                }
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        function displayDesigners() {
+            const container = document.getElementById('designersList');
+            container.innerHTML = '';
+            
+            if (allDesigners.length === 0) {
+                container.innerHTML = '<p>Nenhuma designer encontrada.</p>';
+                return;
+            }
+            
+            const title = document.createElement('h3');
+            title.textContent = `👩‍🎨 Designers Cadastradas (${allDesigners.length}):`;
+            container.appendChild(title);
+            
+            allDesigners.forEach(designer => {
+                const div = document.createElement('div');
+                div.className = designer.is_active ? 'designer-item active' : 'designer-item';
+                
+                div.innerHTML = `
+                    <strong>${designer.is_active ? '🟢 ' : '🔴 '}${designer.name}</strong><br>
+                    <strong>ID:</strong> ${designer.id}<br>
+                    <strong>Email:</strong> ${designer.email}<br>
+                    <strong>Telefone:</strong> ${designer.phone}<br>
+                    <strong>Status:</strong> ${designer.is_active ? 'Ativa' : 'Inativa'}<br>
+                    <strong>PIX:</strong> ${designer.pix_key || 'Não informado'}<br>
+                    <strong>Criada em:</strong> ${new Date(designer.created_at).toLocaleString('pt-BR')}
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function showCreateForm() {
+            document.getElementById('createForm').style.display = 'block';
+        }
+        
+        function hideCreateForm() {
+            document.getElementById('createForm').style.display = 'none';
+            // Limpar campos
+            document.getElementById('designerName').value = '';
+            document.getElementById('designerEmail').value = '';
+            document.getElementById('designerPhone').value = '';
+            document.getElementById('designerPassword').value = '';
+            document.getElementById('designerPix').value = '';
+        }
+        
+        async function createDesigner() {
+            try {
+                const name = document.getElementById('designerName').value;
+                const email = document.getElementById('designerEmail').value;
+                const phone = document.getElementById('designerPhone').value;
+                const password = document.getElementById('designerPassword').value;
+                const pixKey = document.getElementById('designerPix').value;
+                
+                if (!name || !email || !phone || !password) {
+                    log('❌ Preencha todos os campos obrigatórios!');
+                    return;
+                }
+                
+                log('🔄 Criando nova designer...');
+                
+                const { data: designer, error } = await supabase
+                    .from('nail_designers')
+                    .insert({
+                        name: name,
+                        email: email,
+                        phone: phone,
+                        password: password,
+                        pix_key: pixKey || null,
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log(`❌ Erro ao criar designer: ${error.message}`);
+                    return;
+                }
+                
+                log(`✅ Designer criada com sucesso!`);
+                log(`👩‍🎨 Nome: ${designer.name}`);
+                log(`📧 Email: ${designer.email}`);
+                log(`📱 Telefone: ${designer.phone}`);
+                log(`🆔 ID: ${designer.id}`);
+                
+                hideCreateForm();
+                
+                // Recarregar lista
+                setTimeout(() => {
+                    checkDesigners();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        async function createKikaDesigner() {
+            try {
+                log('🔄 Criando designer Kika de exemplo...');
+                
+                // Verificar se já existe uma designer Kika
+                const { data: existingKika, error: checkError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .ilike('name', '%kika%');
+                
+                if (checkError) {
+                    log(`❌ Erro ao verificar designer existente: ${checkError.message}`);
+                    return;
+                }
+                
+                if (existingKika && existingKika.length > 0) {
+                    log('⚠️ Já existe uma designer com nome "Kika"!');
+                    log('📋 Designers encontradas:');
+                    existingKika.forEach(designer => {
+                        log(`   - ${designer.name} (ID: ${designer.id}) - ${designer.is_active ? 'Ativa' : 'Inativa'}`);
+                    });
+                    return;
+                }
+                
+                const { data: designer, error } = await supabase
+                    .from('nail_designers')
+                    .insert({
+                        name: 'Kika',
+                        email: 'kika@nailstudio.com',
+                        phone: '(11) 99999-8888',
+                        password: '123456',
+                        pix_key: 'kika@nailstudio.com',
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log(`❌ Erro ao criar designer Kika: ${error.message}`);
+                    return;
+                }
+                
+                log(`✅ Designer Kika criada com sucesso!`);
+                log(`👩‍🎨 Nome: ${designer.name}`);
+                log(`📧 Email: ${designer.email}`);
+                log(`📱 Telefone: ${designer.phone}`);
+                log(`🆔 ID: ${designer.id}`);
+                log(`💳 PIX: ${designer.pix_key}`);
+                
+                // Recarregar lista
+                setTimeout(() => {
+                    checkDesigners();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Erro inesperado: ${error.message}`);
+            }
+        }
+        
+        // Disponibilizar funções globalmente
+        window.checkDesigners = checkDesigners;
+        window.showCreateForm = showCreateForm;
+        window.hideCreateForm = hideCreateForm;
+        window.createDesigner = createDesigner;
+        window.createKikaDesigner = createKikaDesigner;
+        
+        // Verificar designers automaticamente
+        checkDesigners();
+    </script>
+</body>
+</html>

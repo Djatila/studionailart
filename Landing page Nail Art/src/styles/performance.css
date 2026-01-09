@@ -1,0 +1,256 @@
+/* ===================================
+   PERFORMANCE OPTIMIZATION STYLES
+   Lazy Loading & Animation States
+   =================================== */
+
+/* === LAZY LOADING STATES === */
+.lazy-loading {
+  opacity: 0;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 0%, 
+    rgba(255, 255, 255, 0.2) 50%, 
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  transition: opacity var(--duration-300) var(--ease-out);
+}
+
+.lazy-loaded {
+  opacity: 1;
+  animation: none;
+  background: none;
+}
+
+/* Shimmer animation for loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* === CONTENT LOADING STATES === */
+[data-lazy-content] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--duration-500) var(--ease-out), 
+              transform var(--duration-500) var(--ease-out);
+}
+
+[data-lazy-content].content-loaded {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* === SCROLL ANIMATION STATES === */
+[data-scroll-animation] {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity var(--duration-700) var(--ease-out-quart), 
+              transform var(--duration-700) var(--ease-out-quart);
+}
+
+[data-scroll-animation].animate-fade-in-up {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+[data-scroll-animation].animate-slide-in-left {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+[data-scroll-animation].animate-slide-in-right {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+[data-scroll-animation].animate-scale-in {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Initial states for different animations */
+[data-scroll-animation][data-animation="animate-slide-in-left"] {
+  transform: translateX(-30px);
+}
+
+[data-scroll-animation][data-animation="animate-slide-in-right"] {
+  transform: translateX(30px);
+}
+
+[data-scroll-animation][data-animation="animate-scale-in"] {
+  transform: scale(0.95);
+}
+
+/* === PERFORMANCE OPTIMIZED ANIMATIONS === */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-auto {
+  will-change: auto;
+}
+
+/* === REDUCED MOTION SUPPORT === */
+@media (prefers-reduced-motion: reduce) {
+  .lazy-loading {
+    animation: none;
+  }
+  
+  [data-lazy-content],
+  [data-scroll-animation] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  
+  .animate-fade-in-up,
+  .animate-slide-in-left,
+  .animate-slide-in-right,
+  .animate-scale-in {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* === LOADING SKELETONS === */
+.skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 0%, 
+    rgba(255, 255, 255, 0.2) 50%, 
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-text {
+  height: 1rem;
+  margin-bottom: var(--space-2);
+}
+
+.skeleton-text:last-child {
+  margin-bottom: 0;
+  width: 60%;
+}
+
+.skeleton-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+}
+
+.skeleton-button {
+  height: 2.5rem;
+  width: 8rem;
+  border-radius: var(--radius-full);
+}
+
+/* === INTERSECTION OBSERVER FALLBACKS === */
+.no-intersection-observer .lazy-loading {
+  opacity: 1;
+  animation: none;
+  background: none;
+}
+
+.no-intersection-observer [data-lazy-content],
+.no-intersection-observer [data-scroll-animation] {
+  opacity: 1;
+  transform: none;
+}
+
+/* === CRITICAL RESOURCE LOADING === */
+.critical-css-loading {
+  visibility: hidden;
+}
+
+.critical-css-loaded {
+  visibility: visible;
+}
+
+/* === PROGRESSIVE ENHANCEMENT === */
+.js-enabled .progressive-enhancement {
+  display: block;
+}
+
+.no-js .progressive-enhancement {
+  display: none;
+}
+
+.no-js .fallback-content {
+  display: block;
+}
+
+.js-enabled .fallback-content {
+  display: none;
+}
+
+/* === PERFORMANCE HINTS === */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* === LOADING STATES FOR COMPONENTS === */
+.component-loading {
+  pointer-events: none;
+  opacity: 0.6;
+  position: relative;
+}
+
+.component-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid var(--pink-400);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* === VIEWPORT OPTIMIZATION === */
+.viewport-optimized {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* === FONT LOADING OPTIMIZATION === */
+.font-loading {
+  font-display: swap;
+}
+
+.font-loaded {
+  font-display: auto;
+}

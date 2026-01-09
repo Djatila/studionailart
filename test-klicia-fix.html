@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testar Correção Klicia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #8B5CF6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #7C3AED;
+        }
+        .button.success {
+            background: #10B981;
+        }
+        .button.success:hover {
+            background: #059669;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        .status-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .status-card.success {
+            border-color: #28a745;
+            background-color: #f8fff9;
+        }
+        .status-card.error {
+            border-color: #dc3545;
+            background-color: #fff8f8;
+        }
+        .status-card.warning {
+            border-color: #ffc107;
+            background-color: #fffdf5;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Testar Correção do Agendamento da Klicia</h1>
+    
+    <div class="container">
+        <h2>Ações de Teste</h2>
+        <button class="button" onclick="runFullTest()">🚀 Executar Teste Completo</button>
+        <button class="button" onclick="syncData()">🔄 Sincronizar Dados</button>
+        <button class="button" onclick="testClientDashboard()">👤 Testar Painel Cliente</button>
+        <button class="button" onclick="testDesignerDashboard()">👩‍💼 Testar Painel Designer</button>
+        <button class="button" onclick="clearLogs()">🗑️ Limpar Logs</button>
+    </div>
+
+    <div class="container">
+        <h3>📊 Status do Sistema</h3>
+        <div id="systemStatus"></div>
+    </div>
+
+    <div class="container">
+        <h3>📋 Logs de Teste</h3>
+        <div id="logs" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h3>🔗 Links Rápidos</h3>
+        <a href="/" target="_blank" class="button">🏠 Página Principal</a>
+        <a href="/fix-klicia-appointment.html" target="_blank" class="button">🔧 Ferramenta de Correção</a>
+        <a href="/verify-appointments-database.html" target="_blank" class="button">📊 Verificar Banco</a>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+        
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pjwjqzpqkwqldqmkqzqm.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqd2pxenBxa3dxbGRxbWtxenFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI4NzEsImV4cCI6MjA1MDU0ODg3MX0.Hs_7lCOKKJH6qUJWJWt7hgBJVFqNgU7b8Oa8YrKZqJo'
+        const supabase = createClient(supabaseUrl, supabaseKey)
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString()
+            const logElement = document.getElementById('logs')
+            const colorClass = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'
+            logElement.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`
+            logElement.scrollTop = logElement.scrollHeight
+            console.log(`[${timestamp}] ${message}`)
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = ''
+        }
+        
+        function updateSystemStatus(status, type = 'info') {
+            const statusElement = document.getElementById('systemStatus')
+            const statusClass = type === 'error' ? 'error' : type === 'success' ? 'success' : 'warning'
+            statusElement.innerHTML = `<div class="status-card ${statusClass}"><strong>Status:</strong> ${status}</div>`
+        }
+        
+        async function syncData() {
+            log('🔄 Iniciando sincronização de dados...', 'info')
+            updateSystemStatus('Sincronizando dados...', 'warning')
+            
+            try {
+                // 1. Buscar designers do Supabase
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('name')
+                
+                if (designersError) {
+                    log(`❌ Erro ao buscar designers: ${designersError.message}`, 'error')
+                    updateSystemStatus('Erro na sincronização', 'error')
+                    return false
+                }
+                
+                // 2. Salvar no localStorage
+                localStorage.setItem('nail_designers', JSON.stringify(designers))
+                log(`✅ ${designers.length} designers sincronizados`, 'success')
+                
+                // 3. Verificar se Klicia está presente
+                const klicia = designers.find(d => d.name.toLowerCase().includes('klicia'))
+                if (klicia) {
+                    log(`👩‍💼 Designer Klicia encontrada: ${klicia.name} (ID: ${klicia.id})`, 'success')
+                } else {
+                    log('❌ Designer Klicia não encontrada!', 'error')
+                    updateSystemStatus('Klicia não encontrada', 'error')
+                    return false
+                }
+                
+                updateSystemStatus('Dados sincronizados com sucesso', 'success')
+                return true
+                
+            } catch (error) {
+                log(`❌ Erro durante sincronização: ${error.message}`, 'error')
+                updateSystemStatus('Erro na sincronização', 'error')
+                return false
+            }
+        }
+        
+        async function testClientDashboard() {
+            log('👤 Testando painel do cliente...', 'info')
+            
+            try {
+                // Simular busca de designer como o ClientDashboard faz
+                const savedDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]')
+                log(`📊 Designers no localStorage: ${savedDesigners.length}`, 'info')
+                
+                if (savedDesigners.length === 0) {
+                    log('⚠️ Nenhuma designer no localStorage, isso pode causar o problema!', 'warning')
+                    return false
+                }
+                
+                // Buscar Klicia
+                const klicia = savedDesigners.find(d => d.name.toLowerCase().includes('klicia'))
+                if (klicia) {
+                    log(`✅ Klicia encontrada no localStorage: ${klicia.name} (ID: ${klicia.id})`, 'success')
+                } else {
+                    log('❌ Klicia não encontrada no localStorage!', 'error')
+                    return false
+                }
+                
+                // Simular função getDesignerName
+                const testDesignerId = klicia.id
+                const designer = savedDesigners.find(d => d.id === testDesignerId)
+                const designerName = designer ? designer.name : 'Designer não encontrada'
+                
+                log(`🧪 Teste getDesignerName('${testDesignerId}') = '${designerName}'`, 'info')
+                
+                if (designerName !== 'Designer não encontrada') {
+                    log('✅ Painel do cliente deve funcionar corretamente agora!', 'success')
+                    return true
+                } else {
+                    log('❌ Painel do cliente ainda tem problemas', 'error')
+                    return false
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no teste do painel cliente: ${error.message}`, 'error')
+                return false
+            }
+        }
+        
+        async function testDesignerDashboard() {
+            log('👩‍💼 Testando painel da designer...', 'info')
+            
+            try {
+                // Buscar agendamentos da Klicia
+                const { data: appointments, error } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .gte('date', '2024-08-01')
+                    .lte('date', '2024-08-31')
+                
+                if (error) {
+                    log(`❌ Erro ao buscar agendamentos: ${error.message}`, 'error')
+                    return false
+                }
+                
+                log(`📅 Total de agendamentos em agosto: ${appointments.length}`, 'info')
+                
+                // Buscar Klicia
+                const { data: designers } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .ilike('name', '%klicia%')
+                
+                if (!designers || designers.length === 0) {
+                    log('❌ Klicia não encontrada no Supabase!', 'error')
+                    return false
+                }
+                
+                const klicia = designers[0]
+                log(`👩‍💼 Klicia encontrada: ${klicia.name} (ID: ${klicia.id})`, 'success')
+                
+                // Filtrar agendamentos da Klicia
+                const kliciaAppointments = appointments.filter(apt => apt.designer_id === klicia.id)
+                log(`🎯 Agendamentos da Klicia: ${kliciaAppointments.length}`, 'info')
+                
+                if (kliciaAppointments.length > 0) {
+                    log('✅ Painel da designer deve mostrar os agendamentos!', 'success')
+                    kliciaAppointments.forEach(apt => {
+                        log(`   📅 ${apt.date} ${apt.time} - ${apt.client_name || apt.clientName}`, 'info')
+                    })
+                    return true
+                } else {
+                    log('⚠️ Nenhum agendamento encontrado para Klicia', 'warning')
+                    return false
+                }
+                
+            } catch (error) {
+                log(`❌ Erro no teste do painel designer: ${error.message}`, 'error')
+                return false
+            }
+        }
+        
+        async function runFullTest() {
+            log('🚀 Iniciando teste completo do sistema...', 'info')
+            updateSystemStatus('Executando testes...', 'warning')
+            
+            let allTestsPassed = true
+            
+            // 1. Sincronizar dados
+            log('\n=== ETAPA 1: SINCRONIZAÇÃO ===', 'info')
+            const syncSuccess = await syncData()
+            if (!syncSuccess) {
+                allTestsPassed = false
+            }
+            
+            // 2. Testar painel cliente
+            log('\n=== ETAPA 2: PAINEL CLIENTE ===', 'info')
+            const clientSuccess = await testClientDashboard()
+            if (!clientSuccess) {
+                allTestsPassed = false
+            }
+            
+            // 3. Testar painel designer
+            log('\n=== ETAPA 3: PAINEL DESIGNER ===', 'info')
+            const designerSuccess = await testDesignerDashboard()
+            if (!designerSuccess) {
+                allTestsPassed = false
+            }
+            
+            // Resultado final
+            log('\n=== RESULTADO FINAL ===', 'info')
+            if (allTestsPassed) {
+                log('🎉 TODOS OS TESTES PASSARAM! O problema deve estar resolvido.', 'success')
+                updateSystemStatus('Todos os testes passaram! Sistema funcionando.', 'success')
+            } else {
+                log('❌ Alguns testes falharam. Verifique os logs acima.', 'error')
+                updateSystemStatus('Alguns testes falharam. Verificar logs.', 'error')
+            }
+            
+            log('\n📋 PRÓXIMOS PASSOS:', 'info')
+            log('1. Acesse o painel da cliente para verificar se mostra o nome da designer', 'info')
+            log('2. Acesse o painel da Klicia para verificar se mostra o agendamento', 'info')
+            log('3. Se ainda houver problemas, use a ferramenta de correção', 'info')
+        }
+        
+        // Tornar funções globais
+        window.runFullTest = runFullTest
+        window.syncData = syncData
+        window.testClientDashboard = testClientDashboard
+        window.testDesignerDashboard = testDesignerDashboard
+        window.clearLogs = clearLogs
+        
+        // Inicialização
+        setTimeout(() => {
+            log('🧪 Sistema de teste carregado. Clique em "Executar Teste Completo" para começar.', 'info')
+            updateSystemStatus('Sistema carregado, pronto para testes', 'info')
+        }, 1000)
+    </script>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corrigir Agendamento Klicia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #8B5CF6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #7C3AED;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff3cd;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Corrigir Agendamento da Designer Klicia</h1>
+    
+    <div class="container">
+        <h2>Diagnóstico e Correção</h2>
+        <button class="button" onclick="diagnoseKliciaProblem()">🔍 Diagnosticar Problema</button>
+        <button class="button" onclick="syncDesignersToLocalStorage()">🔄 Sincronizar Designers</button>
+        <button class="button" onclick="fixKliciaAppointment()">🛠️ Corrigir Agendamento</button>
+        <button class="button" onclick="clearLogs()">🗑️ Limpar Logs</button>
+    </div>
+
+    <div class="container">
+        <h3>📋 Logs de Diagnóstico</h3>
+        <div id="logs" class="log"></div>
+    </div>
+
+    <div class="container">
+        <h3>👩‍💼 Designers no Supabase</h3>
+        <div id="supabaseDesigners"></div>
+    </div>
+
+    <div class="container">
+        <h3>💾 Designers no LocalStorage</h3>
+        <div id="localStorageDesigners"></div>
+    </div>
+
+    <div class="container">
+        <h3>📅 Agendamentos Relacionados</h3>
+        <div id="appointments"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+        
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pjwjqzpqkwqldqmkqzqm.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqd2pxenBxa3dxbGRxbWtxenFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI4NzEsImV4cCI6MjA1MDU0ODg3MX0.Hs_7lCOKKJH6qUJWJWt7hgBJVFqNgU7b8Oa8YrKZqJo'
+        const supabase = createClient(supabaseUrl, supabaseKey)
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString()
+            const logElement = document.getElementById('logs')
+            const colorClass = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'
+            logElement.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`
+            logElement.scrollTop = logElement.scrollHeight
+            console.log(`[${timestamp}] ${message}`)
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = ''
+        }
+        
+        async function diagnoseKliciaProblem() {
+            log('🔍 Iniciando diagnóstico do problema da Klicia...', 'info')
+            
+            try {
+                // 1. Buscar designers no Supabase
+                log('📊 Buscando designers no Supabase...', 'info')
+                const { data: supabaseDesigners, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('name')
+                
+                if (designersError) {
+                    log(`❌ Erro ao buscar designers: ${designersError.message}`, 'error')
+                    return
+                }
+                
+                log(`✅ Encontrados ${supabaseDesigners.length} designers no Supabase`, 'success')
+                
+                // Encontrar Klicia
+                const klicia = supabaseDesigners.find(d => d.name.toLowerCase().includes('klicia'))
+                if (klicia) {
+                    log(`👩‍💼 Designer Klicia encontrada no Supabase:`, 'success')
+                    log(`   ID: ${klicia.id}`, 'info')
+                    log(`   Nome: ${klicia.name}`, 'info')
+                    log(`   Email: ${klicia.email}`, 'info')
+                } else {
+                    log('❌ Designer Klicia NÃO encontrada no Supabase!', 'error')
+                }
+                
+                // 2. Verificar localStorage
+                log('💾 Verificando designers no localStorage...', 'info')
+                const localDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]')
+                log(`📊 Encontrados ${localDesigners.length} designers no localStorage`, 'info')
+                
+                const localKlicia = localDesigners.find(d => d.name.toLowerCase().includes('klicia'))
+                if (localKlicia) {
+                    log(`👩‍💼 Designer Klicia encontrada no localStorage:`, 'success')
+                    log(`   ID: ${localKlicia.id}`, 'info')
+                    log(`   Nome: ${localKlicia.name}`, 'info')
+                } else {
+                    log('❌ Designer Klicia NÃO encontrada no localStorage!', 'error')
+                }
+                
+                // 3. Buscar agendamentos
+                log('📅 Buscando agendamentos no Supabase...', 'info')
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .order('date', { ascending: false })
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`, 'error')
+                    return
+                }
+                
+                log(`📊 Encontrados ${appointments.length} agendamentos no Supabase`, 'info')
+                
+                // Buscar agendamentos da Klicia
+                const kliciaAppointments = appointments.filter(apt => 
+                    (klicia && apt.designer_id === klicia.id) ||
+                    (localKlicia && apt.designer_id === localKlicia.id) ||
+                    apt.clientName?.toLowerCase().includes('klicia')
+                )
+                
+                log(`🎯 Encontrados ${kliciaAppointments.length} agendamentos relacionados à Klicia`, 'info')
+                
+                // 4. Verificar agendamentos do localStorage
+                const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]')
+                log(`💾 Encontrados ${localAppointments.length} agendamentos no localStorage`, 'info')
+                
+                // Exibir resultados
+                displayDesigners(supabaseDesigners, 'supabaseDesigners')
+                displayDesigners(localDesigners, 'localStorageDesigners')
+                displayAppointments([...appointments, ...localAppointments])
+                
+                log('✅ Diagnóstico concluído!', 'success')
+                
+            } catch (error) {
+                log(`❌ Erro durante diagnóstico: ${error.message}`, 'error')
+            }
+        }
+        
+        async function syncDesignersToLocalStorage() {
+            log('🔄 Sincronizando designers do Supabase para localStorage...', 'info')
+            
+            try {
+                const { data: supabaseDesigners, error } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .order('name')
+                
+                if (error) {
+                    log(`❌ Erro ao buscar designers: ${error.message}`, 'error')
+                    return
+                }
+                
+                // Salvar no localStorage
+                localStorage.setItem('nail_designers', JSON.stringify(supabaseDesigners))
+                log(`✅ ${supabaseDesigners.length} designers sincronizados para localStorage`, 'success')
+                
+                // Atualizar exibição
+                displayDesigners(supabaseDesigners, 'localStorageDesigners')
+                
+            } catch (error) {
+                log(`❌ Erro durante sincronização: ${error.message}`, 'error')
+            }
+        }
+        
+        async function fixKliciaAppointment() {
+            log('🛠️ Iniciando correção do agendamento da Klicia...', 'info')
+            
+            try {
+                // 1. Buscar Klicia no Supabase
+                const { data: designers, error: designersError } = await supabase
+                    .from('nail_designers')
+                    .select('*')
+                    .ilike('name', '%klicia%')
+                
+                if (designersError) {
+                    log(`❌ Erro ao buscar Klicia: ${designersError.message}`, 'error')
+                    return
+                }
+                
+                if (designers.length === 0) {
+                    log('❌ Designer Klicia não encontrada no Supabase!', 'error')
+                    return
+                }
+                
+                const klicia = designers[0]
+                log(`👩‍💼 Designer Klicia encontrada: ${klicia.name} (ID: ${klicia.id})`, 'success')
+                
+                // 2. Buscar agendamentos problemáticos
+                const { data: appointments, error: appointmentsError } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .gte('date', '2024-08-25')
+                    .lte('date', '2024-08-25')
+                
+                if (appointmentsError) {
+                    log(`❌ Erro ao buscar agendamentos: ${appointmentsError.message}`, 'error')
+                    return
+                }
+                
+                log(`📅 Encontrados ${appointments.length} agendamentos para 25/08/2024`, 'info')
+                
+                // 3. Procurar agendamentos sem designer_id ou com designer_id incorreto
+                const problematicAppointments = appointments.filter(apt => 
+                    !apt.designer_id || apt.designer_id !== klicia.id
+                )
+                
+                if (problematicAppointments.length === 0) {
+                    log('✅ Nenhum agendamento problemático encontrado para esta data', 'success')
+                    return
+                }
+                
+                log(`🔧 Encontrados ${problematicAppointments.length} agendamentos para corrigir`, 'warning')
+                
+                // 4. Corrigir agendamentos
+                for (const apt of problematicAppointments) {
+                    log(`🔧 Corrigindo agendamento ${apt.id}...`, 'info')
+                    
+                    const { error: updateError } = await supabase
+                        .from('appointments')
+                        .update({ designer_id: klicia.id })
+                        .eq('id', apt.id)
+                    
+                    if (updateError) {
+                        log(`❌ Erro ao corrigir agendamento ${apt.id}: ${updateError.message}`, 'error')
+                    } else {
+                        log(`✅ Agendamento ${apt.id} corrigido com sucesso`, 'success')
+                    }
+                }
+                
+                // 5. Sincronizar designers para localStorage
+                await syncDesignersToLocalStorage()
+                
+                log('✅ Correção concluída! Teste o sistema agora.', 'success')
+                
+            } catch (error) {
+                log(`❌ Erro durante correção: ${error.message}`, 'error')
+            }
+        }
+        
+        function displayDesigners(designers, containerId) {
+            const container = document.getElementById(containerId)
+            if (!designers || designers.length === 0) {
+                container.innerHTML = '<p>Nenhuma designer encontrada</p>'
+                return
+            }
+            
+            let html = '<table><tr><th>ID</th><th>Nome</th><th>Email</th><th>Telefone</th></tr>'
+            designers.forEach(designer => {
+                const isKlicia = designer.name.toLowerCase().includes('klicia')
+                html += `<tr class="${isKlicia ? 'highlight' : ''}">
+                    <td>${designer.id}</td>
+                    <td>${designer.name}</td>
+                    <td>${designer.email || 'N/A'}</td>
+                    <td>${designer.phone || 'N/A'}</td>
+                </tr>`
+            })
+            html += '</table>'
+            container.innerHTML = html
+        }
+        
+        function displayAppointments(appointments) {
+            const container = document.getElementById('appointments')
+            if (!appointments || appointments.length === 0) {
+                container.innerHTML = '<p>Nenhum agendamento encontrado</p>'
+                return
+            }
+            
+            // Filtrar agendamentos de agosto de 2024
+            const augustAppointments = appointments.filter(apt => 
+                apt.date && apt.date.includes('2024-08')
+            )
+            
+            let html = '<table><tr><th>ID</th><th>Cliente</th><th>Designer ID</th><th>Data</th><th>Hora</th><th>Status</th><th>Origem</th></tr>'
+            augustAppointments.forEach(apt => {
+                const isProblematic = !apt.designer_id || apt.date === '2024-08-25'
+                html += `<tr class="${isProblematic ? 'highlight' : ''}">
+                    <td>${apt.id}</td>
+                    <td>${apt.clientName || apt.client_name || 'N/A'}</td>
+                    <td>${apt.designer_id || apt.designerId || 'N/A'}</td>
+                    <td>${apt.date}</td>
+                    <td>${apt.time}</td>
+                    <td>${apt.status}</td>
+                    <td>${apt.created_at ? 'Supabase' : 'LocalStorage'}</td>
+                </tr>`
+            })
+            html += '</table>'
+            container.innerHTML = html
+        }
+        
+        // Tornar funções globais
+        window.diagnoseKliciaProblem = diagnoseKliciaProblem
+        window.syncDesignersToLocalStorage = syncDesignersToLocalStorage
+        window.fixKliciaAppointment = fixKliciaAppointment
+        window.clearLogs = clearLogs
+        
+        // Executar diagnóstico inicial
+        setTimeout(() => {
+            log('🚀 Sistema de correção carregado. Clique em "Diagnosticar Problema" para começar.', 'info')
+        }, 1000)
+    </script>
+</body>
+</html>

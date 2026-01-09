@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico Problema kika6</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Diagnóstico: kika6 → Klicia</h1>
+    <button onclick="investigateIssue()">🔍 Investigar Problema</button>
+    <button onclick="fixIssue()">🔧 Corrigir Problema</button>
+    <div id="results"></div>
+
+    <script>
+        const supabaseUrl = 'https://vhvxjiorcggilujjtdbr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU';
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        function log(message, type = 'info') {
+            const div = document.getElementById('results');
+            const p = document.createElement('p');
+            p.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            p.textContent = message;
+            div.appendChild(p);
+        }
+
+        async function investigateIssue() {
+            document.getElementById('results').innerHTML = '';
+            log('🔍 Investigando problema kika6...');
+
+            // 1. Verificar designers no localStorage
+            const localDesigners = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+            log(`📱 Designers no localStorage: ${localDesigners.length}`);
+            localDesigners.forEach(d => {
+                log(`  - ${d.name} (ID: ${d.id})`);
+            });
+
+            // 2. Verificar designers no Supabase
+            const { data: supabaseDesigners, error: designerError } = await supabase
+                .from('nail_designers')
+                .select('*');
+            
+            if (designerError) {
+                log(`❌ Erro ao buscar designers: ${designerError.message}`, 'error');
+            } else {
+                log(`☁️ Designers no Supabase: ${supabaseDesigners.length}`);
+                supabaseDesigners.forEach(d => {
+                    log(`  - ${d.name} (ID: ${d.id})`);
+                });
+            }
+
+            // 3. Verificar agendamentos com designerId 'kika6'
+            const { data: appointments, error: aptError } = await supabase
+                .from('appointments')
+                .select('*')
+                .eq('designer_id', 'kika6');
+            
+            if (aptError) {
+                log(`❌ Erro ao buscar agendamentos: ${aptError.message}`, 'error');
+            } else {
+                log(`📅 Agendamentos com designer_id 'kika6': ${appointments.length}`);
+                appointments.forEach(apt => {
+                    log(`  - ${apt.client_name} em ${apt.appointment_date} às ${apt.appointment_time}`);
+                });
+            }
+
+            // 4. Verificar localStorage de agendamentos
+            const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+            const kika6Appointments = localAppointments.filter(apt => apt.designerId === 'kika6');
+            log(`📱 Agendamentos locais com designerId 'kika6': ${kika6Appointments.length}`);
+        }
+
+        async function fixIssue() {
+            log('🔧 Iniciando correção...');
+            
+            // Encontrar o ID correto da Klicia
+            const { data: designers, error } = await supabase
+                .from('nail_designers')
+                .select('*')
+                .ilike('name', '%klicia%');
+            
+            if (error || designers.length === 0) {
+                log('❌ Não foi possível encontrar a designer Klicia', 'error');
+                return;
+            }
+            
+            const klicia = designers[0];
+            log(`✅ Designer encontrada: ${klicia.name} (ID: ${klicia.id})`);
+            
+            // Atualizar agendamentos no Supabase
+            const { data: updatedAppointments, error: updateError } = await supabase
+                .from('appointments')
+                .update({ designer_id: klicia.id })
+                .eq('designer_id', 'kika6');
+            
+            if (updateError) {
+                log(`❌ Erro ao atualizar agendamentos: ${updateError.message}`, 'error');
+            } else {
+                log('✅ Agendamentos atualizados no Supabase', 'success');
+            }
+            
+            // Atualizar localStorage
+            const localAppointments = JSON.parse(localStorage.getItem('nail_appointments') || '[]');
+            const updatedLocal = localAppointments.map(apt => {
+                if (apt.designerId === 'kika6') {
+                    return { ...apt, designerId: klicia.id };
+                }
+                return apt;
+            });
+            
+            localStorage.setItem('nail_appointments', JSON.stringify(updatedLocal));
+            log('✅ localStorage atualizado', 'success');
+            
+            log('🎉 Correção concluída! Teste o painel do cliente agora.');
+        }
+    </script>
+</body>
+</html>

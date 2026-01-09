@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Visibilidade de Agendamentos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #efe;
+            border: 1px solid #cfc;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            background-color: #eef;
+            border: 1px solid #ccf;
+            color: #33c;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff3cd;
+        }
+        .problem {
+            background-color: #ffebee;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .dashboard-simulation {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        .client-dashboard {
+            border-color: #4caf50;
+            background-color: #f1f8e9;
+        }
+        .admin-dashboard {
+            border-color: #2196f3;
+            background-color: #e3f2fd;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste de Visibilidade de Agendamentos</h1>
+    <p><strong>Problema:</strong> Cliente agendou e está aparecendo no painel dela, mas não aparece no painel da Nail Designer que ela escolheu.</p>
+    
+    <div class="container">
+        <h2>Configuração do Supabase</h2>
+        <input type="text" id="supabase-url" placeholder="URL do Supabase" style="width: 300px;">
+        <input type="password" id="supabase-key" placeholder="Chave Anônima do Supabase" style="width: 300px;">
+        <button onclick="initSupabase()">Conectar ao Supabase</button>
+        <div id="connection-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>Seleção de Teste</h2>
+        <div>
+            <label>Cliente (Designer como Cliente):</label>
+            <select id="client-select">
+                <option value="">Selecione um cliente...</option>
+            </select>
+        </div>
+        <div>
+            <label>Designer Escolhida:</label>
+            <select id="designer-select">
+                <option value="">Selecione uma designer...</option>
+            </select>
+        </div>
+        <button onclick="runVisibilityTest()">Executar Teste de Visibilidade</button>
+    </div>
+
+    <div class="container">
+        <h2>Resultados do Teste</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <div class="container">
+        <h2>Simulação dos Painéis</h2>
+        
+        <div class="dashboard-simulation client-dashboard">
+            <h3>🟢 Painel da Cliente (ClientDashboard)</h3>
+            <div id="client-dashboard-simulation"></div>
+        </div>
+        
+        <div class="dashboard-simulation admin-dashboard">
+            <h3>🔵 Painel da Designer (AdminDashboard)</h3>
+            <div id="admin-dashboard-simulation"></div>
+        </div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+        let designers = [];
+        let appointments = [];
+
+        function initSupabase() {
+            const url = document.getElementById('supabase-url').value;
+            const key = document.getElementById('supabase-key').value;
+            
+            if (!url || !key) {
+                document.getElementById('connection-status').innerHTML = '<div class="error">Por favor, forneça URL e chave do Supabase</div>';
+                return;
+            }
+
+            try {
+                supabaseClient = {
+                    url: url,
+                    key: key,
+                    from: function(table) {
+                        return {
+                            select: function(columns = '*') {
+                                return {
+                                    then: function(callback) {
+                                        fetch(`${url}/rest/v1/${table}?select=${columns}`, {
+                                            headers: {
+                                                'apikey': key,
+                                                'Authorization': `Bearer ${key}`,
+                                                'Content-Type': 'application/json'
+                                            }
+                                        })
+                                        .then(response => response.json())
+                                        .then(data => callback({ data, error: null }))
+                                        .catch(error => callback({ data: null, error }));
+                                    }
+                                };
+                            }
+                        };
+                    }
+                };
+                
+                document.getElementById('connection-status').innerHTML = '<div class="success">✅ Conectado ao Supabase com sucesso!</div>';
+                loadData();
+            } catch (error) {
+                document.getElementById('connection-status').innerHTML = `<div class="error">❌ Erro ao conectar: ${error.message}</div>`;
+            }
+        }
+
+        function loadData() {
+            // Carregar designers do LocalStorage
+            designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+            
+            // Carregar agendamentos do Supabase
+            if (supabaseClient) {
+                supabaseClient.from('appointments').select('*').then(({ data, error }) => {
+                    if (!error && data) {
+                        appointments = data;
+                        populateSelects();
+                    }
+                });
+            }
+        }
+
+        function populateSelects() {
+            const clientSelect = document.getElementById('client-select');
+            const designerSelect = document.getElementById('designer-select');
+            
+            // Limpar opções existentes
+            clientSelect.innerHTML = '<option value="">Selecione um cliente...</option>';
+            designerSelect.innerHTML = '<option value="">Selecione uma designer...</option>';
+            
+            // Adicionar designers como opções
+            designers.forEach(designer => {
+                const clientOption = document.createElement('option');
+                clientOption.value = designer.id;
+                clientOption.textContent = `${designer.name} (${designer.email})`;
+                clientSelect.appendChild(clientOption);
+                
+                const designerOption = document.createElement('option');
+                designerOption.value = designer.id;
+                designerOption.textContent = `${designer.name} (${designer.email})`;
+                designerSelect.appendChild(designerOption);
+            });
+        }
+
+        function runVisibilityTest() {
+            const clientId = document.getElementById('client-select').value;
+            const designerId = document.getElementById('designer-select').value;
+            
+            if (!clientId || !designerId) {
+                document.getElementById('test-results').innerHTML = '<div class="error">❌ Por favor, selecione tanto o cliente quanto a designer</div>';
+                return;
+            }
+
+            if (!supabaseClient) {
+                document.getElementById('test-results').innerHTML = '<div class="error">❌ Conecte-se ao Supabase primeiro</div>';
+                return;
+            }
+
+            const client = designers.find(d => d.id === clientId);
+            const designer = designers.find(d => d.id === designerId);
+            
+            let html = '<div class="info">🔍 Executando teste de visibilidade...</div>';
+            html += `<div class="info">👤 Cliente: <strong>${client.name}</strong> (ID: ${client.id})</div>`;
+            html += `<div class="info">💅 Designer: <strong>${designer.name}</strong> (ID: ${designer.id})</div>`;
+            
+            document.getElementById('test-results').innerHTML = html;
+
+            // Simular lógica do ClientDashboard
+            simulateClientDashboard(client);
+            
+            // Simular lógica do AdminDashboard
+            simulateAdminDashboard(designer);
+            
+            // Analisar diferenças
+            analyzeDifferences(client, designer);
+        }
+
+        function simulateClientDashboard(client) {
+            // Lógica do ClientDashboard: busca agendamentos onde o cliente é o designerId
+            const clientAppointments = appointments.filter(apt => 
+                apt.designer_id === client.id || apt.designerId === client.id
+            );
+            
+            let html = `<div class="info">📊 Lógica do ClientDashboard:</div>`;
+            html += `<div class="info">• Busca agendamentos onde designer_id = '${client.id}'</div>`;
+            html += `<div class="info">• Encontrados: ${clientAppointments.length} agendamento(s)</div>`;
+            
+            if (clientAppointments.length > 0) {
+                html += '<table><tr><th>ID</th><th>Designer ID</th><th>Cliente</th><th>Serviço</th><th>Data</th><th>Hora</th></tr>';
+                clientAppointments.forEach(apt => {
+                    html += `<tr>
+                        <td>${apt.id}</td>
+                        <td><strong>${apt.designer_id}</strong></td>
+                        <td>${apt.client_name}</td>
+                        <td>${apt.service}</td>
+                        <td>${apt.date}</td>
+                        <td>${apt.time}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+            } else {
+                html += '<div class="warning">⚠️ Nenhum agendamento encontrado no painel da cliente</div>';
+            }
+            
+            document.getElementById('client-dashboard-simulation').innerHTML = html;
+        }
+
+        function simulateAdminDashboard(designer) {
+            // Lógica do AdminDashboard: busca agendamentos onde designer_id = designer.id
+            const designerAppointments = appointments.filter(apt => 
+                apt.designer_id === designer.id || apt.designerId === designer.id
+            );
+            
+            let html = `<div class="info">📊 Lógica do AdminDashboard:</div>`;
+            html += `<div class="info">• Busca agendamentos onde designer_id = '${designer.id}'</div>`;
+            html += `<div class="info">• Encontrados: ${designerAppointments.length} agendamento(s)</div>`;
+            
+            if (designerAppointments.length > 0) {
+                html += '<table><tr><th>ID</th><th>Designer ID</th><th>Cliente</th><th>Serviço</th><th>Data</th><th>Hora</th></tr>';
+                designerAppointments.forEach(apt => {
+                    html += `<tr>
+                        <td>${apt.id}</td>
+                        <td><strong>${apt.designer_id}</strong></td>
+                        <td>${apt.client_name}</td>
+                        <td>${apt.service}</td>
+                        <td>${apt.date}</td>
+                        <td>${apt.time}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+            } else {
+                html += '<div class="warning">⚠️ Nenhum agendamento encontrado no painel da designer</div>';
+            }
+            
+            document.getElementById('admin-dashboard-simulation').innerHTML = html;
+        }
+
+        function analyzeDifferences(client, designer) {
+            const clientAppointments = appointments.filter(apt => 
+                apt.designer_id === client.id || apt.designerId === client.id
+            );
+            
+            const designerAppointments = appointments.filter(apt => 
+                apt.designer_id === designer.id || apt.designerId === designer.id
+            );
+            
+            let html = document.getElementById('test-results').innerHTML;
+            
+            html += '<h3>🔍 Análise de Diferenças:</h3>';
+            
+            if (clientAppointments.length > 0 && designerAppointments.length === 0) {
+                html += '<div class="error">❌ PROBLEMA IDENTIFICADO!</div>';
+                html += '<div class="error">• Agendamento aparece no painel da CLIENTE</div>';
+                html += '<div class="error">• Agendamento NÃO aparece no painel da DESIGNER</div>';
+                
+                html += '<h4>🔍 Possíveis Causas:</h4>';
+                html += '<div class="warning">1. O agendamento foi salvo com designer_id = ID da cliente, não da designer escolhida</div>';
+                html += '<div class="warning">2. Problema na lógica de salvamento do BookingPage</div>';
+                html += '<div class="warning">3. selectedDesigner.id não corresponde ao ID da designer real</div>';
+                
+                html += '<h4>📋 Agendamentos Problemáticos:</h4>';
+                html += '<table><tr><th>ID</th><th>Designer ID Salvo</th><th>Cliente</th><th>Deveria ser Designer ID</th></tr>';
+                clientAppointments.forEach(apt => {
+                    html += `<tr class="problem">
+                        <td>${apt.id}</td>
+                        <td><strong>${apt.designer_id}</strong> (Cliente)</td>
+                        <td>${apt.client_name}</td>
+                        <td><strong>${designer.id}</strong> (Designer)</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                
+            } else if (clientAppointments.length === 0 && designerAppointments.length > 0) {
+                html += '<div class="success">✅ Agendamentos aparecem apenas no painel da designer (comportamento esperado)</div>';
+            } else if (clientAppointments.length > 0 && designerAppointments.length > 0) {
+                html += '<div class="info">ℹ️ Agendamentos aparecem em ambos os painéis</div>';
+                html += '<div class="warning">⚠️ Isso pode indicar que cliente e designer são a mesma pessoa</div>';
+            } else {
+                html += '<div class="warning">⚠️ Nenhum agendamento encontrado para esta combinação</div>';
+            }
+            
+            document.getElementById('test-results').innerHTML = html;
+        }
+
+        // Carregar dados automaticamente ao carregar a página
+        window.onload = function() {
+            designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+            if (designers.length > 0) {
+                populateSelects();
+            }
+        };
+    </script>
+</body>
+</html>

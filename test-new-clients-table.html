@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Nova Tabela de Clientes</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste da Nova Tabela de Clientes</h1>
+    
+    <div class="test-section">
+        <h3>1. Conexão com Supabase</h3>
+        <button onclick="testConnection()">Testar Conexão</button>
+        <div id="connection-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Criar Cliente de Teste</h3>
+        <button onclick="createTestClient()">Criar Cliente</button>
+        <div id="create-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Buscar Cliente por Telefone</h3>
+        <button onclick="getClientByPhone()">Buscar por Telefone</button>
+        <div id="search-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Listar Todos os Clientes</h3>
+        <button onclick="getAllClients()">Listar Clientes</button>
+        <div id="list-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>5. Atualizar Cliente</h3>
+        <button onclick="updateTestClient()">Atualizar Cliente</button>
+        <div id="update-result"></div>
+    </div>
+
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://ixmvkqjzfqjfqjzfqjzf.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bXZrcWp6ZnFqZnFqemZxanpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI4NzAsImV4cCI6MjA1MDU0ODg3MH0.example';
+        
+        // Inicializar Supabase
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        const testClientData = {
+            id: 'client-test-' + Date.now(),
+            name: 'Cliente Teste',
+            email: 'teste@cliente.com',
+            phone: '11999999999',
+            password: 'senha123',
+            is_active: true
+        };
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">${message}</div>`;
+        }
+        
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+        
+        async function testConnection() {
+            clearLog('connection-result');
+            log('connection-result', 'Testando conexão com Supabase...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    log('connection-result', `Erro na conexão: ${error.message}`, 'error');
+                } else {
+                    log('connection-result', 'Conexão com Supabase estabelecida com sucesso!', 'success');
+                    log('connection-result', 'Tabela clients encontrada e acessível.', 'success');
+                }
+            } catch (err) {
+                log('connection-result', `Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function createTestClient() {
+            clearLog('create-result');
+            log('create-result', 'Criando cliente de teste...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .insert([testClientData])
+                    .select();
+                
+                if (error) {
+                    log('create-result', `Erro ao criar cliente: ${error.message}`, 'error');
+                } else {
+                    log('create-result', 'Cliente criado com sucesso!', 'success');
+                    log('create-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (err) {
+                log('create-result', `Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function getClientByPhone() {
+            clearLog('search-result');
+            log('search-result', 'Buscando cliente por telefone...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('*')
+                    .eq('phone', testClientData.phone)
+                    .single();
+                
+                if (error) {
+                    log('search-result', `Erro na busca: ${error.message}`, 'error');
+                } else {
+                    log('search-result', 'Cliente encontrado!', 'success');
+                    log('search-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (err) {
+                log('search-result', `Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function getAllClients() {
+            clearLog('list-result');
+            log('list-result', 'Listando todos os clientes...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log('list-result', `Erro ao listar: ${error.message}`, 'error');
+                } else {
+                    log('list-result', `Encontrados ${data.length} clientes:`, 'success');
+                    log('list-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (err) {
+                log('list-result', `Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        async function updateTestClient() {
+            clearLog('update-result');
+            log('update-result', 'Atualizando cliente de teste...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .update({ 
+                        name: 'Cliente Teste Atualizado',
+                        email: 'teste.atualizado@cliente.com'
+                    })
+                    .eq('phone', testClientData.phone)
+                    .select();
+                
+                if (error) {
+                    log('update-result', `Erro ao atualizar: ${error.message}`, 'error');
+                } else {
+                    log('update-result', 'Cliente atualizado com sucesso!', 'success');
+                    log('update-result', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (err) {
+                log('update-result', `Erro: ${err.message}`, 'error');
+            }
+        }
+        
+        // Executar teste de conexão automaticamente
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Correspondência de Designer ID</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #efe;
+            border: 1px solid #cfc;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            background-color: #eef;
+            border: 1px solid #ccf;
+            color: #33c;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff3cd;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste de Correspondência de Designer ID</h1>
+    
+    <div class="container">
+        <h2>Configuração do Supabase</h2>
+        <input type="text" id="supabase-url" placeholder="URL do Supabase" style="width: 300px;">
+        <input type="password" id="supabase-key" placeholder="Chave Anônima do Supabase" style="width: 300px;">
+        <button onclick="initSupabase()">Conectar ao Supabase</button>
+        <div id="connection-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>Teste de Designer Específico</h2>
+        <input type="text" id="designer-id-input" placeholder="ID do Designer para testar" style="width: 300px;">
+        <button onclick="testSpecificDesigner()">Testar Designer</button>
+        <div id="designer-test-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>Análise Completa</h2>
+        <button onclick="runFullAnalysis()">Executar Análise Completa</button>
+        <div id="analysis-result"></div>
+    </div>
+
+    <div class="container">
+        <h2>Designers do LocalStorage</h2>
+        <button onclick="loadLocalStorageDesigners()">Carregar Designers do LocalStorage</button>
+        <div id="localStorage-designers"></div>
+    </div>
+
+    <div class="container">
+        <h2>Agendamentos do Supabase</h2>
+        <button onclick="loadSupabaseAppointments()">Carregar Agendamentos do Supabase</button>
+        <div id="supabase-appointments"></div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+
+        function initSupabase() {
+            const url = document.getElementById('supabase-url').value;
+            const key = document.getElementById('supabase-key').value;
+            
+            if (!url || !key) {
+                document.getElementById('connection-status').innerHTML = '<div class="error">Por favor, forneça URL e chave do Supabase</div>';
+                return;
+            }
+
+            try {
+                // Simular conexão com Supabase (substitua pela biblioteca real se disponível)
+                supabaseClient = {
+                    url: url,
+                    key: key,
+                    from: function(table) {
+                        return {
+                            select: function(columns = '*') {
+                                return {
+                                    then: function(callback) {
+                                        // Simular chamada para o Supabase
+                                        fetch(`${url}/rest/v1/${table}?select=${columns}`, {
+                                            headers: {
+                                                'apikey': key,
+                                                'Authorization': `Bearer ${key}`,
+                                                'Content-Type': 'application/json'
+                                            }
+                                        })
+                                        .then(response => response.json())
+                                        .then(data => callback({ data, error: null }))
+                                        .catch(error => callback({ data: null, error }));
+                                    }
+                                };
+                            }
+                        };
+                    }
+                };
+                
+                document.getElementById('connection-status').innerHTML = '<div class="success">✅ Conectado ao Supabase com sucesso!</div>';
+            } catch (error) {
+                document.getElementById('connection-status').innerHTML = `<div class="error">❌ Erro ao conectar: ${error.message}</div>`;
+            }
+        }
+
+        function loadLocalStorageDesigners() {
+            try {
+                const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+                
+                let html = `<div class="info">📊 Total de designers no LocalStorage: ${designers.length}</div>`;
+                
+                if (designers.length > 0) {
+                    html += '<table><tr><th>ID</th><th>Nome</th><th>Email</th><th>Ativo</th><th>Criado em</th></tr>';
+                    designers.forEach(designer => {
+                        html += `<tr>
+                            <td><strong>${designer.id}</strong></td>
+                            <td>${designer.name}</td>
+                            <td>${designer.email}</td>
+                            <td>${designer.isActive ? '✅' : '❌'}</td>
+                            <td>${designer.createdAt}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                } else {
+                    html += '<div class="error">❌ Nenhum designer encontrado no LocalStorage</div>';
+                }
+                
+                document.getElementById('localStorage-designers').innerHTML = html;
+            } catch (error) {
+                document.getElementById('localStorage-designers').innerHTML = `<div class="error">❌ Erro ao carregar designers: ${error.message}</div>`;
+            }
+        }
+
+        function loadSupabaseAppointments() {
+            if (!supabaseClient) {
+                document.getElementById('supabase-appointments').innerHTML = '<div class="error">❌ Conecte-se ao Supabase primeiro</div>';
+                return;
+            }
+
+            supabaseClient.from('appointments').select('*').then(({ data, error }) => {
+                if (error) {
+                    document.getElementById('supabase-appointments').innerHTML = `<div class="error">❌ Erro ao carregar agendamentos: ${error.message}</div>`;
+                    return;
+                }
+
+                let html = `<div class="info">📊 Total de agendamentos no Supabase: ${data.length}</div>`;
+                
+                if (data.length > 0) {
+                    html += '<table><tr><th>ID</th><th>Designer ID</th><th>Cliente</th><th>Serviço</th><th>Data</th><th>Hora</th><th>Criado em</th></tr>';
+                    data.forEach(appointment => {
+                        html += `<tr>
+                            <td>${appointment.id}</td>
+                            <td><strong>${appointment.designer_id}</strong></td>
+                            <td>${appointment.client_name}</td>
+                            <td>${appointment.service}</td>
+                            <td>${appointment.date}</td>
+                            <td>${appointment.time}</td>
+                            <td>${appointment.created_at}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                } else {
+                    html += '<div class="error">❌ Nenhum agendamento encontrado no Supabase</div>';
+                }
+                
+                document.getElementById('supabase-appointments').innerHTML = html;
+            });
+        }
+
+        function testSpecificDesigner() {
+            const designerId = document.getElementById('designer-id-input').value.trim();
+            
+            if (!designerId) {
+                document.getElementById('designer-test-result').innerHTML = '<div class="error">❌ Por favor, forneça um ID de designer</div>';
+                return;
+            }
+
+            if (!supabaseClient) {
+                document.getElementById('designer-test-result').innerHTML = '<div class="error">❌ Conecte-se ao Supabase primeiro</div>';
+                return;
+            }
+
+            let html = `<div class="info">🔍 Testando designer ID: <strong>${designerId}</strong></div>`;
+            
+            // Verificar se existe no LocalStorage
+            const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+            const localDesigner = designers.find(d => d.id === designerId);
+            
+            if (localDesigner) {
+                html += `<div class="success">✅ Designer encontrado no LocalStorage: ${localDesigner.name} (${localDesigner.email})</div>`;
+            } else {
+                html += `<div class="error">❌ Designer NÃO encontrado no LocalStorage</div>`;
+            }
+
+            // Verificar agendamentos no Supabase
+            supabaseClient.from('appointments').select('*').then(({ data, error }) => {
+                if (error) {
+                    html += `<div class="error">❌ Erro ao buscar agendamentos: ${error.message}</div>`;
+                    document.getElementById('designer-test-result').innerHTML = html;
+                    return;
+                }
+
+                const designerAppointments = data.filter(apt => apt.designer_id === designerId);
+                
+                if (designerAppointments.length > 0) {
+                    html += `<div class="success">✅ ${designerAppointments.length} agendamento(s) encontrado(s) no Supabase para este designer</div>`;
+                    html += '<table><tr><th>ID</th><th>Cliente</th><th>Serviço</th><th>Data</th><th>Hora</th></tr>';
+                    designerAppointments.forEach(apt => {
+                        html += `<tr>
+                            <td>${apt.id}</td>
+                            <td>${apt.client_name}</td>
+                            <td>${apt.service}</td>
+                            <td>${apt.date}</td>
+                            <td>${apt.time}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                } else {
+                    html += `<div class="error">❌ Nenhum agendamento encontrado no Supabase para este designer</div>`;
+                }
+                
+                document.getElementById('designer-test-result').innerHTML = html;
+            });
+        }
+
+        function runFullAnalysis() {
+            if (!supabaseClient) {
+                document.getElementById('analysis-result').innerHTML = '<div class="error">❌ Conecte-se ao Supabase primeiro</div>';
+                return;
+            }
+
+            let html = '<div class="info">🔍 Executando análise completa...</div>';
+            document.getElementById('analysis-result').innerHTML = html;
+
+            // Carregar designers do LocalStorage
+            const designers = JSON.parse(localStorage.getItem('nail_designers') || '[]');
+            
+            // Carregar agendamentos do Supabase
+            supabaseClient.from('appointments').select('*').then(({ data: appointments, error }) => {
+                if (error) {
+                    html += `<div class="error">❌ Erro ao carregar agendamentos: ${error.message}</div>`;
+                    document.getElementById('analysis-result').innerHTML = html;
+                    return;
+                }
+
+                html = `<div class="info">📊 Análise Completa</div>`;
+                html += `<div class="info">• Designers no LocalStorage: ${designers.length}</div>`;
+                html += `<div class="info">• Agendamentos no Supabase: ${appointments.length}</div>`;
+
+                // Analisar correspondências
+                const designerIds = new Set(designers.map(d => d.id));
+                const appointmentDesignerIds = new Set(appointments.map(a => a.designer_id));
+                
+                html += '<h3>🔍 Análise de Correspondências:</h3>';
+                
+                // Designers com agendamentos
+                const designersWithAppointments = designers.filter(d => 
+                    appointments.some(a => a.designer_id === d.id)
+                );
+                
+                if (designersWithAppointments.length > 0) {
+                    html += `<div class="success">✅ ${designersWithAppointments.length} designer(s) com agendamentos:</div>`;
+                    html += '<table><tr><th>Designer</th><th>ID</th><th>Qtd Agendamentos</th></tr>';
+                    designersWithAppointments.forEach(designer => {
+                        const count = appointments.filter(a => a.designer_id === designer.id).length;
+                        html += `<tr class="highlight">
+                            <td>${designer.name}</td>
+                            <td>${designer.id}</td>
+                            <td>${count}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+                
+                // Designers sem agendamentos
+                const designersWithoutAppointments = designers.filter(d => 
+                    !appointments.some(a => a.designer_id === d.id)
+                );
+                
+                if (designersWithoutAppointments.length > 0) {
+                    html += `<div class="error">❌ ${designersWithoutAppointments.length} designer(s) SEM agendamentos:</div>`;
+                    html += '<table><tr><th>Designer</th><th>ID</th><th>Ativo</th></tr>';
+                    designersWithoutAppointments.forEach(designer => {
+                        html += `<tr>
+                            <td>${designer.name}</td>
+                            <td>${designer.id}</td>
+                            <td>${designer.isActive ? '✅' : '❌'}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+                
+                // Agendamentos órfãos (sem designer correspondente)
+                const orphanAppointments = appointments.filter(a => 
+                    !designers.some(d => d.id === a.designer_id)
+                );
+                
+                if (orphanAppointments.length > 0) {
+                    html += `<div class="error">⚠️ ${orphanAppointments.length} agendamento(s) órfão(s) (designer não existe no LocalStorage):</div>`;
+                    html += '<table><tr><th>ID Agendamento</th><th>Designer ID</th><th>Cliente</th><th>Data</th></tr>';
+                    orphanAppointments.forEach(apt => {
+                        html += `<tr>
+                            <td>${apt.id}</td>
+                            <td><strong>${apt.designer_id}</strong></td>
+                            <td>${apt.client_name}</td>
+                            <td>${apt.date}</td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+                
+                document.getElementById('analysis-result').innerHTML = html;
+            });
+        }
+
+        // Carregar designers automaticamente ao carregar a página
+        window.onload = function() {
+            loadLocalStorageDesigners();
+        };
+    </script>
+</body>
+</html>

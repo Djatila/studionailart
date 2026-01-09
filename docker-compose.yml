@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  n8n:
+    build: . # Altere esta linha de 'image: n8nio/n8n:latest' para 'build: .'
+    ports:
+      - "5679:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_CORS_ENABLED=true
+      - N8N_CORS_ORIGIN=http://localhost:5188 # ALtere esta linha para 5188
+      - WEBHOOK_URL=http://localhost:5679/
+      - N8N_EDITOR_BASE_URL=http://localhost:5679/
+      - DB_SQLITE_POOL_SIZE=1
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false # Certifique-se de que esta linha esteja como 'false'
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_ADDITIONAL_PACKAGES=@supabase/supabase-js # Adicione esta linha
+      - NODE_FUNCTION_ALLOW_EXTERNAL=* # Adicione esta linha
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY} # Adicione esta linha
+    volumes:
+      - ./n8n-data:/home/node/.n8n

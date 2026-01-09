@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Seleção de Data no BookingPage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste - Correção do Erro de Seleção de Data</h1>
+        <p>Este teste verifica se a correção do erro <code>TypeError: ft(...).map is not a function</code> funcionou.</p>
+        
+        <div class="test-section info">
+            <h3>📋 Problema Identificado:</h3>
+            <ul>
+                <li>A função <code>getSupabaseAppointments()</code> retornava uma Promise</li>
+                <li>No BookingPage, estava sendo tratada como array síncrono</li>
+                <li>Ao tentar usar <code>.map()</code> em uma Promise, causava erro</li>
+                <li>Resultado: página branca ao selecionar data</li>
+            </ul>
+        </div>
+
+        <div class="test-section warning">
+            <h3>🔧 Correção Aplicada:</h3>
+            <ul>
+                <li>Adicionado <code>async/await</code> nas funções exportadas</li>
+                <li><code>getSupabaseAppointments</code> agora retorna Promise corretamente</li>
+                <li>BookingPage já aguardava a Promise com <code>await</code></li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Testes Automatizados:</h3>
+            <button onclick="testSupabaseConnection()">1. Testar Conexão Supabase</button>
+            <button onclick="testGetAppointments()">2. Testar getSupabaseAppointments()</button>
+            <button onclick="testBookingPageFlow()">3. Simular Seleção de Data</button>
+            <button onclick="clearLogs()">🗑️ Limpar Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Logs de Teste:</h3>
+            <div id="testLogs" class="log-area"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://pjwvdxzxkqnpkmkqvgmx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZodnhqaW9yY2dnaWx1amp0ZGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzYyMzgsImV4cCI6MjA3MTExMjIzOH0.X_7h0ZadhguYIPpbiSY5sbs1DfsyUaZB59zucRM9qKU'

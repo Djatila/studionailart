@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+  <meta name="theme-color" content="#4a008a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Studio Nail Art" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Studio Nail Art - Sua Agenda Profissional</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles/design-system.css">
+  <link rel="stylesheet" href="/src/styles/grid-system.css">
+  <link rel="stylesheet" href="/src/styles/performance.css">
+  <link rel="stylesheet" href="/src/styles/mobile-optimizations.css">
+  <link rel="stylesheet" href="/src/styles/smooth-scroll.css">
+  <style>
+    /* === SMOOTH SCROLLING === */
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 80px;
+      /* Offset for fixed navbar */
+    }
+
+    /* Enhanced smooth scrolling for all browsers */
+    * {
+      scroll-behavior: smooth;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #e91e63, #9c27b0);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #f06292, #ab47bc);
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      /* Enhanced smooth scrolling */
+      scroll-behavior: smooth;
+    }
+
+    .bg-main-gradient {
+      background: linear-gradient(135deg, #4a008a 0%, #8e24aa 50%, #d81b60 100%);
+      background-attachment: fixed;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* === SMOOTH SCROLL ANIMATIONS === */
+    .smooth-scroll-section {
+      scroll-margin-top: 80px;
+      transition: all 0.3s ease-in-out;
+    }
+
+    /* Parallax scrolling effect */
+    .parallax-bg {
+      background-attachment: fixed;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+
+    @keyframes slow-float {
+      0% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+
+      50% {
+        transform: translate(20px, -30px) rotate(5deg);
+      }
+
+      100% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+
+      100% {
+        transform: translateY(0px);
+      }
+    }
+
+    .animate-slow-float {
+      animation: slow-float 15s infinite ease-in-out;
+    }
+
+    .animate-slow-float-reverse {
+      animation: slow-float 20s infinite ease-in-out reverse;
+    }
+
+    .animate-float {
+      animation: float 4s infinite ease-in-out;
+    }
+
+    /* === PHONE FLOATING ANIMATION === */
+    @keyframes phoneFloat {
+
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-15px);
+      }
+    }
+
+    .animate-phone-float {
+      animation: phoneFloat 3s ease-in-out infinite !important;
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    /* Garantir que a animação continue mesmo no hover */
+    .animate-phone-float:hover {
+      animation: phoneFloat 3s ease-in-out infinite !important;
+    }
+
+    /* Forçar animação contínua */
+    .phone-mockup-container .animate-phone-float {
+      animation: phoneFloat 3s ease-in-out infinite !important;
+    }
+
+    /* Animação direta no elemento phone-mockup */
+    .phone-mockup {
+      animation: phoneFloat 3s ease-in-out infinite !important;
+      transform-origin: center center !important;
+      will-change: transform !important;
+    }
+
+    /* Garantir que não há interferência de outras classes */
+    .phone-mockup * {
+      animation-play-state: running !important;
+    }
+
+    /* Shadow animation synchronized with phone float */
+    @keyframes phoneShadow {
+
+      0%,
+      100% {
+        transform: scale(1) translateY(0px);
+        opacity: 0.3;
+      }
+
+      25% {
+        transform: scale(0.9) translateY(5px);
+        opacity: 0.25;
+      }
+
+      50% {
+        transform: scale(0.8) translateY(10px);
+        opacity: 0.2;
+      }
+
+      75% {
+        transform: scale(0.9) translateY(5px);
+        opacity: 0.25;
+      }
+    }
+
+    .animate-phone-shadow {
+      animation: phoneShadow 3s ease-in-out infinite !important;
+    }
+
+    /* Breathing glow effect synchronized with float */
+    @keyframes phoneGlow {
+
+      0%,
+      100% {
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4),
+          0 0 0 1px rgba(255, 255, 255, 0.1),
+          0 0 30px rgba(233, 30, 99, 0.3);
+      }
+
+      25% {
+        box-shadow: 0 35px 70px rgba(0, 0, 0, 0.3),
+          0 0 0 1px rgba(255, 255, 255, 0.12),
+          0 0 35px rgba(233, 30, 99, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.2),
+          0 0 0 1px rgba(255, 255, 255, 0.15),
+          0 0 40px rgba(233, 30, 99, 0.5);
+      }
+
+      75% {
+        box-shadow: 0 35px 70px rgba(0, 0, 0, 0.3),
+          0 0 0 1px rgba(255, 255, 255, 0.12),
+          0 0 35px rgba(233, 30, 99, 0.4);
+      }
+    }
+
+    .animate-phone-glow {
+      animation: phoneGlow 3s ease-in-out infinite !important;
+    }
+
+    /* Aplicar animações diretamente no phone-mockup com máxima prioridade */
+    .phone-mockup {
+      animation: phoneFloat 3s ease-in-out infinite, phoneGlow 3s ease-in-out infinite !important;
+      transform-origin: center center !important;
+      will-change: transform !important;
+      animation-fill-mode: both !important;
+      animation-play-state: running !important;
+    }
+
+    /* Sobrescrever qualquer animação conflitante */
+    .phone-mockup:hover,
+    .phone-mockup:focus,
+    .phone-mockup:active {
+      animation: phoneFloat 3s ease-in-out infinite, phoneGlow 3s ease-in-out infinite !important;
+    }
+
+    /* Garantir que funcione mesmo com classes do Tailwind */
+    .phone-mockup.relative {
+      animation: phoneFloat 3s ease-in-out infinite, phoneGlow 3s ease-in-out infinite !important;
+    }
+
+    /* Screen content subtle animation */
+    @keyframes screenPulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.95;
+      }
+    }
+
+    .animate-screen-pulse {
+      animation: screenPulse 8s ease-in-out infinite;
+    }
+
+    /* === ENHANCED PHONE ANIMATIONS === */
+    /* Removido o hover que estava interferindo na animação contínua */
+
+    /* Logo breathing animation */
+    @keyframes logoBreathe {
+
+      0%,
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(233, 30, 99, 0.3);
+      }
+
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 30px rgba(233, 30, 99, 0.5);
+      }
+    }
+
+    .animate-logo-breathe {
+      animation: logoBreathe 4s ease-in-out infinite;
+    }
+
+    /* Button shimmer effect */
+    @keyframes buttonShimmer {
+      0% {
+        background-position: -200% center;
+      }
+
+      100% {
+        background-position: 200% center;
+      }
+    }
+
+    .button-shimmer {
+      background: linear-gradient(90deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(255, 255, 255, 0) 100%);
+      background-size: 200% 100%;
+      animation: buttonShimmer 3s ease-in-out infinite;
+    }
+
+    /* === SCROLL SNAP === */
+    .scroll-snap-container {
+      scroll-snap-type: y mandatory;
+    }
+
+    .scroll-snap-section {
+      scroll-snap-align: start;
+    }
+
+    /* === SMOOTH TRANSITIONS === */
+    .smooth-transition {
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* === REDUCED MOTION SUPPORT === */
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      * {
+        scroll-behavior: auto;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('SW registered: ', registration);
+          })
+          .catch((registrationError) => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  </script>
+</body>
+
+</html>

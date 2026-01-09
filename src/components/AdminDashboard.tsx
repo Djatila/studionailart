@@ -866,6 +866,7 @@ Nos vemos em breve! 💖`;
 
     // Enviar via webhook para n8n
     await sendToN8nWebhook({
+      project_type: 'nail_scheduler',
       type: 'appointment_created',
       recipient: 'client',
       appointment: appointment,
@@ -892,6 +893,7 @@ Você tem um novo agendamento:
 
       // Enviar via webhook para n8n
       await sendToN8nWebhook({
+        project_type: 'nail_scheduler',
         type: 'appointment_created',
         recipient: 'designer',
         appointment: appointment,
@@ -905,6 +907,7 @@ Você tem um novo agendamento:
   const scheduleReminders = async (appointment: any) => {
     // Agendar lembrete de 24h antes
     await sendToN8nWebhook({
+      project_type: 'nail_scheduler',
       type: 'schedule_reminder',
       reminder_type: '24h',
       appointment: appointment,
@@ -913,6 +916,7 @@ Você tem um novo agendamento:
 
     // Agendar lembrete de 6h antes
     await sendToN8nWebhook({
+      project_type: 'nail_scheduler',
       type: 'schedule_reminder',
       reminder_type: '6h',
       appointment: appointment,

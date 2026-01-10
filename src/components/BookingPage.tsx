@@ -704,8 +704,13 @@ const BookingPage: React.FC<BookingPageProps> = ({ designer: initialDesigner, on
           detail: { appointment: savedAppointment }
         }));
 
-        // 🆕 NOVO: Enviar notificação imediata e agendar lembretes
-        const webhookSent = await sendToN8nWebhook(savedAppointment);
+        // 🆕 NOVO: Enviar notificação com estrutura correta
+        const webhookSent = await sendToN8nWebhook({
+          project_type: 'nail_scheduler',
+          workflow_type: 'appointment_created',
+          phone_number: savedAppointment.client_phone || '',
+          message_data: savedAppointment
+        });
         if (webhookSent) {
           console.log("Dados do agendamento enviados para o n8n com sucesso.");
         } else {
@@ -872,6 +877,8 @@ Você tem um novo agendamento:
 
     try {
       console.log("📤 Enviando dados para o webhook do n8n:", data);
+      console.log("🔍 DEBUG - project_type:", data.project_type);
+      console.log("🔍 DEBUG - Payload completo:", JSON.stringify(data, null, 2));
 
       // Determinar a URL correta (relativa ou absoluta)
       let url: string;
